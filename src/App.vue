@@ -23,6 +23,12 @@
       :cellClass="cellClass"
       :revealSecondsText="revealSecondsText"
       :revealProgress="revealProgress"
+      :flipActive="flipActive"
+      :rowsCount="ROWS"
+      :colsCount="COLS"
+      :faceDownActive="faceDownActive"
+      :faceColors="faceColors"
+      :revealComplete="revealComplete"
       @cellClick="onCellClick"
       @goHome="goHome"
       @newGame="newGame"
@@ -91,6 +97,28 @@ const state = reactive({
   showHome: true,
   mode: 'solo',
 });
+
+// Flip wave animation control (top -> bottom)
+const flipActive = ref(false);
+
+// Face-down colors control
+const faceDownActive = ref(false);
+const faceColors = ref({}); // { 'r-c': 'yellow' | 'green' | 'purple' | 'blue' }
+
+// Reveal bar should remain filled once the memorize phase completes
+const revealComplete = ref(false);
+
+function genFaceColors() {
+  const choices = ['yellow', 'green', 'purple', 'blue'];
+  const map = {};
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const pick = choices[Math.floor(Math.random() * choices.length)];
+      map[`${r}-${c}`] = pick;
+    }
+  }
+  return map;
+}
 
 // Expose statusText for template binding
 const statusText = computed(() => state.statusText);
@@ -239,17 +267,35 @@ function showPath() {
   state.revealEndAt = Date.now() + REVEAL_MS;
   startRevealTicker();
   state.timerId = setTimeout(hidePath, REVEAL_MS);
+  // while revealing, ensure face is up (no face-down colors)
+  faceDownActive.value = false;
+  // reset bar fill state at start
+  revealComplete.value = false;
 }
 
 function hidePath() {
-  state.revealed = false;
+  // Keep revealed=true during the flip so the path remains visible on the front face
   state.inPlay = true;
   state.nextIndex = 0;
   state.correctSet.clear();
   state.wrongSet.clear();
   state.statusText = 'À vous de jouer !';
-  window.alert(state.statusText);
   stopRevealTicker();
+
+  // Assign random face-down colors first so they are visible during the flip
+  faceColors.value = genFaceColors();
+  faceDownActive.value = true;
+  // mark bar as fully filled
+  revealComplete.value = true;
+
+  // Trigger flip wave animation briefly
+  const FLIP_STEP = 70;   // must match BoardView's per-row delay
+  const FLIP_DUR = 420;   // ms for a single cell flip
+  const total = ROWS * FLIP_STEP + FLIP_DUR;
+  flipActive.value = true;
+  setTimeout(() => { flipActive.value = false; }, total);
+  // When the wave finishes, hide the path completely
+  setTimeout(() => { state.revealed = false; }, total);
 }
 
 function onCellClick(r, c) {
@@ -276,6 +322,7 @@ function newGame() {
   state.nextIndex = 0;
   state.correctSet.clear();
   state.wrongSet.clear();
+  faceDownActive.value = false;
   showPath();
 }
 
@@ -294,6 +341,7 @@ function goHome() {
   state.wrongSet.clear();
   state.statusText = 'Cliquez « Nouvelle partie » pour commencer';
   state.showHome = true;
+  faceDownActive.value = false;
 }
 
 function startRevealTicker() {
