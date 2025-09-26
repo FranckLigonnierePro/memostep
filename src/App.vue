@@ -21,6 +21,8 @@
       :cells="cells"
       :boardStyle="boardStyle"
       :cellClass="cellClass"
+      :revealSecondsText="revealSecondsText"
+      :revealProgress="revealProgress"
       @cellClick="onCellClick"
       @goHome="goHome"
       @newGame="newGame"
