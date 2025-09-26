@@ -1,7 +1,8 @@
 <template>
-  <div class="content" style="transform: scale(1.36861);">
-    <div class="header">
+  <div class="content" :style="{ transform: `scale(${rootScale})`, transformOrigin: 'top center' }">
+    <div :class="'header' + (!state.showHome ? ' small' : '')">
       <div class="logo-container">
+        <img :src="logoSrc" alt="Logo" class="logo" width="73" height="73">
       </div>
     </div>
     
@@ -24,10 +25,6 @@
       @goHome="goHome"
       @newGame="newGame"
     />
-
-    <footer ref="footerRef">
-      <p id="status">{{ statusText }}</p>
-    </footer>
   </div>
 </template>
 
@@ -45,6 +42,20 @@ const realLogoUrl = (() => {
 })();
 
 const logoSrc = computed(() => (typeof realLogoUrl === 'string' && realLogoUrl) ? realLogoUrl : '');
+
+// Root scale (scale the whole content like your snippet)
+const ROOT_W = 320;   // Et
+const ROOT_H = 548;   // Ot
+const MAX_H = 750;    // ze (cap height to improve ergonomics)
+const rootScale = ref(1);
+
+function fitRootScale() {
+  const vw = window.innerWidth;
+  const vh = Math.min(MAX_H, window.innerHeight);
+  const sW = vw / ROOT_W;
+  const sH = vh / ROOT_H;
+  rootScale.value = Math.min(sW, sH);
+}
 
 // Constantes
 const COLS = 4;
@@ -96,7 +107,8 @@ const cells = computed(() => {
 // Style du board (CSS var + transform)
 const boardStyle = computed(() => ({
   '--cell': `${state.cellSize}px`,
-  transform: `scale(${state.scale})`,
+  // avoid double-scaling: root scales the whole content
+  transform: 'none',
 }));
 
 // Timer: temps restant et progression pendant l'exposition
@@ -316,14 +328,19 @@ function cellClass(r, c) {
 }
 
 onMounted(() => {
+  fitRootScale();
   fitBoard();
   window.addEventListener('resize', fitBoard);
   window.addEventListener('orientationchange', fitBoard);
+  window.addEventListener('resize', fitRootScale);
+  window.addEventListener('orientationchange', fitRootScale);
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', fitBoard);
   window.removeEventListener('orientationchange', fitBoard);
+  window.removeEventListener('resize', fitRootScale);
+  window.removeEventListener('orientationchange', fitRootScale);
   if (state.timerId) clearTimeout(state.timerId);
   stopRevealTicker();
 });
@@ -356,7 +373,7 @@ html, body, #app {
   padding: 0;
   box-sizing: border-box;
   overflow: hidden;
-  background-color: var(--blue-dark);
+  background-color: var(--bg);
   display: flex;
   flex-direction: column;
   font-weight: 700;
@@ -387,6 +404,10 @@ html, body, #app {
   align-items: center;
   justify-content: center;
   height: 4rem;
+}
+
+.header.small {
+  height: 2.5rem;
 }
 
 .logo-container {

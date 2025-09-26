@@ -18,10 +18,12 @@ const emit = defineEmits(['start', 'daily', 'solo', 'versus', 'battle']);
 
 <style scoped>
 .home {
-  min-height: 60vh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
+  margin-bottom: .5rem;
+  justify-content: space-between;
+  display: flex;
+  flex-grow: 1;
+  flex-direction: column;
+  align-items: center;
 }
 
 .home-card {
