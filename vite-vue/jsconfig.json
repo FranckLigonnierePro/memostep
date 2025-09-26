@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "moduleResolution": "bundler",
+    "target": "ES2020"
+  },
+  "vueCompilerOptions": {
+    "target": 3,
+    "globalTypesPath": "./.volar/vue-global-types.d.ts"
+  },
+  "exclude": ["node_modules", "dist"]
+}
