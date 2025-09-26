@@ -1,18 +1,3 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-/* Optional: custom layers */
-@layer base {
-  :root {
-    /* You can map CSS variables to Tailwind using theme() in utilities if needed */
-  }
-}
-
-@layer components {
-  /* Example: .btn classes, if desired later */
-}
-
-@layer utilities {
-  /* Custom utilities here */
-}
+/* Optional: add custom utilities or theme extensions using Tailwind v4 APIs if needed */

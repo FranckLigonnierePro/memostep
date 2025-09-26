@@ -48,12 +48,9 @@ const emit = defineEmits(['cellClick', 'goHome', 'newGame']);
 
 <style scoped>
 .board-wrap {   
-  margin-bottom: .5rem;
-  justify-content: space-between;
   display: flex;
   flex-grow: 1;
-  flex-direction: column;
-  align-items: center; 
+  justify-content: center;
 }
 
 .panel {

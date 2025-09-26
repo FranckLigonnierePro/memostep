@@ -1,10 +1,15 @@
 <template>
   <div class="home">
-      <div class="menu">
+      <div class="flex flex-col mt-4 w-full grow justify-center">
         <button class="menu-btn" @click="emit('daily')">Parcour du jour</button>
         <button class="menu-btn" @click="emit('solo')">Mode solo</button>
         <button class="menu-btn" @click="emit('versus')">Mode versus</button>
         <button class="menu-btn" @click="emit('battle')">Mode battle royale</button>
+        <div class="w-full h-12 mt-6 flex justify-start relative">
+          <button class="menu-btn mr-2 w-12" @click="emit('daily')">C</button>
+          <button class="menu-btn mr-2 w-12" @click="emit('solo')">T</button>
+          <button class="menu-btn mr-2 w-12" @click="emit('versus')">R</button>
+        </div>
       </div>
   </div>
 </template>
@@ -26,35 +31,6 @@ const emit = defineEmits(['start', 'daily', 'solo', 'versus', 'battle']);
   align-items: center;
 }
 
-.home-card {
-  background: var(--panel);
-  border: 1px solid #2a2e52;
-  border-radius: 16px;
-  box-shadow: 0 2px 0 #1a1c30;
-  padding: 32px 28px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-}
-
-.home-logo { width: 72px; height: 72px; border-radius: 16px; }
-.home-title { margin: 0; font-size: 24px; letter-spacing: .4px; color: var(--text); }
-
-.start-btn {
-  padding: 12px 18px;
-  border-radius: 12px;
-  border: 1px solid #2a2e52;
-  background: var(--panel);
-  color: var(--text);
-  box-shadow: 0 2px 0 #1a1c30;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.start-btn:hover { background: #1f2238; }
-.start-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #1a1c30; }
-
 .menu {
   display: grid;
   grid-template-columns: 1fr;
@@ -67,6 +43,7 @@ const emit = defineEmits(['start', 'daily', 'solo', 'versus', 'battle']);
   padding: 10px 14px;
   border-radius: 10px;
   border: 1px solid #2a2e52;
+  margin-top: .75rem;
   background: #1a1c30;
   color: var(--text);
   box-shadow: 0 2px 0 #1a1c30;

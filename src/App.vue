@@ -1,5 +1,5 @@
 <template>
-  <div class="content" :style="{ transform: `scale(${rootScale})`, transformOrigin: 'top center' }">
+  <div class="content" :style="{ transform: `scale(${rootScale})`}">
     <div :class="'header' + (!state.showHome ? ' small' : '')">
       <div class="logo-container">
         <img :src="logoSrc" alt="Logo" class="logo" width="73" height="73">
