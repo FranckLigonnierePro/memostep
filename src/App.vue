@@ -24,16 +24,29 @@
       :revealSecondsText="revealSecondsText"
       :revealProgress="revealProgress"
       :flipActive="flipActive"
+      :flipBackActive="flipBackActive"
       :rowsCount="ROWS"
       :colsCount="COLS"
       :faceDownActive="faceDownActive"
       :faceColors="faceColors"
       :revealComplete="revealComplete"
+      :timeText="chronoText"
       @cellClick="onCellClick"
       @goHome="goHome"
-      @newGame="newGame"
     />
+
+   
   </div>
+   <!-- Loses modal -->
+    <div v-if="loseActive" class="modal-overlay">
+      <div class="modal-card">
+        <h2 class="modal-title">Perdu</h2>
+        <div class="modal-actions">
+          <button class="modal-btn" @click="handleReplay">Rejouer</button>
+          <button class="modal-btn" @click="handleQuit">Quitter</button>
+        </div>
+      </div>
+    </div>
 </template>
 
 <script setup>
@@ -100,6 +113,7 @@ const state = reactive({
 
 // Flip wave animation control (top -> bottom)
 const flipActive = ref(false);
+const flipBackActive = ref(false);
 
 // Face-down colors control
 const faceDownActive = ref(false);
@@ -107,6 +121,34 @@ const faceColors = ref({}); // { 'r-c': 'yellow' | 'green' | 'purple' | 'blue' }
 
 // Reveal bar should remain filled once the memorize phase completes
 const revealComplete = ref(false);
+
+// Lose modal
+const loseActive = ref(false);
+
+// Chrono (starts when revealComplete is true, stops on win)
+const chronoMs = ref(0);
+let chronoIntervalId = null;
+function formatMs(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const mm = String(Math.floor(total / 60)).padStart(2, '0');
+  const ss = String(total % 60).padStart(2, '0');
+  return `${mm}:${ss}`;
+}
+const chronoText = computed(() => formatMs(chronoMs.value));
+function startChrono() {
+  if (chronoIntervalId) clearInterval(chronoIntervalId);
+  const startAt = Date.now();
+  const base = chronoMs.value;
+  chronoIntervalId = setInterval(() => {
+    chronoMs.value = base + (Date.now() - startAt);
+  }, 250);
+}
+function stopChrono() {
+  if (chronoIntervalId) {
+    clearInterval(chronoIntervalId);
+    chronoIntervalId = null;
+  }
+}
 
 function genFaceColors() {
   const choices = ['yellow', 'green', 'purple', 'blue'];
@@ -287,6 +329,9 @@ function hidePath() {
   faceDownActive.value = true;
   // mark bar as fully filled
   revealComplete.value = true;
+  // reset and start chrono
+  chronoMs.value = 0;
+  startChrono();
 
   // Trigger flip wave animation briefly
   const FLIP_STEP = 70;   // must match BoardView's per-row delay
@@ -307,13 +352,39 @@ function onCellClick(r, c) {
     if (state.nextIndex === state.path.length) {
       state.statusText = 'Bravo !';
       state.inPlay = false;
+      stopChrono();
     }
   } else {
     state.wrongSet.add(`${r}-${c}`);
     state.statusText = 'Raté !';
-    window.alert(state.statusText);
     state.inPlay = false;
+    // Reveal the path with a reverse flip (bottom-left -> top-right wave)
+    // During reverse flip, show front faces at the end
+    const FLIP_BACK_STEP = 70;  // must match BoardView
+    const FLIP_BACK_DUR = 420;  // must match BoardView
+    const backTotal = ROWS * FLIP_BACK_STEP + FLIP_BACK_DUR;
+    flipBackActive.value = true;
+    // Ensure facedown stays during animation, then reveal faces up
+    setTimeout(() => {
+      flipBackActive.value = false;
+      faceDownActive.value = false; // keep faces up revealing the path
+      state.revealed = true;        // keep path styling visible
+      loseActive.value = true;      // show modal
+      stopChrono();
+    }, backTotal);
   }
+}
+
+function handleReplay() {
+  loseActive.value = false;
+  stopChrono();
+  newGame();
+}
+
+function handleQuit() {
+  loseActive.value = false;
+  stopChrono();
+  goHome();
 }
 
 function newGame() {
@@ -323,6 +394,7 @@ function newGame() {
   state.correctSet.clear();
   state.wrongSet.clear();
   faceDownActive.value = false;
+  stopChrono();
   showPath();
 }
 
@@ -342,6 +414,7 @@ function goHome() {
   state.statusText = 'Cliquez « Nouvelle partie » pour commencer';
   state.showHome = true;
   faceDownActive.value = false;
+  stopChrono();
 }
 
 function startRevealTicker() {
@@ -448,6 +521,30 @@ html, body, #app {
   padding: .5rem;
 }
 
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.modal-card {
+  background: var(--panel);
+  border: 1px solid #2a2e52;
+  border-radius: 16px;
+  box-shadow: 0 4px 0 #1a1c30;
+  padding: 16px;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.modal-title { margin: 0; font-size: 20px; color: var(--text); }
+.modal-actions { display: flex; gap: 8px; justify-content: center; }
+
 .header {
   width: 300px;
   display: flex;
@@ -467,5 +564,21 @@ html, body, #app {
   justify-content: center;
   align-items: center;
 }
+
+.modal-btn {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #2a2e52;
+  margin-top: .75rem;
+  background: #1a1c30;
+  color: var(--text);
+  box-shadow: 0 2px 0 #1a1c30;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+}
+
+.modal-btn:hover { background: #1f2238; }
+.modal-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #1a1c30; }
 
 </style>

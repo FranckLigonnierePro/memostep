@@ -12,7 +12,7 @@
               :data-c="cell.c"
               @click="emit('cellClick', cell.r, cell.c)"
             >
-              <div class="cell-inner" :class="{ flipping: flipActive, facedown: faceDownActive }" :style="cellStyle(cell.r, cell.c)">
+              <div class="cell-inner" :class="{ flipping: flipActive, revealing: flipBackActive, facedown: faceDownActive && !flipBackActive }" :style="cellStyle(cell.r, cell.c)">
                 <div class="cell-face front" :class="cellClass(cell.r, cell.c)" />
                 <div class="cell-face back" :class="[ faceDownActive ? faceColorClass(cell.r, cell.c) : null, cellClass(cell.r, cell.c) ]" />
               </div>
@@ -21,13 +21,13 @@
         </div>
       </div>
       <div class="reveal-bar" aria-hidden="true">
-        <div class="reveal-fill" :style="{ transform: `scaleY(${revealComplete ? 100 : revealProgress})` }"></div>
+        <div class="reveal-fill" :style="{ transform: `scaleY(${revealComplete ? 1 : revealProgress})` }"></div>
       </div>
       <div class="flex flex-col flex-1 items-center">
         <div class="side-actions">
           <div class="card">
             <div class="card-body">
-                <div class="time-text">{{ "00:00" }}</div>
+              <div class="time-text">{{ timeText }}</div>
             </div>
           </div>
           <button class="icon-btn" aria-label="Accueil" @click="emit('goHome')">
@@ -67,6 +67,8 @@ const props = defineProps({
   faceDownActive: { type: Boolean, default: false },
   faceColors: { type: Object, default: () => ({}) },
   revealComplete: { type: Boolean, default: false },
+  flipBackActive: { type: Boolean, default: false },
+  timeText: { type: String, default: '00:00' },
 });
 const emit = defineEmits(['cellClick', 'goHome', 'newGame']);
 
@@ -266,9 +268,20 @@ function faceColorClass(r, c) {
   animation-delay: var(--delay, 0ms);
 }
 
+/* Reverse flip (face-down -> face-up) */
+.cell-inner.revealing {
+  animation: cellFlipBack 420ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
 @keyframes cellFlip {
   0% { transform: rotateX(0deg); }
   100% { transform: rotateX(180deg); }
+}
+
+@keyframes cellFlipBack {
+  0% { transform: rotateX(180deg); }
+  100% { transform: rotateX(0deg); }
 }
 
 /* Back face and facedown state */
