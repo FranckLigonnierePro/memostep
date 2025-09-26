@@ -1,56 +1,29 @@
 <template>
-  <div class="app" ref="appRef">
-    <header ref="headerRef">
-      <div class="brand">
-        <img class="logo" :src="logoSrc" alt="MemoStep logo" />
+  <div class="content" style="transform: scale(1.36861);">
+    <div class="header">
+      <div class="logo-container">
       </div>
-    </header>
+    </div>
     
-    <div class="home" v-if="state.showHome">
-      <div class="home-card">
-        <img class="home-logo" :src="logoSrc" alt="MemoStep logo" />
-        <h1 class="home-title">MemoStep</h1>
-        <button class="start-btn" @click="newGame">Commencer à jouer</button>
-      </div>
-    </div>
+    <HomeView
+      v-if="state.showHome"
+      :logoSrc="logoSrc"
+      @start="newGame"
+      @daily="() => startMode('daily')"
+      @solo="() => startMode('solo')"
+      @versus="() => startMode('versus')"
+      @battle="() => startMode('battle')"
+    />
 
-    <div class="board-wrap" v-else>
-      <div class="panel">
-        <div
-          ref="boardRef"
-          id="board"
-          class="board"
-          aria-label="Plateau 4 par 12"
-          role="grid"
-          :style="boardStyle"
-        >
-        <div
-          v-for="(cell, idx) in cells"
-          :key="idx"
-          class="cell"
-          :data-r="cell.r"
-          :data-c="cell.c"
-          :class="cellClass(cell.r, cell.c)"
-          @click="onCellClick(cell.r, cell.c)"
-        />
-        </div>
-      </div>
-      <div class="side-actions">
-        <button class="icon-btn" aria-label="Accueil" @click="goHome">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M3 10.5L12 3l9 7.5" stroke="#111" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M5.5 10.5V20a1 1 0 0 0 1 1H17.5a1 1 0 0 0 1-1v-9.5" stroke="#111" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M10 21v-6h4v6" stroke="#111" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-        <button class="icon-btn" aria-label="Recommencer" @click="newGame">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M20 12a8 8 0 1 1-2.343-5.657" stroke="#111" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M20 4v6h-6" stroke="#111" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-      </div>
-    </div>
+    <BoardView
+      v-else
+      :cells="cells"
+      :boardStyle="boardStyle"
+      :cellClass="cellClass"
+      @cellClick="onCellClick"
+      @goHome="goHome"
+      @newGame="newGame"
+    />
 
     <footer ref="footerRef">
       <p id="status">{{ statusText }}</p>
@@ -60,7 +33,8 @@
 
 <script setup>
 import { onMounted, onBeforeUnmount, reactive, ref, computed } from 'vue';
-import CartoonButton from './components/CartoonButton.vue';
+import HomeView from './components/HomeView.vue';
+import BoardView from './components/BoardView.vue';
 
 // Try to load a real logo from assets if present (supports memostep or memostep-logo)
 const logoModules = import.meta.glob('./assets/{memostep,memostep-logo}.{png,jpg,jpeg,webp,svg}', { eager: true });
@@ -82,7 +56,6 @@ const REVEAL_MS = 8000;  // 8s d'exposition
 const REVEAL_TICK = 100; // rafraîchissement du timer (ms)
 
 // Refs DOM
-const boardRef = ref(null);
 const appRef = ref(null);
 const headerRef = ref(null);
 const footerRef = ref(null);
@@ -103,7 +76,11 @@ const state = reactive({
   revealEndAt: 0,
   nowMs: Date.now(),
   showHome: true,
+  mode: 'solo',
 });
+
+// Expose statusText for template binding
+const statusText = computed(() => state.statusText);
 
 // Générer les cellules (r,c) pour rendu
 const cells = computed(() => {
@@ -185,6 +162,58 @@ function randomPath() {
     arr.push({ r, c });
   }
   return arr;
+}
+
+// RNG deterministe (Mulberry32)
+function seededRng(seed) {
+  let t = seed >>> 0;
+  return function() {
+    t += 0x6D2B79F5;
+    let r = Math.imul(t ^ t >>> 15, 1 | t);
+    r ^= r + Math.imul(r ^ r >>> 7, 61 | r);
+    return ((r ^ r >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function randomPathWithRng(rng) {
+  const arr = [];
+  let c = Math.floor(rng() * COLS);
+  for (let r = ROWS - 1; r >= 0; r--) {
+    if (r < ROWS - 1) {
+      const moves = [-1, 0, 1].map(d => c + d).filter(nc => nc >= 0 && nc < COLS);
+      c = moves[Math.floor(rng() * moves.length)];
+    }
+    arr.push({ r, c });
+  }
+  return arr;
+}
+
+function dailySeed() {
+  const d = new Date();
+  // YYYYMMDD as number
+  const key = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  return key;
+}
+
+function startMode(mode) {
+  state.mode = mode;
+  state.showHome = false;
+  if (mode === 'daily') {
+    const rng = seededRng(dailySeed());
+    state.path = randomPathWithRng(rng);
+  } else if (mode === 'solo') {
+    state.path = randomPath();
+  } else if (mode === 'versus' || mode === 'battle') {
+    // Placeholder: start like solo for now
+    state.path = randomPath();
+    // You can extend with networking/matchmaking later
+  } else {
+    state.path = randomPath();
+  }
+  state.nextIndex = 0;
+  state.correctSet.clear();
+  state.wrongSet.clear();
+  showPath();
 }
 
 function showPath() {
@@ -316,160 +345,56 @@ onBeforeUnmount(() => {
   --muted: #9aa0b4;
 }
 
-* { box-sizing: border-box; }
-html, body, #app { height: 100%; }
-body {
+html, body, #app {
+  font-family: Avenir, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-align: center;
+  height: 100%;
+  width: 100%;
   margin: 0;
   padding: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial;
-  background: radial-gradient(1200px 800px at 80% -10%, #1d1f38 0%, var(--bg) 55%);
-  color: var(--text);
-  overflow: hidden; /* empêche le scroll */
+  box-sizing: border-box;
+  overflow: hidden;
+  background-color: var(--blue-dark);
+  display: flex;
+  flex-direction: column;
+  font-weight: 700;
+  --tw-text-opacity: 1;
+  color: rgb(255 255 255 / var(--tw-text-opacity));
 }
 
-.app {
-  min-height: 100dvh;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 12px;
-}
-
-header, footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-header h1 { font-size: clamp(16px, 2.2vw, 22px); margin: 0; }
-
-.brand { display: flex; align-items: center; gap: 10px; }
-.brand .logo { width: 40px; height: 40px; border-radius: 10px; display: block; }
-.brand .title { margin: 0; font-size: clamp(18px, 2.6vw, 24px); letter-spacing: .4px; }
-header button { padding: 10px 14px; border-radius: 12px; border: 0; background: linear-gradient(180deg, #7b2cff, var(--accent)); color: #fff; font-weight: 700; cursor: pointer; }
-
-.board-wrap { display: flex; justify-content: center; align-items: flex-start; gap: 20px; overflow: hidden; padding: 16px; }
-
-.home {
-  min-height: 60vh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-}
-
-.home-card {
-  background: #fff;
-  border: 1px solid #e5e7ee;
-  border-radius: 16px;
-  box-shadow: 0 2px 0 #eef0f6;
-  padding: 32px 28px;
+#app {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  justify-content: center;
+  flex: 1;
 }
 
-.home-logo { width: 72px; height: 72px; border-radius: 16px; }
-.home-title { margin: 0; font-size: 24px; letter-spacing: .4px; }
-
-.start-btn {
-  padding: 12px 18px;
-  border-radius: 12px;
-  border: 1px solid #d9ddea;
-  background: #fff;
-  box-shadow: 0 2px 0 #eef0f6;
-  font-weight: 700;
-  cursor: pointer;
+.content {
+  width: 320px;
+  height: 548px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: .5rem;
 }
 
-.start-btn:hover { background: #f7f8fc; }
-.start-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #eef0f6; }
-
-.panel {
-  background: #fff;
-  border: 1px solid #e5e7ee;
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 2px 0 #eef0f6;
-}
-
-.side-actions { display: flex; flex-direction: column; gap: 16px; }
-
-.icon-btn {
-  width: 64px;
-  height: 64px;
-  border-radius: 14px;
-  border: 1px solid #e0e2ea;
-  background: #fff;
-  box-shadow: 0 2px 0 #eef0f6;
-  display: inline-flex;
+.header {
+  width: 300px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: transform .06s ease, box-shadow .06s ease, background .06s ease;
+  height: 4rem;
 }
 
-.icon-btn svg { width: 28px; height: 28px; display: block; }
-
-.icon-btn:hover { background: #f7f8fc; }
-.icon-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #eef0f6; }
-
-.progress {
+.logo-container {
+  position: relative;
   width: 100%;
-  height: 10px;
-  background: #1b1e34;
-  border: 1px solid #2a2e52;
-  border-radius: 999px;
-  overflow: hidden;
-  margin-bottom: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.progress-inner {
-  height: 100%;
-  background: linear-gradient(90deg, #7b2cff, var(--accent));
-  width: 0%;
-}
-
-.side-card .hint { color: var(--muted); font-size: 12px; margin: 4px 0 0 0; }
-
-.board {
-  display: grid;
-  grid-template-columns: repeat(var(--cols), var(--cell));
-  grid-template-rows: repeat(var(--rows), var(--cell));
-  gap: 10px; /* plus espacé comme le mockup */
-  background: transparent;
-  border-radius: 12px;
-  padding: 8px;
-  transform-origin: top center;
-  will-change: transform;
-}
-
-.cell {
-  width: var(--cell);
-  height: var(--cell);
-  background: #eff1f6;
-  border: 2px solid #dde1ea;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background .12s ease, border-color .12s ease, transform .06s ease;
-}
-
-.cell:hover { background: #f5f7fb; }
-.cell:active { transform: scale(0.98); }
-
-.cell.path { background: #e9ebf3; border-color: #cfd5e3; }
-.cell.start { background: #e6f6ef; border-color: #c7e8d9; }
-.cell.end { background: #fde8ef; border-color: #f6cad6; }
-.cell.correct { background: #b7f6c2; border-color: #8eeaa1; }
-.cell.wrong { background: #ffc2c7; border-color: #ffa0a8; }
-
-footer { font-size: 14px; color: var(--muted); }
-
-/* Mobile */
-@media (max-width: 640px) {
-  header, footer { flex-direction: column; align-items: stretch; }
-  header button { width: 100%; }
-  body { gap: 8px; padding: 0px; }
-  :root { --gap: 6px; --pad: 10px; }
-  .side-card { display: none; }
-}
-
-@media (max-height: 560px) {
-  header h1 { font-size: 16px; }
-  :root { --gap: 4px; --pad: 8px; }
-}
 </style>
