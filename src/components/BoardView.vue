@@ -31,22 +31,10 @@
             </div>
           </div>
           <button class="icon-btn" aria-label="Accueil" @click="emit('goHome')">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M3 10.5L12 3l9 7.5" stroke="var(--text)" stroke-width="1.8" stroke-linecap="round"
-                stroke-linejoin="round" />
-              <path d="M5.5 10.5V20a1 1 0 0 0 1 1H17.5a1 1 0 0 0 1-1v-9.5" stroke="var(--text)" stroke-width="1.8"
-                stroke-linecap="round" stroke-linejoin="round" />
-              <path d="M10 21v-6h4v6" stroke="var(--text)" stroke-width="1.8" stroke-linecap="round"
-                stroke-linejoin="round" />
-            </svg>
+            <Home :size="28" aria-hidden="true" />
           </button>
           <button class="icon-btn" aria-label="Recommencer" @click="emit('newGame')">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M20 12a8 8 0 1 1-2.343-5.657" stroke="var(--text)" stroke-width="1.8" stroke-linecap="round"
-                stroke-linejoin="round" />
-              <path d="M20 4v6h-6" stroke="var(--text)" stroke-width="1.8" stroke-linecap="round"
-                stroke-linejoin="round" />
-            </svg>
+            <RotateCcw :size="28" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -55,6 +43,7 @@
 </template>
 
 <script setup>
+import { Home, RotateCcw } from 'lucide-vue-next';
 const props = defineProps({
   cells: { type: Array, required: true },
   boardStyle: { type: Object, required: true },

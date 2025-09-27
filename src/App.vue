@@ -320,6 +320,8 @@ function showPath() {
   state.revealed = true;
   state.inPlay = false;
   state.statusText = 'Mémorisez le chemin';
+  // reset chrono display during reveal so timeText shows 00:00 immediately
+  chronoMs.value = 0;
   if (state.timerId) clearTimeout(state.timerId);
   // programme la fin d'exposition et démarre le compteur visuel
   state.revealEndAt = Date.now() + REVEAL_MS;
@@ -386,6 +388,8 @@ function onCellClick(r, c) {
     state.wrongSet.add(`${r}-${c}`);
     state.statusText = 'Raté !';
     state.inPlay = false;
+    // Stop chrono immediately on mistake
+    stopChrono();
     // Reveal the path now so it's visible during reverse flip (bottom-left -> top-right wave)
     // During reverse flip, show front faces at the end
     state.revealed = true;
@@ -398,7 +402,6 @@ function onCellClick(r, c) {
       flipBackActive.value = false;
       faceDownActive.value = false; // keep faces up revealing the path
       loseActive.value = true;      // show modal
-      stopChrono();
     }, backTotal);
   }
 }
@@ -452,6 +455,8 @@ function newGame() {
   state.wrongSet.clear();
   faceDownActive.value = false;
   stopChrono();
+  // ensure timeText resets immediately
+  chronoMs.value = 0;
   showPath();
 }
 
@@ -472,6 +477,7 @@ function goHome() {
   state.showHome = true;
   faceDownActive.value = false;
   stopChrono();
+  chronoMs.value = 0;
   // reset modals
   winActive.value = false;
   loseActive.value = false;
