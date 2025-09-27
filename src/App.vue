@@ -33,6 +33,7 @@
       :timeText="chronoText"
       @cellClick="onCellClick"
       @goHome="goHome"
+      @newGame="newGame"
     />
 
    
@@ -44,6 +45,19 @@
         <div class="modal-actions">
           <button class="modal-btn" @click="handleReplay">Rejouer</button>
           <button class="modal-btn" @click="handleQuit">Quitter</button>
+        </div>
+      </div>
+    </div>
+    <!-- Win modal -->
+    <div v-if="winActive" class="modal-overlay">
+      <div class="modal-card">
+        <h2 class="modal-title">bravo !</h2>
+        <div>
+          Temps: {{ chronoText }}
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn" @click="handleShare">Partager</button>
+          <button class="modal-btn" @click="handleWinReturn">Retour</button>
         </div>
       </div>
     </div>
@@ -124,6 +138,8 @@ const revealComplete = ref(false);
 
 // Lose modal
 const loseActive = ref(false);
+// Win modal
+const winActive = ref(false);
 
 // Chrono (starts when revealComplete is true, stops on win)
 const chronoMs = ref(0);
@@ -352,14 +368,27 @@ function onCellClick(r, c) {
     if (state.nextIndex === state.path.length) {
       state.statusText = 'Bravo !';
       state.inPlay = false;
+      // Stop chrono, reveal path now so it's visible during reverse flip,
+      // then play reverse flip animation (keep facedown colors during the flip)
       stopChrono();
+      state.revealed = true;
+      const FLIP_BACK_STEP = 70;  // must match BoardView
+      const FLIP_BACK_DUR = 420;  // must match BoardView
+      const backTotal = ROWS * FLIP_BACK_STEP + FLIP_BACK_DUR;
+      flipBackActive.value = true;
+      setTimeout(() => {
+        flipBackActive.value = false;
+        faceDownActive.value = false; // show front faces (remove random colors)
+        winActive.value = true;       // show modal after animation
+      }, backTotal);
     }
   } else {
     state.wrongSet.add(`${r}-${c}`);
     state.statusText = 'Raté !';
     state.inPlay = false;
-    // Reveal the path with a reverse flip (bottom-left -> top-right wave)
+    // Reveal the path now so it's visible during reverse flip (bottom-left -> top-right wave)
     // During reverse flip, show front faces at the end
+    state.revealed = true;
     const FLIP_BACK_STEP = 70;  // must match BoardView
     const FLIP_BACK_DUR = 420;  // must match BoardView
     const backTotal = ROWS * FLIP_BACK_STEP + FLIP_BACK_DUR;
@@ -368,7 +397,6 @@ function onCellClick(r, c) {
     setTimeout(() => {
       flipBackActive.value = false;
       faceDownActive.value = false; // keep faces up revealing the path
-      state.revealed = true;        // keep path styling visible
       loseActive.value = true;      // show modal
       stopChrono();
     }, backTotal);
@@ -387,9 +415,38 @@ function handleQuit() {
   goHome();
 }
 
+function handleWinReturn() {
+  winActive.value = false;
+  stopChrono();
+  goHome();
+}
+
+async function handleShare() {
+  const modeTag = state.mode ? ` – Mode: ${state.mode}` : '';
+  const dailyTag = state.mode === 'daily' ? ' – #Daily' : '';
+  const text = `bravo ! Temps: ${chronoText.value}${modeTag}${dailyTag}`;
+  const url = typeof location !== 'undefined' ? location.href : '';
+  try {
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    alert('Résultat copié dans le presse-papiers !');
+  } catch (e) {
+    alert('Impossible de copier automatiquement. Vous pouvez copier manuellement votre résultat.');
+  }
+}
+
 function newGame() {
   state.showHome = false;
-  state.path = randomPath();
+  if (state.mode === 'daily') {
+    const rng = seededRng(dailySeed());
+    state.path = randomPathWithRng(rng); // deterministic for the day
+  } else if (state.mode === 'solo') {
+    state.path = randomPath();
+  } else if (state.mode === 'versus' || state.mode === 'battle') {
+    // Placeholder: same as solo for now
+    state.path = randomPath();
+  } else {
+    state.path = randomPath();
+  }
   state.nextIndex = 0;
   state.correctSet.clear();
   state.wrongSet.clear();
@@ -415,6 +472,9 @@ function goHome() {
   state.showHome = true;
   faceDownActive.value = false;
   stopChrono();
+  // reset modals
+  winActive.value = false;
+  loseActive.value = false;
 }
 
 function startRevealTicker() {

@@ -12,7 +12,7 @@
               :data-c="cell.c"
               @click="emit('cellClick', cell.r, cell.c)"
             >
-              <div class="cell-inner" :class="{ flipping: flipActive, revealing: flipBackActive, facedown: faceDownActive && !flipBackActive }" :style="cellStyle(cell.r, cell.c)">
+              <div class="cell-inner" :class="{ flipping: flipActive, revealing: flipBackActive, facedown: faceDownActive }" :style="cellStyle(cell.r, cell.c)">
                 <div class="cell-face front" :class="cellClass(cell.r, cell.c)" />
                 <div class="cell-face back" :class="[ faceDownActive ? faceColorClass(cell.r, cell.c) : null, cellClass(cell.r, cell.c) ]" />
               </div>
@@ -262,6 +262,11 @@ function faceColorClass(r, c) {
 .cell-face.front.correct { background: #1a3d2e; border-color: var(--ok); }
 .cell-face.front.wrong { background: #3a1c2e; border-color: var(--bad); }
 
+/* Outline the path on the back face during reverse flip (keep background as random color) */
+.cell-face.back.path  { border-color: #3a3f6b; }
+.cell-face.back.start { border-color: #2a5d4e; }
+.cell-face.back.end   { border-color: #5d2a4e; }
+
 /* Flip wave animation applies to inner wrapper */
 .cell-inner.flipping {
   animation: cellFlip 420ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
@@ -286,6 +291,8 @@ function faceColorClass(r, c) {
 
 /* Back face and facedown state */
 .cell-face.back { transform: rotateX(180deg); }
+/* Keep back colors visible until each cell's animation starts; the keyframe animation
+   will override this transform once it begins (even during 'revealing' with delay). */
 .cell-inner.facedown:not(.flipping) { transform: rotateX(180deg); }
 
 /* Face colors for hidden side — harmonized with theme (muted/dark tones) */

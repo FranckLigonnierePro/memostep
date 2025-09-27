@@ -1,7 +1,7 @@
 <template>
   <div class="home">
       <div class="flex flex-col mt-4 w-full grow justify-center">
-        <button class="menu-btn" @click="emit('daily')">Parcour du jour</button>
+        <button class="menu-btn" @click="emit('daily')">Parcours du jour</button>
         <button class="menu-btn" @click="emit('solo')">Mode solo</button>
         <button class="menu-btn" @click="emit('versus')">Mode versus</button>
         <button class="menu-btn" @click="emit('battle')">Mode battle royale</button>
