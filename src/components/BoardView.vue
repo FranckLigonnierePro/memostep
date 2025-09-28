@@ -1,7 +1,7 @@
 <template>
   <div class="board-wrap">
     <div class="flex flex-row w-full">
-      <div class="flex flex-auto flex-col flex-shrink">
+      <div class="flex flex-col flex-shrink">
         <div class="panel">
           <div id="board" class="board" aria-label="Plateau 4 par 12" role="grid" :style="boardStyle">
             <div
