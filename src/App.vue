@@ -2,18 +2,21 @@
   <div class="content" :style="{ transform: `scale(${rootScale})`}">
     <div :class="'header' + (!state.showHome ? ' small' : '')">
       <div class="logo-container">
-        <img :src="logoSrc" alt="Logo" class="logo" width="73" height="73">
+        <img :src="logoSrc" alt="Logo" class="logo" :width="state.showHome ? 200 : 125" :height="state.showHome ? 200 : 100">
       </div>
     </div>
     
     <HomeView
       v-if="state.showHome"
       :logoSrc="logoSrc"
+      :dailyDone="dailyDone"
       @start="newGame"
       @daily="() => startMode('daily')"
       @solo="() => startMode('solo')"
       @versus="() => startMode('versus')"
       @battle="() => startMode('battle')"
+      @help="openHelp"
+      @settings="openSettings"
     />
 
     <BoardView
@@ -42,6 +45,9 @@
     <div v-if="loseActive" class="modal-overlay">
       <div class="modal-card">
         <h2 class="modal-title">Perdu</h2>
+        <div class="flex justify-center">
+          <img src="./assets/looser.png" alt="lose" class="modal-img" width="200" height="100"/>
+        </div>
         <div class="modal-actions">
           <button class="modal-btn" @click="handleReplay">Rejouer</button>
           <button class="modal-btn" @click="handleQuit">Quitter</button>
@@ -52,12 +58,51 @@
     <div v-if="winActive" class="modal-overlay">
       <div class="modal-card">
         <h2 class="modal-title">bravo !</h2>
+        <div class="flex justify-center">
+          <img src="./assets/winner.png" alt="win" class="modal-img" width="200" height="100"/>
+        </div>
         <div>
           Temps: {{ chronoText }}
         </div>
         <div class="modal-actions">
           <button class="modal-btn" @click="handleShare">Partager</button>
           <button class="modal-btn" @click="handleWinReturn">Retour</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Help modal -->
+    <div v-if="showHelp" class="modal-overlay" @click.self="closeOverlays">
+      <div class="modal-card">
+        <h2 class="modal-title">Règles du jeu</h2>
+        <div class="modal-body">
+          <ol class="rules">
+            <li>Mémorisez le chemin affiché pendant quelques secondes.</li>
+            <li>Quand les cases se retournent, suivez le chemin en cliquant case par case.</li>
+            <li>Une erreur termine la partie et le chemin est révélé.</li>
+            <li>Terminez tout le parcours pour gagner. Votre temps est affiché.</li>
+          </ol>
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn" @click="closeOverlays">Fermer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings modal -->
+    <div v-if="showSettings" class="modal-overlay" @click.self="closeOverlays">
+      <div class="modal-card">
+        <h2 class="modal-title">Réglages</h2>
+        <div class="modal-body">
+          <p>Réglages de base (bientôt):</p>
+          <ul class="settings-list">
+            <li>Volume effets sonores</li>
+            <li>Couleur thème</li>
+            <li>Accessibilité</li>
+          </ul>
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn" @click="closeOverlays">Fermer</button>
         </div>
       </div>
     </div>
@@ -140,6 +185,20 @@ const revealComplete = ref(false);
 const loseActive = ref(false);
 // Win modal
 const winActive = ref(false);
+// Help/Settings overlays
+const showHelp = ref(false);
+const showSettings = ref(false);
+
+// Daily completion tracking
+function isDailyDoneToday() {
+  try {
+    const v = localStorage.getItem('memostep_daily_done_date');
+    return v === String(dailySeed());
+  } catch (_) {
+    return false;
+  }
+}
+const dailyDone = ref(isDailyDoneToday());
 
 // Chrono (starts when revealComplete is true, stops on win)
 const chronoMs = ref(0);
@@ -381,6 +440,11 @@ function onCellClick(r, c) {
       setTimeout(() => {
         flipBackActive.value = false;
         faceDownActive.value = false; // show front faces (remove random colors)
+        // Mark daily as done if applicable
+        if (state.mode === 'daily') {
+          try { localStorage.setItem('memostep_daily_done_date', String(dailySeed())); } catch (_) {}
+          dailyDone.value = true;
+        }
         winActive.value = true;       // show modal after animation
       }, backTotal);
     }
@@ -422,6 +486,18 @@ function handleWinReturn() {
   winActive.value = false;
   stopChrono();
   goHome();
+}
+
+function closeOverlays() {
+  showHelp.value = false;
+  showSettings.value = false;
+}
+
+function openHelp() {
+  showHelp.value = true;
+}
+function openSettings() {
+  showSettings.value = true;
 }
 
 async function handleShare() {
@@ -481,6 +557,8 @@ function goHome() {
   // reset modals
   winActive.value = false;
   loseActive.value = false;
+  // refresh daily completion flag
+  dailyDone.value = isDailyDoneToday();
 }
 
 function startRevealTicker() {
@@ -604,9 +682,13 @@ html, body, #app {
   box-shadow: 0 4px 0 #1a1c30;
   padding: 16px;
   min-width: 220px;
+  max-width: 320px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* Bounce-in animation when the modal appears */
+  animation: modalBounce 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform-origin: center;
 }
 .modal-title { margin: 0; font-size: 20px; color: var(--text); }
 .modal-actions { display: flex; gap: 8px; justify-content: center; }
@@ -647,4 +729,10 @@ html, body, #app {
 .modal-btn:hover { background: #1f2238; }
 .modal-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #1a1c30; }
 
+@keyframes modalBounce {
+  0%   { transform: scale(0.9); opacity: 0; }
+  60%  { transform: scale(1.04); opacity: 1; }
+  80%  { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
 </style>
