@@ -126,7 +126,7 @@
         </div>
       </div>
     </div>
-</template>
+  </template>
 
 <script setup>
 import { onMounted, onBeforeUnmount, reactive, ref, computed } from 'vue';

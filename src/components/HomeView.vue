@@ -32,7 +32,8 @@
             <Settings :size="20" />
           </button>
           <button class="menu-btn mr-2 w-11 h-11" @click="toggleAudio" :aria-label="audioMuted ? 'Activer le son' : 'Couper le son'" :title="audioMuted ? 'Activer le son' : 'Couper le son'">
-            <component :is="audioMuted ? 'span' : 'span'">{{ audioMuted ? '🔇' : '🔊' }}</component>
+            <VolumeX v-if="audioMuted" :size="20" />
+            <Volume2 v-else :size="20" />
           </button>
           <!-- Language selector -->
           <div class="lang-wrap">
@@ -48,13 +49,14 @@
           </div>
         </div>
       </div>
-      
+      <!-- Hidden audio element for background music -->
+      <audio ref="audioRef" :src="themeUrl" preload="auto" style="display:none"></audio>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
-import { HelpCircle, Settings, Heart } from 'lucide-vue-next';
+import { HelpCircle, Settings, Heart, VolumeX, Volume2 } from 'lucide-vue-next';
 import themeUrl from '../assets/memosteptheme.mp3';
 import { getAudioMuted, setAudioMuted } from '../lib/storage.js';
 
@@ -286,6 +288,3 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick));
 .lang-item:hover { background: #1f2238; }
 
 </style>
-
-<!-- Hidden audio element for background music -->
-<audio ref="audioRef" :src="themeUrl" preload="auto" style="display:none"></audio>
