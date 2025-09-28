@@ -13,6 +13,7 @@
         <button class="menu-btn" @click="emit('solo')">Mode solo</button>
         <button class="menu-btn" disabled aria-disabled="true" title="Bientôt">Mode versus</button>
         <button class="menu-btn" disabled aria-disabled="true" title="Bientôt">Mode battle royale</button>
+        <button class="menu-btn" @click="emit('stats')">Stats</button>
         <a
           class="menu-btn donate-btn"
           href="https://ko-fi.com/memostep"
@@ -29,6 +30,9 @@
           </button>
           <button class="menu-btn mr-2 w-11 h-11" @click="emit('settings')" aria-label="Paramètres" title="Paramètres">
             <Settings :size="20" />
+          </button>
+          <button class="menu-btn mr-2 w-11 h-11" @click="toggleAudio" :aria-label="audioMuted ? 'Activer le son' : 'Couper le son'" :title="audioMuted ? 'Activer le son' : 'Couper le son'">
+            <component :is="audioMuted ? 'span' : 'span'">{{ audioMuted ? '🔇' : '🔊' }}</component>
           </button>
           <!-- Language selector -->
           <div class="lang-wrap">
@@ -51,17 +55,51 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { HelpCircle, Settings, Heart } from 'lucide-vue-next';
+import themeUrl from '../assets/memosteptheme.mp3';
+import { getAudioMuted, setAudioMuted } from '../lib/storage.js';
 
 const props = defineProps({
   logoSrc: { type: String, default: '' },
   dailyDone: { type: Boolean, default: false },
 });
-const emit = defineEmits(['start', 'daily', 'solo', 'versus', 'battle', 'lang', 'help', 'settings']);
+const emit = defineEmits(['start', 'daily', 'solo', 'versus', 'battle', 'lang', 'help', 'settings', 'stats']);
 
 const showLangMenu = ref(false);
 const currentLang = ref('fr');
 const flags = { fr: '🇫🇷', en: '🇬🇧', es: '🇪🇸', de: '🇩🇪' };
 const currentFlag = computed(() => flags[currentLang.value] || '🇫🇷');
+
+// Background music
+const audioMuted = ref(true);
+const audioRef = ref(null);
+
+function ensureAudio() {
+  const el = audioRef.value;
+  if (!el) return;
+  el.muted = audioMuted.value;
+  el.loop = true;
+}
+
+async function tryPlay() {
+  const el = audioRef.value;
+  if (!el) return;
+  try {
+    await el.play();
+  } catch (_) {
+    // Autoplay might be blocked until user gesture
+  }
+}
+
+function toggleAudio() {
+  audioMuted.value = !audioMuted.value;
+  setAudioMuted(audioMuted.value);
+  ensureAudio();
+  if (!audioMuted.value) {
+    tryPlay();
+  } else {
+    const el = audioRef.value; if (el) el.pause();
+  }
+}
 
 function toggleLangMenu() {
   showLangMenu.value = !showLangMenu.value;
@@ -79,7 +117,22 @@ function onDocClick(e) {
   const wrap = document.querySelector('.lang-wrap');
   if (wrap && !wrap.contains(e.target)) showLangMenu.value = false;
 }
-onMounted(() => document.addEventListener('click', onDocClick));
+onMounted(() => {
+  document.addEventListener('click', onDocClick);
+  // init audio muted state from storage
+  audioMuted.value = getAudioMuted();
+  ensureAudio();
+  // Try to play if unmuted (may still require a user gesture)
+  if (!audioMuted.value) tryPlay();
+  // Fallback: start playback on first user interaction if unmuted
+  function onFirstInteract() {
+    if (!audioMuted.value) tryPlay();
+    window.removeEventListener('pointerdown', onFirstInteract, { capture: true });
+    window.removeEventListener('keydown', onFirstInteract, { capture: true });
+  }
+  window.addEventListener('pointerdown', onFirstInteract, { capture: true, once: true });
+  window.addEventListener('keydown', onFirstInteract, { capture: true, once: true });
+});
 onBeforeUnmount(() => document.removeEventListener('click', onDocClick));
 </script>
 
@@ -233,3 +286,6 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick));
 .lang-item:hover { background: #1f2238; }
 
 </style>
+
+<!-- Hidden audio element for background music -->
+<audio ref="audioRef" :src="themeUrl" preload="auto" style="display:none"></audio>

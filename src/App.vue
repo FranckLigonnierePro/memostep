@@ -17,6 +17,7 @@
       @battle="() => startMode('battle')"
       @help="openHelp"
       @settings="openSettings"
+      @stats="openStats"
     />
 
     <BoardView
@@ -106,12 +107,39 @@
         </div>
       </div>
     </div>
+
+    <!-- Stats modal -->
+    <div v-if="showStats" class="modal-overlay" @click.self="closeOverlays">
+      <div class="modal-card">
+        <h2 class="modal-title">Stats Daily</h2>
+        <div class="modal-body">
+          <ul class="settings-list" style="list-style:none; padding:0; margin:0; text-align:left; display:flex; flex-direction:column; gap:6px;">
+            <li><strong>Total victoires:</strong> {{ stats.totalWins }}</li>
+            <li><strong>Série en cours:</strong> {{ stats.streak }}</li>
+            <li><strong>Meilleur temps:</strong> {{ stats.bestTimeText }}</li>
+            <li><strong>Dernier résultat (tentatives):</strong> {{ stats.lastAttempts ?? '-' }}</li>
+            <li><strong>Dernier résultat (temps):</strong> {{ stats.lastTimeText }}</li>
+          </ul>
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn" @click="closeOverlays">Fermer</button>
+        </div>
+      </div>
+    </div>
 </template>
 
 <script setup>
 import { onMounted, onBeforeUnmount, reactive, ref, computed } from 'vue';
 import HomeView from './components/HomeView.vue';
 import BoardView from './components/BoardView.vue';
+import {
+  ensurePlayerId,
+  setCurrentDay,
+  isDailyDoneToday as storageIsDailyDoneToday,
+  recordDailyWin,
+  markDailyAttempt,
+  getState,
+} from './lib/storage.js';
 
 // Try to load a real logo from assets if present (supports memostep or memostep-logo)
 const logoModules = import.meta.glob('./assets/{memostep,memostep-logo}.{png,jpg,jpeg,webp,svg}', { eager: true });
@@ -188,12 +216,23 @@ const winActive = ref(false);
 // Help/Settings overlays
 const showHelp = ref(false);
 const showSettings = ref(false);
+const showStats = ref(false);
 
-// Daily completion tracking
+// Stats data for modal
+const stats = reactive({
+  totalWins: 0,
+  streak: 0,
+  bestTimeMs: null,
+  bestTimeText: '-:-',
+  lastAttempts: null,
+  lastTimeMs: null,
+  lastTimeText: '-:-',
+});
+
+// Daily completion tracking (via storage)
 function isDailyDoneToday() {
   try {
-    const v = localStorage.getItem('memostep_daily_done_date');
-    return v === String(dailySeed());
+    return storageIsDailyDoneToday();
   } catch (_) {
     return false;
   }
@@ -358,6 +397,8 @@ function startMode(mode) {
   state.mode = mode;
   state.showHome = false;
   if (mode === 'daily') {
+    // set current day in storage for daily mode session
+    try { setCurrentDay(); } catch (_) {}
     const rng = seededRng(dailySeed());
     state.path = randomPathWithRng(rng);
   } else if (mode === 'solo') {
@@ -440,9 +481,11 @@ function onCellClick(r, c) {
       setTimeout(() => {
         flipBackActive.value = false;
         faceDownActive.value = false; // show front faces (remove random colors)
-        // Mark daily as done if applicable
+        // Record daily win in storage
         if (state.mode === 'daily') {
-          try { localStorage.setItem('memostep_daily_done_date', String(dailySeed())); } catch (_) {}
+          try {
+            recordDailyWin({ timeMs: chronoMs.value });
+          } catch (_) {}
           dailyDone.value = true;
         }
         winActive.value = true;       // show modal after animation
@@ -465,6 +508,10 @@ function onCellClick(r, c) {
     setTimeout(() => {
       flipBackActive.value = false;
       faceDownActive.value = false; // keep faces up revealing the path
+      // Record a failed attempt for daily mode
+      if (state.mode === 'daily') {
+        try { markDailyAttempt(); } catch (_) {}
+      }
       loseActive.value = true;      // show modal
     }, backTotal);
   }
@@ -491,6 +538,7 @@ function handleWinReturn() {
 function closeOverlays() {
   showHelp.value = false;
   showSettings.value = false;
+  showStats.value = false;
 }
 
 function openHelp() {
@@ -498,6 +546,24 @@ function openHelp() {
 }
 function openSettings() {
   showSettings.value = true;
+}
+function loadStats() {
+  try {
+    const s = getState();
+    stats.totalWins = s.dailyStats.totalWins || 0;
+    stats.streak = s.dailyStats.streak || 0;
+    stats.bestTimeMs = s.dailyStats.bestTimeMs ?? null;
+    stats.bestTimeText = (stats.bestTimeMs == null) ? '-:-' : formatMs(stats.bestTimeMs);
+    stats.lastAttempts = s.currentDaily.attemptsBeforeWin ?? null;
+    stats.lastTimeMs = s.currentDaily.timeMs ?? null;
+    stats.lastTimeText = (stats.lastTimeMs == null) ? '-:-' : formatMs(stats.lastTimeMs);
+  } catch (_) {
+    // ignore
+  }
+}
+function openStats() {
+  loadStats();
+  showStats.value = true;
 }
 
 async function handleShare() {
@@ -601,6 +667,8 @@ onMounted(() => {
   window.addEventListener('orientationchange', fitBoard);
   window.addEventListener('resize', fitRootScale);
   window.addEventListener('orientationchange', fitRootScale);
+  // Ensure a player id exists for tracking
+  try { ensurePlayerId(); } catch (_) {}
 });
 
 onBeforeUnmount(() => {
