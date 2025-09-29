@@ -93,11 +93,7 @@ function faceColorClass(r, c) {
   box-shadow: 0 2px 0 #1a1c30;
   height: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
   position: relative; /* for vertical progress bar positioning */
-  /* Prevent flexbox from shrinking the panel on small iOS screens */
-  flex: 0 0 auto;
 }
 
 /* Vertical reveal progress bar on the side of panel */
@@ -110,8 +106,6 @@ function faceColorClass(r, c) {
   border: 1px solid #2a2e52;
   overflow: hidden;
   pointer-events: none;
-  /* Keep a stable column width */
-  flex: 0 0 10px;
 }
 .reveal-fill {
   position: absolute;
