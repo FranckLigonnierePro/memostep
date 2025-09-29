@@ -1,6 +1,6 @@
 <template>
   <div class="board-wrap">
-    <div class="flex flex-row w-full">
+    <div class="flex w-full">
       <div class="w-2/3 flex-col">
         <div class="panel">
           <div id="board" class="board" aria-label="Plateau 4 par 12" role="grid" :style="boardStyle">
@@ -81,9 +81,6 @@ function faceColorClass(r, c) {
 .board-wrap {
   display: flex;
   flex-grow: 1;
-  justify-content: center;
-  align-items: stretch;
-  /* make children match the container height */
 }
 
 .panel {
@@ -93,6 +90,8 @@ function faceColorClass(r, c) {
   box-shadow: 0 2px 0 #1a1c30;
   height: 100%;
   display: flex;
+  align-items: center;
+  justify-content: center;
   position: relative; /* for vertical progress bar positioning */
 }
 
