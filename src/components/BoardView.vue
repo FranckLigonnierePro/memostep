@@ -90,9 +90,8 @@ function faceColorClass(r, c) {
   box-shadow: 0 2px 0 #1a1c30;
   height: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
   position: relative; /* for vertical progress bar positioning */
+  padding: 16px;
 }
 
 /* Vertical reveal progress bar on the side of panel */
@@ -204,9 +203,11 @@ function faceColorClass(r, c) {
   gap: 5px;
   border-radius: 12px;
   padding: 8px;
-  transform-origin: top center;
+  transform-origin: center center;
   will-change: transform;
   height: 100%;
+  width: 100%;
+  margin: auto;
   perspective: 800px; /* enable 3D flip effect */
 }
 
