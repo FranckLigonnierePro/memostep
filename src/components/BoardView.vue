@@ -1,7 +1,7 @@
 <template>
   <div class="board-wrap">
-    <div class="flex w-full">
-      <div class="w-2/3 flex-col">
+    <div class="flex w-full h-full">
+      <div class="w-2/3 flex-col h-full">
         <div class="panel">
           <div id="board" class="board" aria-label="Plateau 4 par 12" role="grid" :style="boardStyle">
             <div
@@ -81,6 +81,8 @@ function faceColorClass(r, c) {
 .board-wrap {
   display: flex;
   flex-grow: 1;
+  height: 100%;
+  overflow: hidden;
 }
 
 .panel {
@@ -89,9 +91,13 @@ function faceColorClass(r, c) {
   border-radius: 16px;
   box-shadow: 0 2px 0 #1a1c30;
   height: 100%;
+  max-height: 100%;
   display: flex;
+  justify-content: center;
   position: relative; /* for vertical progress bar positioning */
-  padding: 16px;
+  padding: 8px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* Vertical reveal progress bar on the side of panel */
@@ -205,9 +211,9 @@ function faceColorClass(r, c) {
   padding: 8px;
   transform-origin: center center;
   will-change: transform;
-  height: 100%;
-  width: 100%;
-  margin: auto;
+  max-height: 100%;
+  max-width: 100%;
+  aspect-ratio: var(--cols) / var(--rows);
   perspective: 800px; /* enable 3D flip effect */
 }
 
