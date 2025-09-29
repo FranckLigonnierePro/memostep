@@ -42,15 +42,33 @@
 
    
   </div>
-   <!-- Loses modal -->
+    <!-- Loses modal -->
     <div v-if="loseActive" class="modal-overlay">
       <div class="modal-card">
         <h2 class="modal-title">Perdu</h2>
         <div class="flex justify-center">
           <img src="./assets/looser.png" alt="lose" class="modal-img" width="200" height="100"/>
         </div>
+        <!-- Lives hearts (daily mode): 3 hearts, one turns off per failed attempt -->
+        <div class="hearts" aria-label="Vies restantes" role="group">
+          <div
+            v-for="i in 3"
+            :key="i"
+            :class="['heart', { off: (i-1) < livesUsed, blink: justLost && (i-1) === lastExtinguishedIndex }]"
+            :aria-hidden="state.mode !== 'daily' ? 'true' : 'false'"
+            :title="state.mode === 'daily' ? `${Math.max(0, 3 - livesUsed)} vies restantes` : ''"
+          >
+            <svg viewBox="0 0 24 24" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M12 21s-7.5-4.35-10-8.5C-0.5 8.5 2.5 4 6.5 5.5 8 6 9 7.5 12 10c3-2.5 4-4 5.5-4.5C21.5 4 24.5 8.5 22 12.5 19.5 16.65 12 21 12 21z"/>
+            </svg>
+          </div>
+        </div>
         <div class="modal-actions">
-          <button class="modal-btn" @click="handleReplay">Rejouer</button>
+          <button
+            v-if="!(state.mode === 'daily' && dailyAttempts >= 3)"
+            class="modal-btn"
+            @click="handleReplay"
+          >Rejouer</button>
           <button class="modal-btn" @click="handleQuit">Quitter</button>
         </div>
       </div>
@@ -229,6 +247,15 @@ const stats = reactive({
   lastTimeText: '-:-',
 });
 
+// Track today's attempts (failed tries so far before a win) to enforce daily limit
+const dailyAttempts = ref(0);
+try {
+  const s = getState();
+  dailyAttempts.value = s.currentDaily?.attemptsBeforeWin || 0;
+} catch (_) {
+  dailyAttempts.value = 0;
+}
+
 // Daily completion tracking (via storage)
 function isDailyDoneToday() {
   try {
@@ -238,6 +265,11 @@ function isDailyDoneToday() {
   }
 }
 const dailyDone = ref(isDailyDoneToday());
+
+// Hearts state for lose modal
+const justLost = ref(false);
+const livesUsed = computed(() => state.mode === 'daily' ? Math.min(3, dailyAttempts.value) : 0);
+const lastExtinguishedIndex = computed(() => state.mode === 'daily' ? Math.min(2, livesUsed.value - 1) : -1);
 
 // Chrono (starts when revealComplete is true, stops on win)
 const chronoMs = ref(0);
@@ -397,8 +429,43 @@ function startMode(mode) {
   state.mode = mode;
   state.showHome = false;
   if (mode === 'daily') {
+    // If today's daily is already done, jump directly to the win popup
+    if (isDailyDoneToday()) {
+      try {
+        const s = getState();
+        // Display the stored time in the win modal
+        chronoMs.value = s.currentDaily.timeMs ?? 0;
+      } catch (_) {
+        chronoMs.value = 0;
+      }
+      // Ensure a clean non-playing board state
+      state.inPlay = false;
+      state.revealed = false;
+      faceDownActive.value = false;
+      stopChrono();
+      // Mark the daily flag and show win modal immediately
+      dailyDone.value = true;
+      winActive.value = true;
+      return; // Do not start a new game sequence
+    }
     // set current day in storage for daily mode session
     try { setCurrentDay(); } catch (_) {}
+    // If already reached the daily attempt limit, show lose modal immediately
+    try {
+      const s = getState();
+      const attempts = s.currentDaily?.attemptsBeforeWin || 0;
+      dailyAttempts.value = attempts;
+      if (attempts >= 3) {
+        // Ensure a clean non-playing board state
+        state.inPlay = false;
+        state.revealed = false;
+        faceDownActive.value = false;
+        stopChrono();
+        loseActive.value = true;
+        return;
+      }
+    } catch (_) {}
+    // start normal daily
     const rng = seededRng(dailySeed());
     state.path = randomPathWithRng(rng);
   } else if (mode === 'solo') {
@@ -510,8 +577,14 @@ function onCellClick(r, c) {
       faceDownActive.value = false; // keep faces up revealing the path
       // Record a failed attempt for daily mode
       if (state.mode === 'daily') {
-        try { markDailyAttempt(); } catch (_) {}
+        try {
+          const attempts = markDailyAttempt();
+          dailyAttempts.value = attempts;
+        } catch (_) {}
       }
+      // Trigger heart extinguish animation only on actual new loss
+      justLost.value = true;
+      setTimeout(() => { justLost.value = false; }, 900);
       loseActive.value = true;      // show modal
     }, backTotal);
   }
@@ -582,6 +655,20 @@ async function handleShare() {
 function newGame() {
   state.showHome = false;
   if (state.mode === 'daily') {
+    // Block starting a new daily game if limit reached
+    try {
+      const s = getState();
+      const attempts = s.currentDaily?.attemptsBeforeWin || 0;
+      dailyAttempts.value = attempts;
+      if (attempts >= 3) {
+        stopChrono();
+        state.inPlay = false;
+        state.revealed = false;
+        faceDownActive.value = false;
+        loseActive.value = true;
+        return;
+      }
+    } catch (_) {}
     const rng = seededRng(dailySeed());
     state.path = randomPathWithRng(rng); // deterministic for the day
   } else if (state.mode === 'solo') {
@@ -625,6 +712,11 @@ function goHome() {
   loseActive.value = false;
   // refresh daily completion flag
   dailyDone.value = isDailyDoneToday();
+  // refresh attempts for the day
+  try {
+    const s = getState();
+    dailyAttempts.value = s.currentDaily?.attemptsBeforeWin || 0;
+  } catch (_) { dailyAttempts.value = 0; }
 }
 
 function startRevealTicker() {
@@ -796,6 +888,40 @@ html, body, #app {
 
 .modal-btn:hover { background: #1f2238; }
 .modal-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #1a1c30; }
+
+/* Hearts (lives) shown in lose modal */
+.hearts {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.heart {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff5a8a; /* active heart color */
+  opacity: 1;
+  transition: color 220ms ease, opacity 220ms ease, transform 160ms ease;
+}
+.heart svg { display: block; }
+.heart svg path { fill: currentColor; }
+.heart.off {
+  color: #3a3f6b;   /* muted gray for off hearts */
+  opacity: 0.45;
+}
+.heart.blink {
+  animation: heartExtinguish 640ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes heartExtinguish {
+  0%   { transform: scale(1); }
+  25%  { transform: scale(1.2); }
+  55%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
 
 @keyframes modalBounce {
   0%   { transform: scale(0.9); opacity: 0; }
