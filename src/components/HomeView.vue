@@ -24,16 +24,15 @@
           <Heart :size="18" />
           <span>{{ $t('home.support') }}</span>
         </a>
-        <div class="w-full h-12 mt-6 flex justify-center relative">
+        <div class="w-full h-12 mt-5 flex justify-center relative">
           <button class="menu-btn mr-2 w-11 h-11" @click="emit('help')" :aria-label="$t('home.help')" :title="$t('home.help')">
-            <HelpCircle :size="20" />
+            <img :src="helpIcon" alt="help" width="20" height="20" />
           </button>
           <button class="menu-btn mr-2 w-11 h-11" @click="emit('settings')" :aria-label="$t('home.settings')" :title="$t('home.settings')">
-            <Settings :size="20" />
+            <img :src="settingsIcon" alt="settings" width="20" height="20" />
           </button>
           <button class="menu-btn mr-2 w-11 h-11" @click="toggleAudio" :aria-label="audioMuted ? $t('home.audioOn') : $t('home.audioOff')" :title="audioMuted ? $t('home.audioOn') : $t('home.audioOff')">
-            <VolumeX v-if="audioMuted" :size="20" />
-            <Volume2 v-else :size="20" />
+            <img :src="audioMuted ? volumeXIcon : volume2Icon" alt="volume" width="20" height="20" />
           </button>
           <!-- Language button opens modal in parent -->
           <button class="menu-btn w-11 h-11" @click="emit('openLang')" :aria-label="$t('home.lang')" :title="$t('home.lang')">
@@ -51,6 +50,10 @@ import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { HelpCircle, Settings, Heart, VolumeX, Volume2 } from 'lucide-vue-next';
 import themeUrl from '../assets/memosteptheme.mp3';
 import { getAudioMuted, setAudioMuted } from '../lib/storage.js';
+import helpIcon from '../assets/help.png';
+import settingsIcon from '../assets/settings.png';
+import volumeXIcon from '../assets/mute.png';
+import volume2Icon from '../assets/unmute.png';
 
 const props = defineProps({
   logoSrc: { type: String, default: '' },
