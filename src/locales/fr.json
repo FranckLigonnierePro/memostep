@@ -1,0 +1,74 @@
+{
+  "home": {
+    "daily": "Parcours du jour",
+    "solo": "Mode solo",
+    "versus": "Mode versus",
+    "battle": "Mode battle royale",
+    "stats": "Stats",
+    "support": "Soutenir le projet",
+    "help": "Aide",
+    "settings": "Paramètres",
+    "lang": "Langue",
+    "audioOn": "Activer le son",
+    "audioOff": "Couper le son",
+    "doneToday": "Terminé aujourd'hui",
+    "soon": "Bientôt"
+  },
+  "modals": {
+    "loseTitle": "Perdu",
+    "score": "Score",
+    "replay": "Rejouer",
+    "quit": "Quitter",
+    "winTitle": "bravo !",
+    "time": "Temps",
+    "share": "Partager",
+    "back": "Retour"
+  },
+  "help": {
+    "title": "Règles du jeu",
+    "rule1": "Mémorisez le chemin affiché pendant quelques secondes.",
+    "rule2": "Quand les cases se retournent, suivez le chemin en cliquant case par case.",
+    "rule3": "Une erreur termine la partie et le chemin est révélé.",
+    "rule4": "Terminez tout le parcours pour gagner. Votre temps est affiché.",
+    "close": "Fermer"
+  },
+  "settings": {
+    "title": "Réglages",
+    "basicSoon": "Réglages de base (bientôt):",
+    "volume": "Volume effets sonores",
+    "theme": "Couleur thème",
+    "a11y": "Accessibilité",
+    "close": "Fermer"
+  },
+  "lang": {
+    "title": "Langue",
+    "fr": "Français",
+    "en": "English",
+    "es": "Español",
+    "de": "Deutsch"
+  },
+  "stats": {
+    "title": "Stats Daily",
+    "totalWins": "Total victoires",
+    "streak": "Série en cours",
+    "bestTime": "Meilleur temps",
+    "lastAttempts": "Dernier résultat (tentatives)",
+    "lastTime": "Dernier résultat (temps)",
+    "close": "Fermer"
+  },
+  "board": {
+    "gridAria": "Plateau {cols} par {rows}",
+    "home": "Accueil"
+  },
+  "alerts": {
+    "shareCopied": "Résultat copié dans le presse-papiers !",
+    "shareFailed": "Impossible de copier automatiquement. Vous pouvez copier manuellement votre résultat."
+  },
+  "status": {
+    "newGame": "Cliquez \"Nouvelle partie\" pour commencer",
+    "memorize": "Mémorisez le chemin",
+    "yourTurn": "À vous de jouer !",
+    "miss": "Raté !",
+    "bravo": "Bravo !"
+  }
+}

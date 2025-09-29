@@ -1,0 +1,74 @@
+{
+  "home": {
+    "daily": "Täglicher Parcours",
+    "solo": "Solo-Modus",
+    "versus": "Versus-Modus",
+    "battle": "Battle-Royale-Modus",
+    "stats": "Statistiken",
+    "support": "Projekt unterstützen",
+    "help": "Hilfe",
+    "settings": "Einstellungen",
+    "lang": "Sprache",
+    "audioOn": "Ton einschalten",
+    "audioOff": "Ton stummschalten",
+    "doneToday": "Heute erledigt",
+    "soon": "Bald"
+  },
+  "modals": {
+    "loseTitle": "Verloren",
+    "score": "Punktzahl",
+    "replay": "Erneut spielen",
+    "quit": "Beenden",
+    "winTitle": "Bravo!",
+    "time": "Zeit",
+    "share": "Teilen",
+    "back": "Zurück"
+  },
+  "help": {
+    "title": "Spielregeln",
+    "rule1": "Merke dir den angezeigten Weg für ein paar Sekunden.",
+    "rule2": "Wenn die Kacheln umdrehen, folge dem Weg, indem du Kachel für Kachel klickst.",
+    "rule3": "Ein Fehler beendet das Spiel und der Weg wird angezeigt.",
+    "rule4": "Beende den gesamten Parcours, um zu gewinnen. Deine Zeit wird angezeigt.",
+    "close": "Schließen"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "basicSoon": "Grundeinstellungen (bald):",
+    "volume": "Lautstärke der Soundeffekte",
+    "theme": "Themenfarbe",
+    "a11y": "Barrierefreiheit",
+    "close": "Schließen"
+  },
+  "lang": {
+    "title": "Sprache",
+    "fr": "Français",
+    "en": "English",
+    "es": "Español",
+    "de": "Deutsch"
+  },
+  "stats": {
+    "title": "Tägliche Statistiken",
+    "totalWins": "Gesamtsiege",
+    "streak": "Aktuelle Serie",
+    "bestTime": "Beste Zeit",
+    "lastAttempts": "Letztes Ergebnis (Versuche)",
+    "lastTime": "Letztes Ergebnis (Zeit)",
+    "close": "Schließen"
+  },
+  "board": {
+    "gridAria": "Brett {cols} mal {rows}",
+    "home": "Start"
+  },
+  "alerts": {
+    "shareCopied": "Ergebnis in die Zwischenablage kopiert!",
+    "shareFailed": "Konnte nicht automatisch kopieren. Du kannst dein Ergebnis manuell kopieren."
+  },
+  "status": {
+    "newGame": "Klicke auf \"Neues Spiel\", um zu starten",
+    "memorize": "Merke dir den Weg",
+    "yourTurn": "Du bist dran!",
+    "miss": "Daneben!",
+    "bravo": "Bravo!"
+  }
+}

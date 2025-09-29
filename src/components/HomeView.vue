@@ -2,51 +2,43 @@
   <div class="home">
       <div class="flex flex-col mt-4 w-full grow justify-center">
         <button class="menu-btn daily-btn" @click="emit('daily')">
-          <span>Parcours du jour</span>
-          <input type="checkbox" class="daily-check" :checked="!!dailyDone" disabled aria-label="Terminé aujourd'hui" />
+          <span>{{ $t('home.daily') }}</span>
+          <input type="checkbox" class="daily-check" :checked="!!dailyDone" disabled :aria-label="$t('home.doneToday')" />
           <span class="daily-checkmark" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </span>
         </button>
-        <button class="menu-btn" @click="emit('solo')">Mode solo</button>
-        <button class="menu-btn" disabled aria-disabled="true" title="Bientôt">Mode versus</button>
-        <button class="menu-btn" disabled aria-disabled="true" title="Bientôt">Mode battle royale</button>
-        <button class="menu-btn" @click="emit('stats')">Stats</button>
+        <button class="menu-btn" @click="emit('solo')">{{ $t('home.solo') }}</button>
+        <button class="menu-btn" disabled aria-disabled="true" :title="$t('home.soon')">{{ $t('home.versus') }}</button>
+        <button class="menu-btn" disabled aria-disabled="true" :title="$t('home.soon')">{{ $t('home.battle') }}</button>
+        <button class="menu-btn" @click="emit('stats')">{{ $t('home.stats') }}</button>
         <a
           class="menu-btn donate-btn"
           href="https://ko-fi.com/memostep"
           target="_blank"
           rel="noopener"
-          aria-label="Soutenir le projet sur Ko‑fi"
+          :aria-label="$t('home.support') + ' Ko‑fi'"
         >
           <Heart :size="18" />
-          <span>Soutenir le projet</span>
+          <span>{{ $t('home.support') }}</span>
         </a>
         <div class="w-full h-12 mt-6 flex justify-center relative">
-          <button class="menu-btn mr-2 w-11 h-11" @click="emit('help')" aria-label="Aide" title="Aide">
+          <button class="menu-btn mr-2 w-11 h-11" @click="emit('help')" :aria-label="$t('home.help')" :title="$t('home.help')">
             <HelpCircle :size="20" />
           </button>
-          <button class="menu-btn mr-2 w-11 h-11" @click="emit('settings')" aria-label="Paramètres" title="Paramètres">
+          <button class="menu-btn mr-2 w-11 h-11" @click="emit('settings')" :aria-label="$t('home.settings')" :title="$t('home.settings')">
             <Settings :size="20" />
           </button>
-          <button class="menu-btn mr-2 w-11 h-11" @click="toggleAudio" :aria-label="audioMuted ? 'Activer le son' : 'Couper le son'" :title="audioMuted ? 'Activer le son' : 'Couper le son'">
+          <button class="menu-btn mr-2 w-11 h-11" @click="toggleAudio" :aria-label="audioMuted ? $t('home.audioOn') : $t('home.audioOff')" :title="audioMuted ? $t('home.audioOn') : $t('home.audioOff')">
             <VolumeX v-if="audioMuted" :size="20" />
             <Volume2 v-else :size="20" />
           </button>
-          <!-- Language selector -->
-          <div class="lang-wrap">
-            <button class="menu-btn w-11 h-11" @click="toggleLangMenu" aria-haspopup="menu" :aria-expanded="showLangMenu ? 'true' : 'false'">
-              {{ currentFlag }}
-            </button>
-            <div v-if="showLangMenu" class="lang-menu" role="menu">
-              <button class="lang-item" role="menuitem" @click="selectLang('fr')">🇫🇷 </button>
-              <button class="lang-item" role="menuitem" @click="selectLang('en')">🇬🇧</button>
-              <button class="lang-item" role="menuitem" @click="selectLang('es')">🇪🇸</button>
-              <button class="lang-item" role="menuitem" @click="selectLang('de')">🇩🇪</button>
-            </div>
-          </div>
+          <!-- Language button opens modal in parent -->
+          <button class="menu-btn w-11 h-11" @click="emit('openLang')" :aria-label="$t('home.lang')" :title="$t('home.lang')">
+            {{ currentFlag }}
+          </button>
         </div>
       </div>
       <!-- Hidden audio element for background music -->
@@ -55,7 +47,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { HelpCircle, Settings, Heart, VolumeX, Volume2 } from 'lucide-vue-next';
 import themeUrl from '../assets/memosteptheme.mp3';
 import { getAudioMuted, setAudioMuted } from '../lib/storage.js';
@@ -63,13 +55,9 @@ import { getAudioMuted, setAudioMuted } from '../lib/storage.js';
 const props = defineProps({
   logoSrc: { type: String, default: '' },
   dailyDone: { type: Boolean, default: false },
+  currentFlag: { type: String, default: '🇫🇷' },
 });
-const emit = defineEmits(['start', 'daily', 'solo', 'versus', 'battle', 'lang', 'help', 'settings', 'stats']);
-
-const showLangMenu = ref(false);
-const currentLang = ref('fr');
-const flags = { fr: '🇫🇷', en: '🇬🇧', es: '🇪🇸', de: '🇩🇪' };
-const currentFlag = computed(() => flags[currentLang.value] || '🇫🇷');
+const emit = defineEmits(['start', 'daily', 'solo', 'versus', 'battle', 'openLang', 'help', 'settings', 'stats']);
 
 // Background music
 const audioMuted = ref(true);
@@ -103,24 +91,9 @@ function toggleAudio() {
   }
 }
 
-function toggleLangMenu() {
-  showLangMenu.value = !showLangMenu.value;
-}
-function selectLang(code) {
-  currentLang.value = code;
-  emit('lang', code);
-  showLangMenu.value = false;
-}
-
 // help/settings handled by parent via emits
 
-// close menu on outside click
-function onDocClick(e) {
-  const wrap = document.querySelector('.lang-wrap');
-  if (wrap && !wrap.contains(e.target)) showLangMenu.value = false;
-}
 onMounted(() => {
-  document.addEventListener('click', onDocClick);
   // init audio muted state from storage
   audioMuted.value = getAudioMuted();
   ensureAudio();
@@ -135,7 +108,7 @@ onMounted(() => {
   window.addEventListener('pointerdown', onFirstInteract, { capture: true, once: true });
   window.addEventListener('keydown', onFirstInteract, { capture: true, once: true });
 });
-onBeforeUnmount(() => document.removeEventListener('click', onDocClick));
+onBeforeUnmount(() => {});
 </script>
 
 <style scoped>
@@ -251,29 +224,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick));
 }
 
 /* Language dropdown */
-.lang-wrap { position: relative; }
-.lang-menu {
-  position: absolute;
-  top: 130%;
-  right: 0;
-  background: var(--panel);
-  border: 1px solid #2a2e52;
-  border-radius: 10px;
-  box-shadow: 0 4px 0 #1a1c30;
-  padding: 6px 8px;
-  display: flex;
-  flex-direction: row;
-  gap: 6px;
-  z-index: 20;
-}
-.lang-item {
-  padding: 6px 10px;
-  background: #1a1c30;
-  color: var(--text);
-  border: 1px solid #2a2e52;
-  border-radius: 8px;
-  text-align: left;
-}
+/* removed dropdown styles now that language opens in modal */
 
 .donate-btn {
   display: flex;

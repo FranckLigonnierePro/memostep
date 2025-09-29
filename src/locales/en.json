@@ -1,0 +1,74 @@
+{
+  "home": {
+    "daily": "Daily run",
+    "solo": "Solo mode",
+    "versus": "Versus mode",
+    "battle": "Battle royale mode",
+    "stats": "Stats",
+    "support": "Support the project",
+    "help": "Help",
+    "settings": "Settings",
+    "lang": "Language",
+    "audioOn": "Turn sound on",
+    "audioOff": "Mute sound",
+    "doneToday": "Completed today",
+    "soon": "Soon"
+  },
+  "modals": {
+    "loseTitle": "You lost",
+    "score": "Score",
+    "replay": "Replay",
+    "quit": "Quit",
+    "winTitle": "Bravo!",
+    "time": "Time",
+    "share": "Share",
+    "back": "Back"
+  },
+  "help": {
+    "title": "Game rules",
+    "rule1": "Memorize the path shown for a few seconds.",
+    "rule2": "When the tiles flip, follow the path by clicking tile by tile.",
+    "rule3": "A mistake ends the game and the path is revealed.",
+    "rule4": "Finish the full path to win. Your time is displayed.",
+    "close": "Close"
+  },
+  "settings": {
+    "title": "Settings",
+    "basicSoon": "Basic settings (soon):",
+    "volume": "Sound effects volume",
+    "theme": "Theme color",
+    "a11y": "Accessibility",
+    "close": "Close"
+  },
+  "lang": {
+    "title": "Language",
+    "fr": "Français",
+    "en": "English",
+    "es": "Español",
+    "de": "Deutsch"
+  },
+  "stats": {
+    "title": "Daily Stats",
+    "totalWins": "Total wins",
+    "streak": "Current streak",
+    "bestTime": "Best time",
+    "lastAttempts": "Last result (attempts)",
+    "lastTime": "Last result (time)",
+    "close": "Close"
+  },
+  "board": {
+    "gridAria": "Board {cols} by {rows}",
+    "home": "Home"
+  },
+  "alerts": {
+    "shareCopied": "Result copied to clipboard!",
+    "shareFailed": "Could not copy automatically. You can copy your result manually."
+  },
+  "status": {
+    "newGame": "Click \"New game\" to start",
+    "memorize": "Memorize the path",
+    "yourTurn": "Your turn!",
+    "miss": "Missed!",
+    "bravo": "Bravo!"
+  }
+}

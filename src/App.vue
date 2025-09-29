@@ -10,6 +10,7 @@
       v-if="state.showHome"
       :logoSrc="logoSrc"
       :dailyDone="dailyDone"
+      :currentFlag="currentFlag"
       @start="newGame"
       @daily="() => startMode('daily')"
       @solo="() => startMode('solo')"
@@ -18,6 +19,7 @@
       @help="openHelp"
       @settings="openSettings"
       @stats="openStats"
+      @openLang="openLang"
     />
 
     <BoardView
@@ -35,6 +37,8 @@
       :faceColors="faceColors"
       :revealComplete="revealComplete"
       :timeText="chronoText"
+      :score="soloLevel"
+      :mode="state.mode"
       @cellClick="onCellClick"
       @goHome="goHome"
       @newGame="newGame"
@@ -45,18 +49,19 @@
     <!-- Loses modal -->
     <div v-if="loseActive" class="modal-overlay">
       <div class="modal-card">
-        <h2 class="modal-title">Perdu</h2>
+        <h2 class="modal-title">{{ $t('modals.loseTitle') }}</h2>
         <div class="flex justify-center">
           <img src="./assets/looser.png" alt="lose" class="modal-img" width="200" height="100"/>
         </div>
-        <!-- Lives hearts (daily mode): 3 hearts, one turns off per failed attempt -->
+        <div v-if="state.mode === 'solo'" style="margin-top:6px;">{{ $t('modals.score') }}: {{ soloLevel }}</div>
+        <!-- Lives hearts (daily & solo): 3 hearts, one turns off per failed attempt -->
         <div class="hearts" aria-label="Vies restantes" role="group">
           <div
             v-for="i in 3"
             :key="i"
             :class="['heart', { off: (i-1) < livesUsed, blink: justLost && (i-1) === lastExtinguishedIndex }]"
-            :aria-hidden="state.mode !== 'daily' ? 'true' : 'false'"
-            :title="state.mode === 'daily' ? `${Math.max(0, 3 - livesUsed)} vies restantes` : ''"
+            :aria-hidden="!(state.mode === 'daily' || state.mode === 'solo') ? 'true' : 'false'"
+            :title="(state.mode === 'daily' || state.mode === 'solo') ? `${Math.max(0, 3 - livesUsed)} vies restantes` : ''"
           >
             <svg viewBox="0 0 24 24" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <path d="M12 21s-7.5-4.35-10-8.5C-0.5 8.5 2.5 4 6.5 5.5 8 6 9 7.5 12 10c3-2.5 4-4 5.5-4.5C21.5 4 24.5 8.5 22 12.5 19.5 16.65 12 21 12 21z"/>
@@ -65,27 +70,27 @@
         </div>
         <div class="modal-actions">
           <button
-            v-if="!(state.mode === 'daily' && dailyAttempts >= 3)"
+            v-if="!((state.mode === 'daily' && dailyAttempts >= 3) || (state.mode === 'solo' && soloLivesUsed >= 3))"
             class="modal-btn"
             @click="handleReplay"
-          >Rejouer</button>
-          <button class="modal-btn" @click="handleQuit">Quitter</button>
+          >{{ $t('modals.replay') }}</button>
+          <button class="modal-btn" @click="handleQuit">{{ $t('modals.quit') }}</button>
         </div>
       </div>
     </div>
     <!-- Win modal -->
     <div v-if="winActive" class="modal-overlay">
       <div class="modal-card">
-        <h2 class="modal-title">bravo !</h2>
+        <h2 class="modal-title">{{ $t('modals.winTitle') }}</h2>
         <div class="flex justify-center">
           <img src="./assets/winner.png" alt="win" class="modal-img" width="200" height="100"/>
         </div>
         <div>
-          Temps: {{ chronoText }}
+          {{ $t('modals.time') }}: {{ chronoText }}
         </div>
         <div class="modal-actions">
-          <button class="modal-btn" @click="handleShare">Partager</button>
-          <button class="modal-btn" @click="handleWinReturn">Retour</button>
+          <button class="modal-btn" @click="handleShare">{{ $t('modals.share') }}</button>
+          <button class="modal-btn" @click="handleWinReturn">{{ $t('modals.back') }}</button>
         </div>
       </div>
     </div>
@@ -93,17 +98,17 @@
     <!-- Help modal -->
     <div v-if="showHelp" class="modal-overlay" @click.self="closeOverlays">
       <div class="modal-card">
-        <h2 class="modal-title">Règles du jeu</h2>
+        <h2 class="modal-title">{{ $t('help.title') }}</h2>
         <div class="modal-body">
           <ol class="rules">
-            <li>Mémorisez le chemin affiché pendant quelques secondes.</li>
-            <li>Quand les cases se retournent, suivez le chemin en cliquant case par case.</li>
-            <li>Une erreur termine la partie et le chemin est révélé.</li>
-            <li>Terminez tout le parcours pour gagner. Votre temps est affiché.</li>
+            <li>{{ $t('help.rule1') }}</li>
+            <li>{{ $t('help.rule2') }}</li>
+            <li>{{ $t('help.rule3') }}</li>
+            <li>{{ $t('help.rule4') }}</li>
           </ol>
         </div>
         <div class="modal-actions">
-          <button class="modal-btn" @click="closeOverlays">Fermer</button>
+          <button class="modal-btn" @click="closeOverlays">{{ $t('help.close') }}</button>
         </div>
       </div>
     </div>
@@ -111,17 +116,33 @@
     <!-- Settings modal -->
     <div v-if="showSettings" class="modal-overlay" @click.self="closeOverlays">
       <div class="modal-card">
-        <h2 class="modal-title">Réglages</h2>
+        <h2 class="modal-title">{{ $t('settings.title') }}</h2>
         <div class="modal-body">
-          <p>Réglages de base (bientôt):</p>
+          <p>{{ $t('settings.basicSoon') }}</p>
           <ul class="settings-list">
-            <li>Volume effets sonores</li>
-            <li>Couleur thème</li>
-            <li>Accessibilité</li>
+            <li>{{ $t('settings.volume') }}</li>
+            <li>{{ $t('settings.theme') }}</li>
+            <li>{{ $t('settings.a11y') }}</li>
           </ul>
         </div>
         <div class="modal-actions">
-          <button class="modal-btn" @click="closeOverlays">Fermer</button>
+          <button class="modal-btn" @click="closeOverlays">{{ $t('settings.close') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Language modal -->
+    <div v-if="showLang" class="modal-overlay" @click.self="closeOverlays">
+      <div class="modal-card">
+        <h2 class="modal-title">{{ $t('lang.title') }}</h2>
+        <div class="modal-body" style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+          <button class="lang-pick modal-btn" @click="selectLang('fr')">🇫🇷 {{ $t('lang.fr') }}</button>
+          <button class="lang-pick modal-btn" @click="selectLang('en')">🇬🇧 {{ $t('lang.en') }}</button>
+          <button class="lang-pick modal-btn" @click="selectLang('es')">🇪🇸 {{ $t('lang.es') }}</button>
+          <button class="lang-pick modal-btn" @click="selectLang('de')">🇩🇪 {{ $t('lang.de') }}</button>
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn" @click="closeOverlays">{{ $t('settings.close') }}</button>
         </div>
       </div>
     </div>
@@ -129,18 +150,18 @@
     <!-- Stats modal -->
     <div v-if="showStats" class="modal-overlay" @click.self="closeOverlays">
       <div class="modal-card">
-        <h2 class="modal-title">Stats Daily</h2>
+        <h2 class="modal-title">{{ $t('stats.title') }}</h2>
         <div class="modal-body">
           <ul class="settings-list" style="list-style:none; padding:0; margin:0; text-align:left; display:flex; flex-direction:column; gap:6px;">
-            <li><strong>Total victoires:</strong> {{ stats.totalWins }}</li>
-            <li><strong>Série en cours:</strong> {{ stats.streak }}</li>
-            <li><strong>Meilleur temps:</strong> {{ stats.bestTimeText }}</li>
-            <li><strong>Dernier résultat (tentatives):</strong> {{ stats.lastAttempts ?? '-' }}</li>
-            <li><strong>Dernier résultat (temps):</strong> {{ stats.lastTimeText }}</li>
+            <li><strong>{{ $t('stats.totalWins') }}:</strong> {{ stats.totalWins }}</li>
+            <li><strong>{{ $t('stats.streak') }}:</strong> {{ stats.streak }}</li>
+            <li><strong>{{ $t('stats.bestTime') }}:</strong> {{ stats.bestTimeText }}</li>
+            <li><strong>{{ $t('stats.lastAttempts') }}:</strong> {{ stats.lastAttempts ?? '-' }}</li>
+            <li><strong>{{ $t('stats.lastTime') }}:</strong> {{ stats.lastTimeText }}</li>
           </ul>
         </div>
         <div class="modal-actions">
-          <button class="modal-btn" @click="closeOverlays">Fermer</button>
+          <button class="modal-btn" @click="closeOverlays">{{ $t('stats.close') }}</button>
         </div>
       </div>
     </div>
@@ -148,6 +169,7 @@
 
 <script setup>
 import { onMounted, onBeforeUnmount, reactive, ref, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import HomeView from './components/HomeView.vue';
 import BoardView from './components/BoardView.vue';
 import {
@@ -197,13 +219,16 @@ const appRef = ref(null);
 const headerRef = ref(null);
 const footerRef = ref(null);
 
+// i18n
+const { t, locale } = useI18n();
+
 // Etat
 const state = reactive({
   path: [],            // [{r,c}, ...]
   nextIndex: 0,
   inPlay: false,
   revealed: false,     // pendant l'exposition du chemin
-  statusText: 'Cliquez « Nouvelle partie » pour commencer',
+  statusText: t('status.newGame'),
   correctSet: new Set(), // 'r-c'
   wrongSet: new Set(),   // 'r-c'
   cellSize: TARGET_CELL, // pixels
@@ -214,6 +239,8 @@ const state = reactive({
   nowMs: Date.now(),
   showHome: true,
   mode: 'solo',
+  // Persist current solo path across retries until success
+  soloPath: [],
 });
 
 // Flip wave animation control (top -> bottom)
@@ -235,6 +262,12 @@ const winActive = ref(false);
 const showHelp = ref(false);
 const showSettings = ref(false);
 const showStats = ref(false);
+const showLang = ref(false);
+
+// Language state
+const currentLang = ref('fr');
+const flags = { fr: '🇫🇷', en: '🇬🇧', es: '🇪🇸', de: '🇩🇪' };
+const currentFlag = computed(() => flags[currentLang.value] || '🇫🇷');
 
 // Stats data for modal
 const stats = reactive({
@@ -268,8 +301,17 @@ const dailyDone = ref(isDailyDoneToday());
 
 // Hearts state for lose modal
 const justLost = ref(false);
-const livesUsed = computed(() => state.mode === 'daily' ? Math.min(3, dailyAttempts.value) : 0);
-const lastExtinguishedIndex = computed(() => state.mode === 'daily' ? Math.min(2, livesUsed.value - 1) : -1);
+const soloLivesUsed = ref(0);
+const soloLevel = ref(0);
+const livesUsed = computed(() => {
+  if (state.mode === 'daily') return Math.min(3, dailyAttempts.value);
+  if (state.mode === 'solo') return Math.min(3, soloLivesUsed.value);
+  return 0;
+});
+const lastExtinguishedIndex = computed(() => {
+  if (state.mode === 'daily' || state.mode === 'solo') return Math.min(2, livesUsed.value - 1);
+  return -1;
+});
 
 // Chrono (starts when revealComplete is true, stops on win)
 const chronoMs = ref(0);
@@ -469,7 +511,13 @@ function startMode(mode) {
     const rng = seededRng(dailySeed());
     state.path = randomPathWithRng(rng);
   } else if (mode === 'solo') {
-    state.path = randomPath();
+    // reset solo lives at the start of a solo session
+    soloLivesUsed.value = 0;
+    // reset solo level at the start of a solo session
+    soloLevel.value = 0;
+    // starting solo from home should create a new path
+    state.soloPath = randomPath();
+    state.path = state.soloPath;
   } else if (mode === 'versus' || mode === 'battle') {
     // Placeholder: start like solo for now
     state.path = randomPath();
@@ -486,7 +534,7 @@ function startMode(mode) {
 function showPath() {
   state.revealed = true;
   state.inPlay = false;
-  state.statusText = 'Mémorisez le chemin';
+  state.statusText = t('status.memorize');
   // reset chrono display during reveal so timeText shows 00:00 immediately
   chronoMs.value = 0;
   if (state.timerId) clearTimeout(state.timerId);
@@ -506,7 +554,7 @@ function hidePath() {
   state.nextIndex = 0;
   state.correctSet.clear();
   state.wrongSet.clear();
-  state.statusText = 'À vous de jouer !';
+  state.statusText = t('status.yourTurn');
   stopRevealTicker();
 
   // Assign random face-down colors first so they are visible during the flip
@@ -535,7 +583,7 @@ function onCellClick(r, c) {
     state.correctSet.add(`${r}-${c}`);
     state.nextIndex++;
     if (state.nextIndex === state.path.length) {
-      state.statusText = 'Bravo !';
+      state.statusText = t('status.bravo');
       state.inPlay = false;
       // Stop chrono, reveal path now so it's visible during reverse flip,
       // then play reverse flip animation (keep facedown colors during the flip)
@@ -554,13 +602,21 @@ function onCellClick(r, c) {
             recordDailyWin({ timeMs: chronoMs.value });
           } catch (_) {}
           dailyDone.value = true;
+        } else if (state.mode === 'solo') {
+          // Solo: increment level, prepare next path, auto-advance without win modal
+          soloLevel.value = (soloLevel.value || 0) + 1;
+          state.soloPath = randomPath();
+          // Immediately start next game
+          newGame();
+          return;
+        } else {
+          winActive.value = true;       // show modal after animation
         }
-        winActive.value = true;       // show modal after animation
       }, backTotal);
     }
   } else {
     state.wrongSet.add(`${r}-${c}`);
-    state.statusText = 'Raté !';
+    state.statusText = t('status.miss');
     state.inPlay = false;
     // Stop chrono immediately on mistake
     stopChrono();
@@ -581,6 +637,9 @@ function onCellClick(r, c) {
           const attempts = markDailyAttempt();
           dailyAttempts.value = attempts;
         } catch (_) {}
+      } else if (state.mode === 'solo') {
+        // increase solo lives used on each loss
+        soloLivesUsed.value = Math.min(3, (soloLivesUsed.value || 0) + 1);
       }
       // Trigger heart extinguish animation only on actual new loss
       justLost.value = true;
@@ -612,6 +671,7 @@ function closeOverlays() {
   showHelp.value = false;
   showSettings.value = false;
   showStats.value = false;
+  showLang.value = false;
 }
 
 function openHelp() {
@@ -619,6 +679,15 @@ function openHelp() {
 }
 function openSettings() {
   showSettings.value = true;
+}
+function openLang() {
+  showLang.value = true;
+}
+function selectLang(code) {
+  currentLang.value = code;
+  try { locale.value = code; } catch (_) {}
+  try { localStorage.setItem('locale', code); } catch (_) {}
+  closeOverlays();
 }
 function loadStats() {
   try {
@@ -646,9 +715,9 @@ async function handleShare() {
   const url = typeof location !== 'undefined' ? location.href : '';
   try {
     await navigator.clipboard.writeText(`${text} ${url}`);
-    alert('Résultat copié dans le presse-papiers !');
+    alert(t('alerts.shareCopied'));
   } catch (e) {
-    alert('Impossible de copier automatiquement. Vous pouvez copier manuellement votre résultat.');
+    alert(t('alerts.shareFailed'));
   }
 }
 
@@ -672,7 +741,8 @@ function newGame() {
     const rng = seededRng(dailySeed());
     state.path = randomPathWithRng(rng); // deterministic for the day
   } else if (state.mode === 'solo') {
-    state.path = randomPath();
+    // In solo: keep the same path after a loss; use the prepared next path after a win
+    state.path = (state.soloPath && state.soloPath.length) ? state.soloPath : randomPath();
   } else if (state.mode === 'versus' || state.mode === 'battle') {
     // Placeholder: same as solo for now
     state.path = randomPath();
@@ -702,7 +772,7 @@ function goHome() {
   state.inPlay = false;
   state.correctSet.clear();
   state.wrongSet.clear();
-  state.statusText = 'Cliquez « Nouvelle partie » pour commencer';
+  state.statusText = t('status.newGame');
   state.showHome = true;
   faceDownActive.value = false;
   stopChrono();
@@ -717,6 +787,8 @@ function goHome() {
     const s = getState();
     dailyAttempts.value = s.currentDaily?.attemptsBeforeWin || 0;
   } catch (_) { dailyAttempts.value = 0; }
+  // reset solo lives when returning home
+  soloLivesUsed.value = 0;
 }
 
 function startRevealTicker() {
@@ -753,6 +825,8 @@ function cellClass(r, c) {
 }
 
 onMounted(() => {
+  // Sync flag with current i18n locale
+  try { currentLang.value = String(locale.value || 'fr'); } catch (_) {}
   fitRootScale();
   fitBoard();
   window.addEventListener('resize', fitBoard);

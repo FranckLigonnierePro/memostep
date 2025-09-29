@@ -3,7 +3,7 @@
     <div class="flex w-full h-full">
       <div class="w-2/3 flex-col h-full">
         <div class="panel">
-          <div id="board" class="board" aria-label="Plateau 4 par 12" role="grid" :style="boardStyle">
+          <div id="board" class="board" :aria-label="$t('board.gridAria', { cols: colsCount, rows: rowsCount })" role="grid" :style="boardStyle">
             <div
               v-for="(cell, idx) in cells"
               :key="idx"
@@ -25,16 +25,18 @@
       </div>
       <div class="flex flex-col flex-1 items-center">
         <div class="side-actions">
+          <div v-if="mode === 'solo'" class="card">
+            <div class="card-body">
+              <div class="score-text">{{ score }}</div>
+            </div>
+          </div>
           <div class="card">
             <div class="card-body">
               <div class="time-text">{{ timeText }}</div>
             </div>
           </div>
-          <button class="icon-btn" aria-label="Accueil" @click="emit('goHome')">
+          <button class="icon-btn" :aria-label="$t('board.home')" @click="emit('goHome')">
             <Home :size="28" aria-hidden="true" />
-          </button>
-          <button class="icon-btn" aria-label="Recommencer" @click="emit('newGame')">
-            <RotateCcw :size="28" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -58,8 +60,10 @@ const props = defineProps({
   revealComplete: { type: Boolean, default: false },
   flipBackActive: { type: Boolean, default: false },
   timeText: { type: String, default: '00:00' },
+  score: { type: Number, default: 0 },
+  mode: { type: String, default: 'solo' },
 });
-const emit = defineEmits(['cellClick', 'goHome', 'newGame']);
+const emit = defineEmits(['cellClick', 'goHome']);
 
 function cellStyle(row, col) {
   const STEP = 70; // ms per diagonal delay

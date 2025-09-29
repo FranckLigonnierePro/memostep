@@ -1,0 +1,74 @@
+{
+  "home": {
+    "daily": "Recorrido diario",
+    "solo": "Modo solitario",
+    "versus": "Modo versus",
+    "battle": "Modo battle royale",
+    "stats": "Estadísticas",
+    "support": "Apoyar el proyecto",
+    "help": "Ayuda",
+    "settings": "Ajustes",
+    "lang": "Idioma",
+    "audioOn": "Activar sonido",
+    "audioOff": "Silenciar sonido",
+    "doneToday": "Completado hoy",
+    "soon": "Pronto"
+  },
+  "modals": {
+    "loseTitle": "Perdido",
+    "score": "Puntuación",
+    "replay": "Rejugar",
+    "quit": "Salir",
+    "winTitle": "¡Bravo!",
+    "time": "Tiempo",
+    "share": "Compartir",
+    "back": "Volver"
+  },
+  "help": {
+    "title": "Reglas del juego",
+    "rule1": "Memoriza el camino que se muestra durante unos segundos.",
+    "rule2": "Cuando las casillas se volteen, sigue el camino haciendo clic casilla por casilla.",
+    "rule3": "Un error termina la partida y se revela el camino.",
+    "rule4": "Completa todo el recorrido para ganar. Tu tiempo se muestra.",
+    "close": "Cerrar"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "basicSoon": "Ajustes básicos (pronto):",
+    "volume": "Volumen de efectos",
+    "theme": "Color del tema",
+    "a11y": "Accesibilidad",
+    "close": "Cerrar"
+  },
+  "lang": {
+    "title": "Idioma",
+    "fr": "Français",
+    "en": "English",
+    "es": "Español",
+    "de": "Deutsch"
+  },
+  "stats": {
+    "title": "Estadísticas diarias",
+    "totalWins": "Victorias totales",
+    "streak": "Racha actual",
+    "bestTime": "Mejor tiempo",
+    "lastAttempts": "Último resultado (intentos)",
+    "lastTime": "Último resultado (tiempo)",
+    "close": "Cerrar"
+  },
+  "board": {
+    "gridAria": "Tablero {cols} por {rows}",
+    "home": "Inicio"
+  },
+  "alerts": {
+    "shareCopied": "¡Resultado copiado al portapapeles!",
+    "shareFailed": "No se pudo copiar automáticamente. Puedes copiar tu resultado manualmente."
+  },
+  "status": {
+    "newGame": "Haz clic en \"Nueva partida\" para empezar",
+    "memorize": "Memoriza el camino",
+    "yourTurn": "¡Tu turno!",
+    "miss": "¡Fallaste!",
+    "bravo": "¡Bravo!"
+  }
+}
