@@ -133,13 +133,15 @@
 
     <!-- Language modal -->
     <div v-if="showLang" class="modal-overlay" @click.self="closeOverlays">
-      <div class="modal-card">
+      <div class="modal-card w-1/2">
         <h2 class="modal-title">{{ $t('lang.title') }}</h2>
-        <div class="modal-body" style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
-          <button class="lang-pick modal-btn" @click="selectLang('fr')">🇫🇷 {{ $t('lang.fr') }}</button>
-          <button class="lang-pick modal-btn" @click="selectLang('en')">🇬🇧 {{ $t('lang.en') }}</button>
-          <button class="lang-pick modal-btn" @click="selectLang('es')">🇪🇸 {{ $t('lang.es') }}</button>
-          <button class="lang-pick modal-btn" @click="selectLang('de')">🇩🇪 {{ $t('lang.de') }}</button>
+        <div class="modal-body" style="display:flex; gap:22px; justify-content:center; flex-wrap:wrap;">
+          <button class="lang-pick modal-btn" @click="selectLang('fr')"><img src="./assets/fr.png" alt="fr" width="48" height="48" /></button>
+          <button class="lang-pick modal-btn" @click="selectLang('en')"><img src="./assets/en.png" alt="en" width="48" height="48" /></button>
+        </div>
+        <div class="modal-body" style="display:flex; gap:22px; justify-content:center; flex-wrap:wrap;">
+          <button class="lang-pick modal-btn" @click="selectLang('es')"><img src="./assets/es.png" alt="es" width="48" height="48" /></button>
+          <button class="lang-pick modal-btn" @click="selectLang('de')"><img src="./assets/de.png" alt="de" width="48" height="48" /></button>
         </div>
         <div class="modal-actions">
           <button class="modal-btn" @click="closeOverlays">{{ $t('settings.close') }}</button>
@@ -172,6 +174,11 @@ import { onMounted, onBeforeUnmount, reactive, ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import HomeView from './components/HomeView.vue';
 import BoardView from './components/BoardView.vue';
+// Import flag assets so Vite resolves URLs correctly
+import frFlag from './assets/fr.png';
+import enFlag from './assets/en.png';
+import esFlag from './assets/es.png';
+import deFlag from './assets/de.png';
 import {
   ensurePlayerId,
   setCurrentDay,
@@ -266,8 +273,8 @@ const showLang = ref(false);
 
 // Language state
 const currentLang = ref('fr');
-const flags = { fr: '🇫🇷', en: '🇬🇧', es: '🇪🇸', de: '🇩🇪' };
-const currentFlag = computed(() => flags[currentLang.value] || '🇫🇷');
+const flags = { fr: frFlag, en: enFlag, es: esFlag, de: deFlag };
+const currentFlag = computed(() => flags[currentLang.value] || frFlag);
 
 // Stats data for modal
 const stats = reactive({

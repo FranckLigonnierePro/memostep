@@ -37,7 +37,7 @@
           </button>
           <!-- Language button opens modal in parent -->
           <button class="menu-btn w-11 h-11" @click="emit('openLang')" :aria-label="$t('home.lang')" :title="$t('home.lang')">
-            {{ currentFlag }}
+            <img :src="currentFlag" alt="flag" width="20" height="20" />
           </button>
         </div>
       </div>
@@ -55,7 +55,7 @@ import { getAudioMuted, setAudioMuted } from '../lib/storage.js';
 const props = defineProps({
   logoSrc: { type: String, default: '' },
   dailyDone: { type: Boolean, default: false },
-  currentFlag: { type: String, default: '🇫🇷' },
+  currentFlag: { type: String, default: '@/assets/fr.png' },
 });
 const emit = defineEmits(['start', 'daily', 'solo', 'versus', 'battle', 'openLang', 'help', 'settings', 'stats']);
 
