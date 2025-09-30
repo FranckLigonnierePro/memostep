@@ -4,16 +4,18 @@
 const KEY = 'memostep';
 
 function todayStr(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+  // Use UTC so the "day" is the same worldwide
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
 
 function isYesterday(prev, curr) {
   if (!prev || !curr) return false;
-  const prevD = new Date(prev);
-  const currD = new Date(curr);
+  // Parse as UTC midnight
+  const prevD = new Date(`${prev}T00:00:00Z`);
+  const currD = new Date(`${curr}T00:00:00Z`);
   const diff = (currD - prevD) / (1000 * 60 * 60 * 24);
   return Math.round(diff) === 1;
 }

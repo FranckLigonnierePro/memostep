@@ -469,8 +469,8 @@ function randomPathWithRng(rng) {
 
 function dailySeed() {
   const d = new Date();
-  // YYYYMMDD as number
-  const key = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  // Use UTC date so the daily seed is identical worldwide (YYYYMMDD)
+  const key = d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
   return key;
 }
 
