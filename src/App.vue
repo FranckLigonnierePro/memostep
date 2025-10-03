@@ -163,17 +163,27 @@
         <h2 class="modal-title">Versus</h2>
         <div class="modal-body" style="display:flex; flex-direction:column; gap:8px;">
           <div v-if="!versusCode">
+            <div style="display:flex; gap:6px; justify-content:center; align-items:center;">
+              <input v-model="usernameInput" placeholder="Pseudo" style="padding:8px; border-radius:8px; border:1px solid #2a2e52; background:#0f1020; color:#fff;" />
+            </div>
             <button class="modal-btn" @click="handleCreateRoom">Créer une partie</button>
             <div style="display:flex; gap:6px; justify-content:center; align-items:center;">
-              <input v-model="joinInput" placeholder="Code" style="padding:8px; border-radius:8px; border:1px solid #2a2e52; background:#0f1020; color:#fff;" />
+              <input v-model="joinInput" placeholder="Code" style="padding:8px; border-radius:8px; border:1px solid #2a2e52; background:#0f1020; color:#fff; text-transform:uppercase;" />
               <button class="modal-btn" @click="handleJoinRoom">Rejoindre</button>
             </div>
             <div v-if="versusError" style="color:#ff5a8a; font-size:12px;">{{ versusError }}</div>
           </div>
           <div v-else>
-            <div style="margin:8px 0;">Partage le code:</div>
+            <div style="margin:8px 0;">Code de salle</div>
             <div style="font-size:24px; letter-spacing:3px;">{{ versusCode }}</div>
-            <div style="font-size:12px; color:var(--muted);">En attente d'un adversaire...</div>
+            <div style="margin:10px 0; font-weight:600;">Joueurs ({{ (versusRoom?.players || []).length || 1 }}/8)</div>
+            <ul style="list-style:none; padding:0; margin:0; display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">
+              <li v-for="p in (versusRoom?.players || defaultPlayers)" :key="p.id" style="padding:6px 10px; border:1px solid #2a2e52; border-radius:8px;">{{ p.name || 'Player' }}</li>
+            </ul>
+            <div v-if="versusIsHost" style="margin-top:12px; display:flex; gap:8px; justify-content:center;">
+              <button class="modal-btn" :disabled="((versusRoom?.players || defaultPlayers).length < 2)" @click="handleStartVersus">Démarrer</button>
+            </div>
+            <div v-if="versusError" style="color:#ff5a8a; font-size:12px;">{{ versusError }}</div>
           </div>
         </div>
         <div class="modal-actions">
@@ -291,6 +301,7 @@ const showLang = ref(false);
 const showVersus = ref(false);
 const versusCode = ref('');
 const joinInput = ref('');
+const usernameInput = ref('');
 const versusIsHost = ref(false);
 const versusError = ref('');
 let versusUnsub = null;
@@ -298,6 +309,7 @@ const versusSeed = ref(null);
 const versusStartAtMs = ref(null);
 const playerId = ref(null);
 const versusRoom = ref(null); // latest room snapshot
+const defaultPlayers = computed(() => [{ id: playerId.value || ensurePlayerId(), name: (usernameInput.value || 'Player') }]);
 
 // Language state
 const currentLang = ref('fr');
@@ -861,9 +873,11 @@ function closeVersus() {
 
 async function handleCreateRoom() {
   versusError.value = '';
+  const name = (usernameInput.value || '').trim();
+  if (!name) { versusError.value = 'Pseudo requis'; return; }
   try {
     const pid = playerId.value || ensurePlayerId();
-    const code = await createRoom(pid);
+    const code = await createRoom(pid, name);
     versusCode.value = code;
     versusIsHost.value = true;
     subscribeToRoom(code);
@@ -875,10 +889,12 @@ async function handleCreateRoom() {
 async function handleJoinRoom() {
   versusError.value = '';
   const code = (joinInput.value || '').trim().toUpperCase();
+  const name = (usernameInput.value || '').trim();
+  if (!name) { versusError.value = 'Pseudo requis'; return; }
   if (!code) { versusError.value = 'Code requis'; return; }
   try {
     const pid = playerId.value || ensurePlayerId();
-    await joinRoom(code, pid);
+    await joinRoom(code, pid, name);
     versusCode.value = code;
     versusIsHost.value = false;
     subscribeToRoom(code);
@@ -893,13 +909,6 @@ function subscribeToRoom(code) {
   async function handleRoomUpdate(room) {
     if (!room) return;
     versusRoom.value = room;
-    // If host and guest just arrived, start the match
-    if (versusIsHost.value && room.host_id === playerId.value && room.guest_id && room.status === 'waiting') {
-      const seed = Math.floor(Math.random() * 1e9);
-      const startAt = Date.now() + 1500; // 1.5s buffer for both clients
-      try { await startRoom(code, seed, startAt); } catch (_) {}
-      return;
-    }
     // When playing, both clients begin simultaneously
     if (room.status === 'playing' && typeof room.seed === 'number' && typeof room.start_at_ms === 'number') {
       beginVersus(room.seed, room.start_at_ms);
@@ -935,6 +944,21 @@ function subscribeToRoom(code) {
       // ignore fetch errors; realtime may still deliver updates
     }
   })();
+}
+
+async function handleStartVersus() {
+  try {
+    const room = versusRoom.value;
+    const playersCount = (room && Array.isArray(room.players)) ? room.players.length : (defaultPlayers.value.length);
+    if (!versusIsHost.value) { versusError.value = 'Seul l\'hôte peut démarrer'; return; }
+    if (!versusCode.value) { versusError.value = 'Salle inconnue'; return; }
+    if (playersCount < 2) { versusError.value = 'Au moins 2 joueurs requis'; return; }
+    const seed = Math.floor(Math.random() * 1e9);
+    const startAt = Date.now() + 1500; // petite latence pour synchroniser
+    await startRoom(versusCode.value, seed, startAt);
+  } catch (e) {
+    versusError.value = String(e && e.message || e);
+  }
 }
 
 function beginVersus(seed, startAtMs) {

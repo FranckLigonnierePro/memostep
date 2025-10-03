@@ -21,22 +21,25 @@ function randomCode(len = 6) {
   return out;
 }
 
-export async function createRoom(hostId) {
+export async function createRoom(hostId, hostName) {
   initRealtime();
   const code = randomCode(6);
+  const players = [{ id: hostId, name: hostName || 'Player' }];
   const { error } = await supabase.from('rooms').insert({
     code,
+    // keep legacy columns for compatibility, but primary roster is in players
     host_id: hostId,
     guest_id: null,
     status: 'waiting',
     seed: null,
     start_at_ms: null,
+    players,
   });
   if (error) throw error;
   return code;
 }
 
-export async function joinRoom(code, guestId) {
+export async function joinRoom(code, playerId, playerName) {
   initRealtime();
   const { data, error } = await supabase
     .from('rooms')
@@ -45,11 +48,18 @@ export async function joinRoom(code, guestId) {
     .single();
   if (error) throw error;
   if (!data) throw new Error('Room not found');
-  if (data.guest_id && data.guest_id !== guestId) throw new Error('Room full');
   if (data.status !== 'waiting') throw new Error('Room not joinable');
+  const players = Array.isArray(data.players) ? data.players.slice() : [];
+  // Already in room
+  if (players.find(p => p && p.id === playerId)) return true;
+  if (players.length >= 8) throw new Error('Room full');
+  players.push({ id: playerId, name: playerName || 'Player' });
+  const update = { players };
+  // keep legacy guest_id for 2-player compatibility if empty
+  if (!data.guest_id) update.guest_id = playerId;
   const { error: upErr } = await supabase
     .from('rooms')
-    .update({ guest_id: guestId })
+    .update(update)
     .eq('code', code);
   if (upErr) throw upErr;
   return true;
