@@ -880,7 +880,8 @@ async function handleJoinRoom() {
 
 function subscribeToRoom(code) {
   if (versusUnsub) { try { versusUnsub(); } catch (_) {} }
-  versusUnsub = subscribeRoom(code, async (room) => {
+  // Shared handler to process any room snapshot (from realtime or initial fetch)
+  async function handleRoomUpdate(room) {
     if (!room) return;
     versusRoom.value = room;
     // If host and guest just arrived, start the match
@@ -909,7 +910,22 @@ function subscribeToRoom(code) {
       }
       return;
     }
+  }
+
+  // Subscribe to realtime updates
+  versusUnsub = subscribeRoom(code, async (room) => {
+    await handleRoomUpdate(room);
   });
+
+  // Immediately fetch current state to avoid missing an update that happened before subscribing
+  (async () => {
+    try {
+      const snapshot = await getRoom(code);
+      await handleRoomUpdate(snapshot);
+    } catch (_) {
+      // ignore fetch errors; realtime may still deliver updates
+    }
+  })();
 }
 
 function beginVersus(seed, startAtMs) {
