@@ -38,6 +38,23 @@
           <button class="icon-btn" :aria-label="$t('board.home')" @click="emit('goHome')">
             <Home :size="28" aria-hidden="true" />
           </button>
+          <!-- Lives hearts under Home button (daily & solo) -->
+          <div
+            v-if="mode === 'daily' || mode === 'solo'"
+            class="hearts"
+            aria-label="Vies restantes"
+            role="group"
+            style="margin-top: 6px; display:flex; flex-direction: column; gap: 8px;"
+          >
+            <div
+              v-for="i in 3"
+              :key="i"
+              :class="['heart', { off: (i-1) < livesUsed, blink: justLost && (i-1) === lastExtinguishedIndex }]"
+              :title="`${Math.max(0, 3 - (Number(livesUsed) || 0))} vies restantes`"
+            >
+            <Heart />
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -45,7 +62,7 @@
 </template>
 
 <script setup>
-import { Home, RotateCcw } from 'lucide-vue-next';
+import { Home, RotateCcw, Heart } from 'lucide-vue-next';
 const props = defineProps({
   cells: { type: Array, required: true },
   boardStyle: { type: Object, required: true },
@@ -62,6 +79,9 @@ const props = defineProps({
   timeText: { type: String, default: '00:00' },
   score: { type: Number, default: 0 },
   mode: { type: String, default: 'solo' },
+  livesUsed: { type: Number, default: 0 },
+  justLost: { type: Boolean, default: false },
+  lastExtinguishedIndex: { type: Number, default: -1 },
 });
 const emit = defineEmits(['cellClick', 'goHome']);
 
@@ -107,7 +127,7 @@ function faceColorClass(r, c) {
 /* Vertical reveal progress bar on the side of panel */
 .reveal-bar {
   position: relative;
-  margin: 12px 6px;
+  margin: 12px 8px;
   width: 10px;
   border-radius: 999px;
   background: #1b1e34;
@@ -212,7 +232,6 @@ function faceColorClass(r, c) {
   grid-template-rows: repeat(var(--rows), 1fr);
   gap: 5px;
   border-radius: 12px;
-  padding: 8px;
   transform-origin: center center;
   will-change: transform;
   max-height: 100%;
@@ -328,7 +347,7 @@ function faceColorClass(r, c) {
 
 @media (max-width: 640px) {
   .board-wrap {
-    padding: 16px;
+    padding: 0px;
   }
 }
 </style>

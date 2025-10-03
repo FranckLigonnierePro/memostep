@@ -39,6 +39,9 @@
       :timeText="chronoText"
       :score="soloLevel"
       :mode="state.mode"
+      :livesUsed="livesUsed"
+      :justLost="justLost"
+      :lastExtinguishedIndex="lastExtinguishedIndex"
       @cellClick="onCellClick"
       @goHome="goHome"
       @newGame="newGame"
@@ -54,20 +57,6 @@
           <img src="./assets/looser.png" alt="lose" class="modal-img" width="200" height="100"/>
         </div>
         <div v-if="state.mode === 'solo'" style="margin-top:6px;">{{ $t('modals.score') }}: {{ soloLevel }}</div>
-        <!-- Lives hearts (daily & solo): 3 hearts, one turns off per failed attempt -->
-        <div class="hearts" aria-label="Vies restantes" role="group">
-          <div
-            v-for="i in 3"
-            :key="i"
-            :class="['heart', { off: (i-1) < livesUsed, blink: justLost && (i-1) === lastExtinguishedIndex }]"
-            :aria-hidden="!(state.mode === 'daily' || state.mode === 'solo') ? 'true' : 'false'"
-            :title="(state.mode === 'daily' || state.mode === 'solo') ? `${Math.max(0, 3 - livesUsed)} vies restantes` : ''"
-          >
-            <svg viewBox="0 0 24 24" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M12 21s-7.5-4.35-10-8.5C-0.5 8.5 2.5 4 6.5 5.5 8 6 9 7.5 12 10c3-2.5 4-4 5.5-4.5C21.5 4 24.5 8.5 22 12.5 19.5 16.65 12 21 12 21z"/>
-            </svg>
-          </div>
-        </div>
         <div class="modal-actions">
           <button
             v-if="!((state.mode === 'daily' && dailyAttempts >= 3) || (state.mode === 'solo' && soloLivesUsed >= 3))"
@@ -214,7 +203,7 @@ function fitRootScale() {
 
 // Constantes
 const COLS = 4;
-const ROWS = 12;
+const ROWS = 10;
 const TARGET_CELL = 56;  // taille cible confortable
 const MIN_CELL = 48;     // taille minimale ergonomique
 const MAX_CELL = 72;     // taille max esthétique
@@ -609,6 +598,8 @@ function onCellClick(r, c) {
             recordDailyWin({ timeMs: chronoMs.value });
           } catch (_) {}
           dailyDone.value = true;
+          // Show the win modal after recording a successful daily
+          winActive.value = true;
         } else if (state.mode === 'solo') {
           // Solo: increment level, prepare next path, auto-advance without win modal
           soloLevel.value = (soloLevel.value || 0) + 1;
@@ -651,7 +642,23 @@ function onCellClick(r, c) {
       // Trigger heart extinguish animation only on actual new loss
       justLost.value = true;
       setTimeout(() => { justLost.value = false; }, 900);
-      loseActive.value = true;      // show modal
+      // Only show lose modal when out of hearts; otherwise auto-restart
+      if (state.mode === 'daily') {
+        if ((dailyAttempts.value || 0) >= 3) {
+          loseActive.value = true;
+        } else {
+          setTimeout(() => { newGame(); }, 350);
+        }
+      } else if (state.mode === 'solo') {
+        if ((soloLivesUsed.value || 0) >= 3) {
+          loseActive.value = true;
+        } else {
+          setTimeout(() => { newGame(); }, 350);
+        }
+      } else {
+        // For other modes, keep previous behavior
+        loseActive.value = true;
+      }
     }, backTotal);
   }
 }
@@ -857,7 +864,7 @@ onBeforeUnmount(() => {
 <style>
 :root {
   --cols: 4;
-  --rows: 12;
+  --rows: 10;
   --cell: 56px;          /* taille cible des cases */
   --gap: 8px;            /* espace entre cases */
   --pad: 12px;           /* padding du board */
