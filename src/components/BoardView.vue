@@ -1,6 +1,6 @@
 <template>
   <div class="board-wrap">
-    <div class="flex w-full h-full">
+    <div class="flex w-full h-full" style="justify-content: center;">
       <div class="w-2/3 flex-col h-full">
         <div class="panel">
           <div id="board" class="board" :aria-label="$t('board.gridAria', { cols: colsCount, rows: rowsCount })" role="grid" :style="boardStyle">
@@ -23,7 +23,7 @@
       <div class="reveal-bar" aria-hidden="true">
         <div class="reveal-fill" :style="{ transform: `scaleY(${revealComplete ? 1 : revealProgress})` }"></div>
       </div>
-      <div class="flex flex-col flex-1 items-center">
+      <div class="flex flex-col items-center">
         <div class="side-actions">
           <div v-if="mode === 'solo'" class="card">
             <div class="card-body">
