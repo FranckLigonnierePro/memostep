@@ -748,11 +748,20 @@ function onCellClick(r, c) {
       // Only show lose modal when out of hearts; otherwise auto-restart (daily/solo). Versus: finish room marking opponent winner.
       if (state.mode === 'versus') {
         try {
-          const room = versusRoom.value || await getRoom(versusCode.value);
+          // Fetch latest snapshot to avoid stale opponent id
+          const snapshot = await getRoom(versusCode.value).catch(() => versusRoom.value);
+          const room = snapshot || versusRoom.value;
           const me = playerId.value || ensurePlayerId();
-          const opponent = room ? ((room.host_id === me) ? room.guest_id : room.host_id) : null;
-          await finishRoom(versusCode.value, opponent || null, chronoMs.value);
+          let opponent = null;
+          if (room) {
+            // If I'm host, opponent is guest; otherwise opponent is host
+            if (room.host_id && room.host_id !== me) opponent = room.host_id;
+            else if (room.guest_id && room.guest_id !== me) opponent = room.guest_id;
+          }
+          // Mark room finished with opponent as winner so they receive win modal
+          await finishRoom(versusCode.value, opponent, chronoMs.value);
         } catch (_) {}
+        // Show local lose modal immediately for the losing player
         loseActive.value = true;
       } else if (state.mode === 'daily') {
         if ((dailyAttempts.value || 0) >= 3) {
