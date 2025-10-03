@@ -14,7 +14,7 @@
       @start="newGame"
       @daily="() => startMode('daily')"
       @solo="() => startMode('solo')"
-      @versus="() => startMode('versus')"
+      @versus="openVersus"
       @battle="() => startMode('battle')"
       @help="openHelp"
       @settings="openSettings"
@@ -156,6 +156,31 @@
         </div>
       </div>
     </div>
+
+    <!-- Versus modal -->
+    <div v-if="showVersus" class="modal-overlay" @click.self="closeOverlays">
+      <div class="modal-card">
+        <h2 class="modal-title">Versus</h2>
+        <div class="modal-body" style="display:flex; flex-direction:column; gap:8px;">
+          <div v-if="!versusCode">
+            <button class="modal-btn" @click="handleCreateRoom">Créer une partie</button>
+            <div style="display:flex; gap:6px; justify-content:center; align-items:center;">
+              <input v-model="joinInput" placeholder="Code" style="padding:8px; border-radius:8px; border:1px solid #2a2e52; background:#0f1020; color:#fff;" />
+              <button class="modal-btn" @click="handleJoinRoom">Rejoindre</button>
+            </div>
+            <div v-if="versusError" style="color:#ff5a8a; font-size:12px;">{{ versusError }}</div>
+          </div>
+          <div v-else>
+            <div style="margin:8px 0;">Partage le code:</div>
+            <div style="font-size:24px; letter-spacing:3px;">{{ versusCode }}</div>
+            <div style="font-size:12px; color:var(--muted);">En attente d'un adversaire...</div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn" @click="closeVersus">Fermer</button>
+        </div>
+      </div>
+    </div>
   </template>
 
 <script setup>
@@ -176,6 +201,7 @@ import {
   markDailyAttempt,
   getState,
 } from './lib/storage.js';
+import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom } from './lib/realtime.js';
 
 // Try to load a real logo from assets if present (supports memostep or memostep-logo)
 const logoModules = import.meta.glob('./assets/{memostep,memostep-logo}.{png,jpg,jpeg,webp,svg}', { eager: true });
@@ -261,6 +287,16 @@ const showHelp = ref(false);
 const showSettings = ref(false);
 const showStats = ref(false);
 const showLang = ref(false);
+// Versus UI state
+const showVersus = ref(false);
+const versusCode = ref('');
+const joinInput = ref('');
+const versusIsHost = ref(false);
+const versusError = ref('');
+let versusUnsub = null;
+const versusSeed = ref(null);
+const versusStartAtMs = ref(null);
+const playerId = ref(null);
 
 // Language state
 const currentLang = ref('fr');
@@ -323,11 +359,19 @@ function formatMs(ms) {
 const chronoText = computed(() => formatMs(chronoMs.value));
 function startChrono() {
   if (chronoIntervalId) clearInterval(chronoIntervalId);
-  const startAt = Date.now();
-  const base = chronoMs.value;
-  chronoIntervalId = setInterval(() => {
-    chronoMs.value = base + (Date.now() - startAt);
-  }, 250);
+  // In versus, share a common chrono anchored to the agreed start time + reveal duration
+  if (state.mode === 'versus' && typeof versusStartAtMs.value === 'number') {
+    const baseStart = versusStartAtMs.value + REVEAL_MS;
+    chronoIntervalId = setInterval(() => {
+      chronoMs.value = Math.max(0, Date.now() - baseStart);
+    }, 250);
+  } else {
+    const startAt = Date.now();
+    const base = chronoMs.value;
+    chronoIntervalId = setInterval(() => {
+      chronoMs.value = base + (Date.now() - startAt);
+    }, 250);
+  }
 }
 function stopChrono() {
   if (chronoIntervalId) {
@@ -622,7 +666,7 @@ function onCellClick(r, c) {
       const FLIP_BACK_DUR = 420;  // must match BoardView
       const backTotal = ROWS * FLIP_BACK_STEP + FLIP_BACK_DUR;
       flipBackActive.value = true;
-      setTimeout(() => {
+      setTimeout(async () => {
         flipBackActive.value = false;
         faceDownActive.value = false; // show front faces (remove random colors)
         // Record daily win in storage
@@ -641,6 +685,13 @@ function onCellClick(r, c) {
           newGame();
           return;
         } else {
+          // Versus or other modes: show win; in versus, mark finish
+          try {
+            if (state.mode === 'versus') {
+              const pid = playerId.value || ensurePlayerId();
+              await finishRoom(versusCode.value, pid, chronoMs.value);
+            }
+          } catch (_) {}
           winActive.value = true;       // show modal after animation
         }
       }, backTotal);
@@ -771,6 +822,93 @@ function loadStats() {
 function openStats() {
   loadStats();
   showStats.value = true;
+}
+
+function openVersus() {
+  showVersus.value = true;
+  versusCode.value = '';
+  versusIsHost.value = false;
+  versusError.value = '';
+  joinInput.value = '';
+  if (!playerId.value) {
+    try { playerId.value = ensurePlayerId(); } catch (_) {}
+  }
+  try { initRealtime(); } catch (e) { versusError.value = 'Supabase non configuré'; }
+}
+
+function closeVersus() {
+  showVersus.value = false;
+  if (versusUnsub) { try { versusUnsub(); } catch (_) {} versusUnsub = null; }
+}
+
+async function handleCreateRoom() {
+  versusError.value = '';
+  try {
+    const pid = playerId.value || ensurePlayerId();
+    const code = await createRoom(pid);
+    versusCode.value = code;
+    versusIsHost.value = true;
+    subscribeToRoom(code);
+  } catch (e) {
+    versusError.value = String(e && e.message || e);
+  }
+}
+
+async function handleJoinRoom() {
+  versusError.value = '';
+  const code = (joinInput.value || '').trim().toUpperCase();
+  if (!code) { versusError.value = 'Code requis'; return; }
+  try {
+    const pid = playerId.value || ensurePlayerId();
+    await joinRoom(code, pid);
+    versusCode.value = code;
+    versusIsHost.value = false;
+    subscribeToRoom(code);
+  } catch (e) {
+    versusError.value = String(e && e.message || e);
+  }
+}
+
+function subscribeToRoom(code) {
+  if (versusUnsub) { try { versusUnsub(); } catch (_) {} }
+  versusUnsub = subscribeRoom(code, async (room) => {
+    if (!room) return;
+    // If host and guest just arrived, start the match
+    if (versusIsHost.value && room.host_id === playerId.value && room.guest_id && room.status === 'waiting') {
+      const seed = Math.floor(Math.random() * 1e9);
+      const startAt = Date.now() + 1500; // 1.5s buffer for both clients
+      try { await startRoom(code, seed, startAt); } catch (_) {}
+      return;
+    }
+    // When playing, both clients begin simultaneously
+    if (room.status === 'playing' && typeof room.seed === 'number' && typeof room.start_at_ms === 'number') {
+      beginVersus(room.seed, room.start_at_ms);
+      closeVersus();
+      return;
+    }
+  });
+}
+
+function beginVersus(seed, startAtMs) {
+  versusSeed.value = seed;
+  versusStartAtMs.value = startAtMs;
+  state.mode = 'versus';
+  state.showHome = false;
+  // Prepare deterministic path
+  const rng = seededRng(seed);
+  state.path = randomPathWithRng(rng);
+  state.nextIndex = 0;
+  state.correctSet.clear();
+  state.wrongSet.clear();
+  faceDownActive.value = false;
+  stopChrono();
+  chronoMs.value = 0;
+  // Schedule reveal to start exactly at startAtMs
+  const delay = Math.max(0, startAtMs - Date.now());
+  if (state.timerId) clearTimeout(state.timerId);
+  state.timerId = setTimeout(() => {
+    showPath();
+  }, delay);
 }
 
 async function handleShare() {

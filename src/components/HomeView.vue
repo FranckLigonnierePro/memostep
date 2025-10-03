@@ -11,7 +11,7 @@
           </span>
         </button>
         <button class="menu-btn" @click="emit('solo')">{{ $t('home.solo') }}</button>
-        <button class="menu-btn" disabled aria-disabled="true" :title="$t('home.soon')">{{ $t('home.versus') }}</button>
+        <button class="menu-btn" @click="emit('versus')">{{ $t('home.versus') }}</button>
         <button class="menu-btn" disabled aria-disabled="true" :title="$t('home.soon')">{{ $t('home.battle') }}</button>
         <button class="menu-btn" @click="emit('stats')">{{ $t('home.stats') }}</button>
         <a
