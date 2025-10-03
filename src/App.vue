@@ -727,59 +727,59 @@ function onCellClick(r, c) {
     const FLIP_BACK_STEP = 70;  // must match BoardView
     const FLIP_BACK_DUR = 420;  // must match BoardView
     const backTotal = ROWS * FLIP_BACK_STEP + FLIP_BACK_DUR;
-    flipBackActive.value = true;
-    // Ensure facedown stays during animation, then reveal faces up
-    setTimeout(() => {
-      flipBackActive.value = false;
-      faceDownActive.value = false; // keep faces up revealing the path
-      // Record a failed attempt for daily mode
-      if (state.mode === 'daily') {
-        try {
-          const attempts = markDailyAttempt();
-          dailyAttempts.value = attempts;
-        } catch (_) {}
-      } else if (state.mode === 'solo') {
-        // increase solo lives used on each loss
-        soloLivesUsed.value = Math.min(3, (soloLivesUsed.value || 0) + 1);
-      }
-      // Trigger heart extinguish animation only on actual new loss
-      justLost.value = true;
-      setTimeout(() => { justLost.value = false; }, 900);
-      // Only show lose modal when out of hearts; otherwise auto-restart (daily/solo). Versus: finish room marking opponent winner.
-      if (state.mode === 'versus') {
-        try {
-          // Fetch latest snapshot to avoid stale opponent id
-          const snapshot = await getRoom(versusCode.value).catch(() => versusRoom.value);
-          const room = snapshot || versusRoom.value;
-          const me = playerId.value || ensurePlayerId();
-          let opponent = null;
-          if (room) {
-            // If I'm host, opponent is guest; otherwise opponent is host
-            if (room.host_id && room.host_id !== me) opponent = room.host_id;
-            else if (room.guest_id && room.guest_id !== me) opponent = room.guest_id;
-          }
-          // Mark room finished with opponent as winner so they receive win modal
-          await finishRoom(versusCode.value, opponent, chronoMs.value);
-        } catch (_) {}
-        // Show local lose modal immediately for the losing player
+  flipBackActive.value = true;
+  // Ensure facedown stays during animation, then reveal faces up
+  setTimeout(async () => {
+    flipBackActive.value = false;
+    faceDownActive.value = false; // keep faces up revealing the path
+    // Record a failed attempt for daily mode
+    if (state.mode === 'daily') {
+      try {
+        const attempts = markDailyAttempt();
+        dailyAttempts.value = attempts;
+      } catch (_) {}
+    } else if (state.mode === 'solo') {
+      // increase solo lives used on each loss
+      soloLivesUsed.value = Math.min(3, (soloLivesUsed.value || 0) + 1);
+    }
+    // Trigger heart extinguish animation only on actual new loss
+    justLost.value = true;
+    setTimeout(() => { justLost.value = false; }, 900);
+    // Only show lose modal when out of hearts; otherwise auto-restart (daily/solo). Versus: finish room marking opponent winner.
+    if (state.mode === 'versus') {
+      try {
+        // Fetch latest snapshot to avoid stale opponent id
+        const snapshot = await getRoom(versusCode.value).catch(() => versusRoom.value);
+        const room = snapshot || versusRoom.value;
+        const me = playerId.value || ensurePlayerId();
+        let opponent = null;
+        if (room) {
+          // If I'm host, opponent is guest; otherwise opponent is host
+          if (room.host_id && room.host_id !== me) opponent = room.host_id;
+          else if (room.guest_id && room.guest_id !== me) opponent = room.guest_id;
+        }
+        // Mark room finished with opponent as winner so they receive win modal
+        await finishRoom(versusCode.value, opponent, chronoMs.value);
+      } catch (_) {}
+      // Show local lose modal immediately for the losing player
+      loseActive.value = true;
+    } else if (state.mode === 'daily') {
+      if ((dailyAttempts.value || 0) >= 3) {
         loseActive.value = true;
-      } else if (state.mode === 'daily') {
-        if ((dailyAttempts.value || 0) >= 3) {
-          loseActive.value = true;
-        } else {
-          setTimeout(() => { newGame(); }, 350);
-        }
-      } else if (state.mode === 'solo') {
-        if ((soloLivesUsed.value || 0) >= 3) {
-          loseActive.value = true;
-        } else {
-          setTimeout(() => { newGame(); }, 350);
-        }
       } else {
-        // For other modes, keep previous behavior
-        loseActive.value = true;
+        setTimeout(() => { newGame(); }, 350);
       }
-    }, backTotal);
+    } else if (state.mode === 'solo') {
+      if ((soloLivesUsed.value || 0) >= 3) {
+        loseActive.value = true;
+      } else {
+        setTimeout(() => { newGame(); }, 350);
+      }
+    } else {
+      // For other modes, keep previous behavior
+      loseActive.value = true;
+    }
+  }, backTotal);
   }
 }
 
