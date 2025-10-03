@@ -237,6 +237,8 @@ const state = reactive({
   mode: 'solo',
   // Persist current solo path across retries until success
   soloPath: [],
+  // Solo decoy cells (adjacent to path), active from level >= 5
+  decoys: new Set(), // 'r-c'
 });
 
 // Flip wave animation control (top -> bottom)
@@ -456,6 +458,36 @@ function randomPathWithRng(rng) {
   return arr;
 }
 
+// Generate up to 2 decoy cells adjacent (orthogonal) to the path, not overlapping path cells
+function generateSoloDecoys() {
+  state.decoys.clear();
+  // Only for solo and level >= 5
+  if (state.mode !== 'solo' || (soloLevel.value || 0) < 5) return;
+  const pathSet = new Set(state.path.map(p => `${p.r}-${p.c}`));
+  const candidates = new Set();
+  for (const p of state.path) {
+    const neigh = [
+      { r: p.r - 1, c: p.c },
+      { r: p.r + 1, c: p.c },
+      { r: p.r, c: p.c - 1 },
+      { r: p.r, c: p.c + 1 },
+    ];
+    for (const n of neigh) {
+      if (n.r < 0 || n.r >= ROWS || n.c < 0 || n.c >= COLS) continue;
+      const key = `${n.r}-${n.c}`;
+      if (!pathSet.has(key)) candidates.add(key);
+    }
+  }
+  const candArr = Array.from(candidates);
+  // Shuffle and pick up to 2
+  for (let i = candArr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candArr[i], candArr[j]] = [candArr[j], candArr[i]];
+  }
+  const picks = candArr.slice(0, 2);
+  for (const k of picks) state.decoys.add(k);
+}
+
 function dailySeed() {
   const d = new Date();
   // Use UTC date so the daily seed is identical worldwide (YYYYMMDD)
@@ -514,6 +546,7 @@ function startMode(mode) {
     // starting solo from home should create a new path
     state.soloPath = randomPath();
     state.path = state.soloPath;
+    generateSoloDecoys();
   } else if (mode === 'versus' || mode === 'battle') {
     // Placeholder: start like solo for now
     state.path = randomPath();
@@ -613,6 +646,24 @@ function onCellClick(r, c) {
       }, backTotal);
     }
   } else {
+    // Solo decoy handling: clicking a decoy does not cost a life but penalizes progress (-3 steps)
+    if (state.mode === 'solo') {
+      const key = `${r}-${c}`;
+      if (state.decoys.has(key)) {
+        // Move back 3 steps
+        const prevIndex = state.nextIndex;
+        const newIndex = Math.max(0, prevIndex - 3);
+        // Remove last correct marks accordingly
+        for (let i = prevIndex - 1; i >= newIndex; i--) {
+          const p = state.path[i];
+          if (!p) break;
+          state.correctSet.delete(`${p.r}-${p.c}`);
+        }
+        state.nextIndex = newIndex;
+        state.statusText = t('status.miss');
+        return; // do not trigger loss flow
+      }
+    }
     state.wrongSet.add(`${r}-${c}`);
     state.statusText = t('status.miss');
     state.inPlay = false;
@@ -757,6 +808,7 @@ function newGame() {
   } else if (state.mode === 'solo') {
     // In solo: keep the same path after a loss; use the prepared next path after a win
     state.path = (state.soloPath && state.soloPath.length) ? state.soloPath : randomPath();
+    generateSoloDecoys();
   } else if (state.mode === 'versus' || state.mode === 'battle') {
     // Placeholder: same as solo for now
     state.path = randomPath();
