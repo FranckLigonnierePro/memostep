@@ -297,6 +297,7 @@ let versusUnsub = null;
 const versusSeed = ref(null);
 const versusStartAtMs = ref(null);
 const playerId = ref(null);
+const versusRoom = ref(null); // latest room snapshot
 
 // Language state
 const currentLang = ref('fr');
@@ -744,8 +745,16 @@ function onCellClick(r, c) {
       // Trigger heart extinguish animation only on actual new loss
       justLost.value = true;
       setTimeout(() => { justLost.value = false; }, 900);
-      // Only show lose modal when out of hearts; otherwise auto-restart
-      if (state.mode === 'daily') {
+      // Only show lose modal when out of hearts; otherwise auto-restart (daily/solo). Versus: finish room marking opponent winner.
+      if (state.mode === 'versus') {
+        try {
+          const room = versusRoom.value || await getRoom(versusCode.value);
+          const me = playerId.value || ensurePlayerId();
+          const opponent = room ? ((room.host_id === me) ? room.guest_id : room.host_id) : null;
+          await finishRoom(versusCode.value, opponent || null, chronoMs.value);
+        } catch (_) {}
+        loseActive.value = true;
+      } else if (state.mode === 'daily') {
         if ((dailyAttempts.value || 0) >= 3) {
           loseActive.value = true;
         } else {
@@ -873,6 +882,7 @@ function subscribeToRoom(code) {
   if (versusUnsub) { try { versusUnsub(); } catch (_) {} }
   versusUnsub = subscribeRoom(code, async (room) => {
     if (!room) return;
+    versusRoom.value = room;
     // If host and guest just arrived, start the match
     if (versusIsHost.value && room.host_id === playerId.value && room.guest_id && room.status === 'waiting') {
       const seed = Math.floor(Math.random() * 1e9);
@@ -884,6 +894,19 @@ function subscribeToRoom(code) {
     if (room.status === 'playing' && typeof room.seed === 'number' && typeof room.start_at_ms === 'number') {
       beginVersus(room.seed, room.start_at_ms);
       closeVersus();
+      return;
+    }
+    // If finished, decide win/lose locally based on winner_id
+    if (room.status === 'finished' && room.winner_id) {
+      stopChrono();
+      state.inPlay = false;
+      faceDownActive.value = false;
+      const me = playerId.value || ensurePlayerId();
+      if (room.winner_id === me) {
+        winActive.value = true;
+      } else {
+        loseActive.value = true;
+      }
       return;
     }
   });
