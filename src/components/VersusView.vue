@@ -1,32 +1,31 @@
 <template>
   <div class="versus-view">
-    <div class="header">
-      <div class="logo-container">
-        <!-- Optional logo area; keep consistent spacing -->
-        <h2 style="margin:0">Versus</h2>
+    <div v-if="!versusCode" class="flex flex-col mt-4 w-full grow justify-center">
+      <div class="input-with-btn" style="height:46px;">
+        <button type="button" class="icon-input-btn" aria-label="Pseudo">
+          <User :size="18" aria-hidden="true" />
+        </button>
+        <input v-model="usernameInput" placeholder="Pseudo" class="input" style="height: 46px; width: 100%;"/> 
       </div>
-    </div>
-
-    <div class="body">
-      <div v-if="!versusCode">
-        <div style="display:flex; gap:6px; justify-content:center; align-items:center; margin-bottom:10px;">
-          <input v-model="usernameInput" placeholder="Pseudo" class="input" />
-        </div>
-        <button class="btn" @click="handleCreateRoom">Créer une partie</button>
-        <div style="display:flex; gap:6px; justify-content:center; align-items:center; margin-top:10px;">
-          <input v-model="joinInput" placeholder="Code" class="input" style="text-transform:uppercase;" />
+      <button class="btn" @click="handleCreateRoom">Créer une partie</button>
+        <div style="display:flex; gap:6px; justify-content:center; align-items:center;">
+          <input v-model="joinInput" placeholder="Code" class="input" style="text-transform:uppercase; margin-top: 12px; height: 46px;" />
           <button class="btn" @click="handleJoinRoom">Rejoindre</button>
         </div>
         <div v-if="versusError" class="error">{{ versusError }}</div>
       </div>
-
-      <div v-else>
+      <div v-else class="flex flex-col mt-4 w-full grow justify-center">
         <div style="margin:8px 0;">Code de salle</div>
         <div style="font-size:24px; letter-spacing:3px;">{{ versusCode }}</div>
-        <div style="margin:10px 0; font-weight:600;">Joueurs ({{ (versusRoom?.players || []).length || 1 }}/8)</div>
-        <ul class="players">
-          <li v-for="p in (versusRoom?.players || defaultPlayers)" :key="p.id">{{ p.name || 'Player' }}</li>
-        </ul>
+        <div style="margin:10px 0; font-weight:600;">Joueurs ({{ (versusRoom?.players || defaultPlayers).length }}/8)</div>
+        <div class="slots">
+          <div v-for="i in 8" :key="i" class="slot">
+            <div class="badge">{{ i }}</div>
+            <div class="name">
+              {{ slotName(i-1) }}
+            </div>
+          </div>
+        </div>
         <div v-if="versusIsHost" style="margin-top:12px; display:flex; gap:8px; justify-content:center;">
           <button class="btn" :disabled="((versusRoom?.players || defaultPlayers).length < 2)" @click="handleStartVersus">Démarrer</button>
         </div>
@@ -34,16 +33,14 @@
       </div>
     </div>
 
-    <div class="footer">
-      <button class="btn" @click="closeLobby">Retour</button>
-    </div>
-  </div>
+    <button class="btn" @click="closeLobby">Retour</button>
 </template>
 
 <script setup>
-import { ref, computed, onBeforeUnmount } from 'vue';
+import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import { ensurePlayerId } from '../lib/storage.js';
 import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, getRoom } from '../lib/realtime.js';
+import { User } from 'lucide-vue-next';
 
 const emit = defineEmits(['close', 'begin']);
 
@@ -56,10 +53,35 @@ const versusRoom = ref(null);
 const playerId = ref(null);
 let unsub = null;
 
+// Persist username locally
+const USERNAME_STORAGE_KEY = 'memostep_username';
+onMounted(() => {
+  try {
+    const saved = localStorage.getItem(USERNAME_STORAGE_KEY);
+    if (saved) usernameInput.value = saved;
+  } catch (_) {}
+});
+watch(() => usernameInput.value, (v) => {
+  try { localStorage.setItem(USERNAME_STORAGE_KEY, String(v || '')); } catch (_) {}
+});
+
 function defaultPlayersComputed() {
   return [{ id: playerId.value || ensurePlayerId(), name: (usernameInput.value || 'Player') }];
 }
 const defaultPlayers = computed(defaultPlayersComputed);
+
+const slots = computed(() => {
+  const list = (versusRoom.value && Array.isArray(versusRoom.value.players)) ? versusRoom.value.players : defaultPlayers.value;
+  const arr = new Array(8).fill(null);
+  for (let i = 0; i < Math.min(8, list.length); i++) arr[i] = list[i];
+  return arr;
+});
+
+function slotName(idx) {
+  const s = slots.value[idx];
+  if (!s) return 'Libre';
+  return s.name || 'Player';
+}
 
 function closeLobby() {
   cleanupSub();
@@ -157,20 +179,14 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .versus-view {
-  width: 320px;
-  height: 548px;
-  box-sizing: border-box;
+  margin-bottom: .5rem;
+  justify-content: space-between;
   display: flex;
+  flex-grow: 1;
   flex-direction: column;
-  padding: .5rem;
-}
-.header {
-  width: 300px;
-  display: flex;
   align-items: center;
-  justify-content: center;
-  height: 4rem;
 }
+
 .body { flex: 1; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; }
 .footer { display:flex; justify-content:center; }
 .input {
@@ -188,7 +204,41 @@ onBeforeUnmount(() => {
   cursor: pointer;
   text-align: center;
 }
-.players { list-style:none; padding:0; margin:0; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
-.players li { padding:6px 10px; border:1px solid #2a2e52; border-radius:8px; }
+.slots { display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:8px; }
+.slot { display:flex; align-items:center; gap:8px; padding:8px; border:1px solid #2a2e52; border-radius:10px; background:#0f1020; min-width:0; }
+.slot .badge { width:22px; height:22px; border-radius:999px; background:#1a1c30; border:1px solid #2a2e52; display:flex; align-items:center; justify-content:center; font-size:12px; color:#fff; }
+.slot .name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#fff; font-weight:700; }
 .error { color:#ff5a8a; font-size:12px; margin-top:6px; }
+.menu-btn {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #2a2e52;
+  margin-top: .75rem;
+  background: #1a1c30;
+  color: var(--text);
+  box-shadow: 0 2px 0 #1a1c30;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+}
+
+.menu-btn:hover { background: #1f2238; }
+.menu-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #1a1c30; }
+
+/* Input with external icon button */
+.input-with-btn { display:flex; align-items:center; gap:8px; }
+.icon-input-btn {
+  width: 46px; height: 46px;
+  min-width: 46px;
+  display:flex; align-items:center; justify-content:center;
+  border-radius: 10px;
+  border: 1px solid #2a2e52;
+  background: #1a1c30;
+  color: var(--text);
+  pointer-events: none;
+  cursor: pointer;
+}
+.icon-input-btn:hover { background: #1f2238; }
+.icon-input-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #1a1c30; }
+.icon-person { width:18px; height:18px; color: var(--text); opacity:.9; }
 </style>

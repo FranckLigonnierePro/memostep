@@ -150,9 +150,17 @@ export async function joinRoom(code, playerId, playerName) {
 
 export async function startRoom(code, seed, startAtMs) {
   initRealtime();
+  // Fetch current players to reset per-round progress
+  const { data: room, error: getErr } = await supabase
+    .from('rooms')
+    .select('*')
+    .eq('code', code)
+    .single();
+  if (getErr) throw getErr;
+  const players = Array.isArray(room?.players) ? room.players.map(p => ({ ...p, progress: 0 })) : [];
   const { error } = await supabase
     .from('rooms')
-    .update({ status: 'playing', seed, start_at_ms: startAtMs })
+    .update({ status: 'playing', seed, start_at_ms: startAtMs, players })
     .eq('code', code);
   if (error) throw error;
 }
