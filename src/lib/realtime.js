@@ -213,3 +213,47 @@ export async function getRoom(code) {
   if (error) throw error;
   return data;
 }
+
+// Decrement lives for a given loser without awarding a round win or changing the
+// current round seed/start time. If lives reach 0, finish the room and set winner_id.
+export async function reportLifeLoss(code, loserId, winnerIdIfBusted) {
+  initRealtime();
+  const { data: room, error: getErr } = await supabase
+    .from('rooms')
+    .select('*')
+    .eq('code', code)
+    .single();
+  if (getErr) throw getErr;
+  if (!room) throw new Error('Room not found');
+
+  const players = Array.isArray(room.players) ? room.players.slice() : [];
+  let i = players.findIndex(p => p && p.id === loserId);
+  if (i === -1) {
+    players.push({ id: loserId, name: 'Player', score: 0, lives: 3 });
+    i = players.length - 1;
+  }
+  const cur = players[i] || {};
+  const lives = Math.max(0, Number(cur.lives ?? 3) - 1);
+  players[i] = { ...cur, lives };
+
+  if (lives <= 0 && winnerIdIfBusted) {
+    const { data, error: upErr } = await supabase
+      .from('rooms')
+      .update({ status: 'finished', winner_id: winnerIdIfBusted, players })
+      .eq('code', code)
+      .select('*')
+      .single();
+    if (upErr) throw upErr;
+    return data;
+  }
+
+  // Keep status/seed/start_at_ms unchanged to continue the same round/path
+  const { data, error: upErr } = await supabase
+    .from('rooms')
+    .update({ players })
+    .eq('code', code)
+    .select('*')
+    .single();
+  if (upErr) throw upErr;
+  return data;
+}

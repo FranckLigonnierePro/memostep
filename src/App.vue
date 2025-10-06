@@ -185,7 +185,7 @@ import {
   markDailyAttempt,
   getState,
 } from './lib/storage.js';
-import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult } from './lib/realtime.js';
+import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult, reportLifeLoss } from './lib/realtime.js';
 
 // Try to load a real logo from assets if present (supports memostep or memostep-logo)
 const logoModules = import.meta.glob('./assets/{memostep,memostep-logo}.{png,jpg,jpeg,webp,svg}', { eager: true });
@@ -783,11 +783,14 @@ function onCellClick(r, c) {
             else if (room.guest_id && room.guest_id !== me) opponent = room.guest_id;
           }
         }
-        const updated = await reportRoundResult(versusCode.value, opponent, me, chronoMs.value);
+        // Decrement my life; if busted, room finishes with opponent winner
+        const updated = await reportLifeLoss(versusCode.value, me, opponent);
         if (updated) { versusRoom.value = updated; }
-        // Only show local lose modal if the room is finished and I am not the winner
-        if (updated && updated.status === 'finished' && updated.winner_id && updated.winner_id !== me) {
+        if (updated && updated.status === 'finished') {
           loseActive.value = true;
+        } else {
+          // Continue same round by re-showing the same path after animation delay
+          setTimeout(() => { showPath(); }, 350);
         }
       } catch (_) {
         // On error, show lose modal to avoid dead-end
