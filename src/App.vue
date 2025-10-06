@@ -200,6 +200,30 @@ const realLogoUrl = (() => {
 
 const logoSrc = computed(() => (typeof realLogoUrl === 'string' && realLogoUrl) ? realLogoUrl : '');
 
+// Versus auto-publish ticker (100ms)
+let progressTicker = null;
+let lastSentProgress = -1;
+function startProgressAutoPublish() {
+  stopProgressAutoPublish();
+  if (state.mode !== 'versus') return;
+  progressTicker = setInterval(() => {
+    try {
+      if (!versusCode.value) return;
+      if (!state.inPlay) return;
+      const me = playerId.value || ensurePlayerId();
+      const len = state.path.length || 1;
+      const prog = Math.max(0, Math.min(1, state.nextIndex / len));
+      if (prog === lastSentProgress) return;
+      lastSentProgress = prog;
+      setPlayerProgress(versusCode.value, me, prog).then(updated => { if (updated) versusRoom.value = updated; }).catch(() => {});
+    } catch (_) {}
+  }, 100);
+}
+function stopProgressAutoPublish() {
+  if (progressTicker) { clearInterval(progressTicker); progressTicker = null; }
+  lastSentProgress = -1;
+}
+
 // Root scale (scale the whole content like your snippet)
 const ROOT_W = 320;   // Et
 const ROOT_H = 548;   // Ot
@@ -677,6 +701,8 @@ function hidePath() {
       const me = playerId.value || ensurePlayerId();
       if (versusCode.value) setPlayerProgress(versusCode.value, me, 0).then(updated => { if (updated) versusRoom.value = updated; }).catch(() => {});
     } catch (_) {}
+    // Start auto-publish ticker
+    startProgressAutoPublish();
   }
 
   // Trigger flip wave animation briefly
@@ -707,6 +733,8 @@ function onCellClick(r, c) {
     if (state.nextIndex === state.path.length) {
       state.statusText = t('status.bravo');
       state.inPlay = false;
+      // Stop auto publish at end of round
+      stopProgressAutoPublish();
       // Stop chrono, reveal path now so it's visible during reverse flip,
       // then play reverse flip animation (keep facedown colors during the flip)
       stopChrono();
