@@ -185,7 +185,7 @@ import {
   markDailyAttempt,
   getState,
 } from './lib/storage.js';
-import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom } from './lib/realtime.js';
+import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult } from './lib/realtime.js';
 
 // Try to load a real logo from assets if present (supports memostep or memostep-logo)
 const logoModules = import.meta.glob('./assets/{memostep,memostep-logo}.{png,jpg,jpeg,webp,svg}', { eager: true });
@@ -325,13 +325,23 @@ const dailyDone = ref(isDailyDoneToday());
 const justLost = ref(false);
 const soloLivesUsed = ref(0);
 const soloLevel = ref(0);
+const versusLivesUsed = computed(() => {
+  if (state.mode !== 'versus') return 0;
+  const room = versusRoom.value;
+  const me = playerId.value || ensurePlayerId();
+  const roster = (room && Array.isArray(room.players)) ? room.players : [];
+  const meEntry = roster.find(p => p && p.id === me);
+  const lives = Number(meEntry && meEntry.lives != null ? meEntry.lives : 3);
+  return Math.min(3, Math.max(0, 3 - lives));
+});
 const livesUsed = computed(() => {
   if (state.mode === 'daily') return Math.min(3, dailyAttempts.value);
   if (state.mode === 'solo') return Math.min(3, soloLivesUsed.value);
+  if (state.mode === 'versus') return versusLivesUsed.value;
   return 0;
 });
 const lastExtinguishedIndex = computed(() => {
-  if (state.mode === 'daily' || state.mode === 'solo') return Math.min(2, livesUsed.value - 1);
+  if (state.mode === 'daily' || state.mode === 'solo' || state.mode === 'versus') return Math.min(2, livesUsed.value - 1);
   return -1;
 });
 
@@ -673,14 +683,35 @@ function onCellClick(r, c) {
           newGame();
           return;
         } else {
-          // Versus or other modes: show win; in versus, mark finish
+          // Versus or other modes: in versus, report round result (first to 5 or hearts KO)
           try {
             if (state.mode === 'versus') {
-              const pid = playerId.value || ensurePlayerId();
-              await finishRoom(versusCode.value, pid, chronoMs.value);
+              const me = playerId.value || ensurePlayerId();
+              // Identify opponent (2-player assumption)
+              const snapshot = await getRoom(versusCode.value).catch(() => versusRoom.value);
+              const room = snapshot || versusRoom.value;
+              let opponent = null;
+              if (room) {
+                const roster = Array.isArray(room.players) ? room.players : [];
+                const other = roster.find(p => p && p.id && p.id !== me);
+                opponent = other?.id || null;
+                if (!opponent) {
+                  if (room.host_id && room.host_id !== me) opponent = room.host_id;
+                  else if (room.guest_id && room.guest_id !== me) opponent = room.guest_id;
+                }
+              }
+              const updated = await reportRoundResult(versusCode.value, me, opponent, chronoMs.value);
+              // If room finished with me as winner, show win modal
+              if (updated && updated.status === 'finished' && updated.winner_id === me) {
+                winActive.value = true;
+              }
+            } else {
+              winActive.value = true;
             }
-          } catch (_) {}
-          winActive.value = true;       // show modal after animation
+          } catch (_) {
+            // Fallback: show modal
+            winActive.value = true;
+          }
         }
       }, backTotal);
     }
@@ -735,21 +766,31 @@ function onCellClick(r, c) {
     // Only show lose modal when out of hearts; otherwise auto-restart (daily/solo). Versus: finish room marking opponent winner.
     if (state.mode === 'versus') {
       try {
-        // Fetch latest snapshot to avoid stale opponent id
+        // Fetch latest snapshot to identify opponent id if needed
         const snapshot = await getRoom(versusCode.value).catch(() => versusRoom.value);
         const room = snapshot || versusRoom.value;
         const me = playerId.value || ensurePlayerId();
         let opponent = null;
         if (room) {
-          // If I'm host, opponent is guest; otherwise opponent is host
-          if (room.host_id && room.host_id !== me) opponent = room.host_id;
-          else if (room.guest_id && room.guest_id !== me) opponent = room.guest_id;
+          // Prefer roster players list to find someone not me
+          const roster = Array.isArray(room.players) ? room.players : [];
+          const other = roster.find(p => p && p.id && p.id !== me);
+          opponent = other?.id || null;
+          // Fallback to legacy host/guest ids
+          if (!opponent) {
+            if (room.host_id && room.host_id !== me) opponent = room.host_id;
+            else if (room.guest_id && room.guest_id !== me) opponent = room.guest_id;
+          }
         }
-        // Mark room finished with opponent as winner so they receive win modal
-        await finishRoom(versusCode.value, opponent, chronoMs.value);
-      } catch (_) {}
-      // Show local lose modal immediately for the losing player
-      loseActive.value = true;
+        const updated = await reportRoundResult(versusCode.value, opponent, me, chronoMs.value);
+        // Only show local lose modal if the room is finished and I am not the winner
+        if (updated && updated.status === 'finished' && updated.winner_id && updated.winner_id !== me) {
+          loseActive.value = true;
+        }
+      } catch (_) {
+        // On error, show lose modal to avoid dead-end
+        loseActive.value = true;
+      }
     } else if (state.mode === 'daily') {
       if ((dailyAttempts.value || 0) >= 3) {
         loseActive.value = true;

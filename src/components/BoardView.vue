@@ -38,9 +38,9 @@
           <button class="icon-btn" :aria-label="$t('board.home')" @click="emit('goHome')">
             <Home :size="28" aria-hidden="true" />
           </button>
-          <!-- Lives hearts under Home button (daily & solo) -->
+          <!-- Lives hearts under Home button (daily, solo & versus) -->
           <div
-            v-if="mode === 'daily' || mode === 'solo'"
+            v-if="mode === 'daily' || mode === 'solo' || mode === 'versus'"
             class="hearts"
             aria-label="Vies restantes"
             role="group"
