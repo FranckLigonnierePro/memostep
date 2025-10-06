@@ -24,7 +24,7 @@
         <div class="reveal-fill" :style="{ transform: `scaleY(${revealComplete ? 1 : revealProgress})` }"></div>
       </div>
       <!-- Versus wins bar (5 segments) -->
-      <div v-if="mode === 'versus'" class="wins-bar" aria-hidden="true" :title="`Progression parcours: ${(Number(versusProgress)*100).toFixed(0)}%`">
+      <div v-if="mode === 'versus'" class="wins-bar" aria-hidden="true" :title="`Victoires: ${Number(versusWins)}/5 – Parcours en cours: ${(Number(versusProgress)*100).toFixed(0)}%`">
         <div v-for="i in 5" :key="i" class="wins-segment">
           <div class="wins-fill" :style="{ transform: `scaleY(${segmentFill(i)})` }"></div>
         </div>
@@ -108,13 +108,18 @@ function faceColorClass(r, c) {
   return `face-${v}`;
 }
 
-// Return per-segment fill (0..1). There are 5 segments; each covers 1/5 of progress.
+// Each segment = one parcours
+// - Segments <= versusWins are fully filled
+// - The next segment (wins+1) fills with current parcours progress (0..1)
+// - Remaining segments are empty
 function segmentFill(index) {
-  const p = Math.max(0, Math.min(1, Number(props.versusProgress) || 0));
-  const perSeg = p * 5; // 0..5
-  const segStart = index - 1; // 0-based
-  const raw = perSeg - segStart; // amount into this segment
-  return Math.max(0, Math.min(1, raw));
+  const wins = Math.max(0, Math.min(5, Number(props.versusWins) || 0));
+  if (index <= wins) return 1;
+  if (index === wins + 1) {
+    const p = Math.max(0, Math.min(1, Number(props.versusProgress) || 0));
+    return p;
+  }
+  return 0;
 }
 </script>
 
@@ -144,11 +149,14 @@ function segmentFill(index) {
 /* Vertical reveal progress bar on the side of panel */
 .reveal-bar {
   position: relative;
-  margin: 12px 8px;
-  width: 10px;
-  border-radius: 999px;
+  margin: 12px 0px;
+  margin-right: 8px;
+  width: 8px;
+  border-bottom-right-radius: 999px;
+  border-top-right-radius: 999px;
   background: #1b1e34;
   border: 1px solid #2a2e52;
+  border-left: none;
   overflow: hidden;
   pointer-events: none;
 }
@@ -169,11 +177,14 @@ function segmentFill(index) {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin: 12px 2px 12px 0;
+margin-right: 8px;
+  align-self: center; /* take full available height in the flex row */
+  height: 95%;
 }
 .wins-segment {
-  width: 12px;
-  height: 18px;
+  width: 10px;
+  /* Distribute segments to fill the full height */
+  flex: 1 1 0;
   border-radius: 4px;
   background: #1b1e34;
   border: 1px solid #2a2e52;
