@@ -13,9 +13,9 @@
           <button class="btn" @click="handleJoinRoom">Rejoindre</button>
         </div>
         <div v-if="versusError" class="error">{{ versusError }}</div>
+      <button class="btn" @click="closeLobby">Retour</button>
       </div>
       <div v-else class="flex flex-col mt-4 w-full grow justify-center">
-        <div style="margin:8px 0;">Code de salle</div>
         <div style="font-size:24px; letter-spacing:3px;">{{ versusCode }}</div>
         <div style="margin:10px 0; font-weight:600;">Joueurs ({{ (versusRoom?.players || defaultPlayers).length }}/8)</div>
         <div class="slots">
@@ -27,13 +27,12 @@
           </div>
         </div>
         <div v-if="versusIsHost" style="margin-top:12px; display:flex; gap:8px; justify-content:center;">
+          <button class="btn" @click="closeLobby">Retour</button>
           <button class="btn" :disabled="((versusRoom?.players || defaultPlayers).length < 2)" @click="handleStartVersus">Démarrer</button>
         </div>
         <div v-if="versusError" class="error">{{ versusError }}</div>
       </div>
     </div>
-
-    <button class="btn" @click="closeLobby">Retour</button>
 </template>
 
 <script setup>
@@ -204,8 +203,8 @@ onBeforeUnmount(() => {
   cursor: pointer;
   text-align: center;
 }
-.slots { display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:8px; }
-.slot { display:flex; align-items:center; gap:8px; padding:8px; border:1px solid #2a2e52; border-radius:10px; background:#0f1020; min-width:0; }
+.slots { display:flex; flex-direction: column; flex-wrap:wrap; gap:4px; }
+.slot { display:flex; align-items:center; gap:8px; padding:4px; border:1px solid #2a2e52; border-radius:10px; background:#0f1020; min-width:0; }
 .slot .badge { width:22px; height:22px; border-radius:999px; background:#1a1c30; border:1px solid #2a2e52; display:flex; align-items:center; justify-content:center; font-size:12px; color:#fff; }
 .slot .name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#fff; font-weight:700; }
 .error { color:#ff5a8a; font-size:12px; margin-top:6px; }
