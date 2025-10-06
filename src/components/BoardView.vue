@@ -175,9 +175,9 @@ function segmentFill(index) {
 /* Wins bar next to reveal bar */
 .wins-bar {
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   gap: 4px;
-margin-right: 8px;
+  margin-right: 8px;
   align-self: center; /* take full available height in the flex row */
   height: 95%;
 }
