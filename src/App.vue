@@ -701,6 +701,7 @@ function onCellClick(r, c) {
                 }
               }
               const updated = await reportRoundResult(versusCode.value, me, opponent, chronoMs.value);
+              if (updated) { versusRoom.value = updated; }
               // If room finished with me as winner, show win modal
               if (updated && updated.status === 'finished' && updated.winner_id === me) {
                 winActive.value = true;
@@ -783,6 +784,7 @@ function onCellClick(r, c) {
           }
         }
         const updated = await reportRoundResult(versusCode.value, opponent, me, chronoMs.value);
+        if (updated) { versusRoom.value = updated; }
         // Only show local lose modal if the room is finished and I am not the winner
         if (updated && updated.status === 'finished' && updated.winner_id && updated.winner_id !== me) {
           loseActive.value = true;
