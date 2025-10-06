@@ -70,6 +70,33 @@ export async function reportRoundResult(code, winnerId, loserId, timeMs) {
   return data;
 }
 
+// Update a player's per-round progress (0..1) inside players[] without changing
+// seed/start/status. This enables realtime UI for bubbles.
+export async function setPlayerProgress(code, playerId, progress) {
+  initRealtime();
+  const p = Math.max(0, Math.min(1, Number(progress) || 0));
+  const { data: room, error: getErr } = await supabase
+    .from('rooms')
+    .select('*')
+    .eq('code', code)
+    .single();
+  if (getErr) throw getErr;
+  if (!room) throw new Error('Room not found');
+  const players = Array.isArray(room.players) ? room.players.slice() : [];
+  let i = players.findIndex(pl => pl && pl.id === playerId);
+  if (i === -1) { players.push({ id: playerId, name: 'Player', score: 0, lives: 3, progress: p }); i = players.length - 1; }
+  const cur = players[i] || {};
+  players[i] = { ...cur, progress: p };
+  const { data, error: upErr } = await supabase
+    .from('rooms')
+    .update({ players })
+    .eq('code', code)
+    .select('*')
+    .single();
+  if (upErr) throw upErr;
+  return data;
+}
+
 function randomCode(len = 6) {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let out = '';

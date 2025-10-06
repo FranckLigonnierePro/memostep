@@ -47,6 +47,7 @@
       :mode="state.mode"
       :versusWins="versusWins"
       :versusProgress="versusProgress"
+      :versusPlayers="versusPlayers"
       :livesUsed="livesUsed"
       :justLost="justLost"
       :lastExtinguishedIndex="lastExtinguishedIndex"
@@ -187,7 +188,7 @@ import {
   markDailyAttempt,
   getState,
 } from './lib/storage.js';
-import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult, reportLifeLoss } from './lib/realtime.js';
+import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult, reportLifeLoss, setPlayerProgress } from './lib/realtime.js';
 
 // Try to load a real logo from assets if present (supports memostep or memostep-logo)
 const logoModules = import.meta.glob('./assets/{memostep,memostep-logo}.{png,jpg,jpeg,webp,svg}', { eager: true });
@@ -350,6 +351,21 @@ const versusProgress = computed(() => {
   if (!state.inPlay) return 0;
   const len = state.path.length || 1;
   return Math.max(0, Math.min(1, state.nextIndex / len));
+});
+// Players list with wins and progress (progress only known locally for self)
+const versusPlayers = computed(() => {
+  if (state.mode !== 'versus') return [];
+  const room = versusRoom.value;
+  const me = playerId.value || ensurePlayerId();
+  const roster = (room && Array.isArray(room.players)) ? room.players : [];
+  return roster.map(p => {
+    const wins = Number(p && p.score != null ? p.score : 0);
+    // Prefer live local progress for self, otherwise use stored progress
+    const storedProg = Number(p && p.progress != null ? p.progress : 0);
+    const progress = (p && p.id === me) ? (Number(versusProgress.value) || 0) : storedProg;
+    const name = (p && p.name) ? String(p.name) : 'Player';
+    return { id: p.id, name, wins, progress };
+  });
 });
 const livesUsed = computed(() => {
   if (state.mode === 'daily') return Math.min(3, dailyAttempts.value);
@@ -654,6 +670,14 @@ function hidePath() {
   chronoMs.value = 0;
   startChrono();
 
+  // Versus: reset and publish per-round progress to 0 at start of play
+  if (state.mode === 'versus') {
+    try {
+      const me = playerId.value || ensurePlayerId();
+      if (versusCode.value) setPlayerProgress(versusCode.value, me, 0).then(updated => { if (updated) versusRoom.value = updated; }).catch(() => {});
+    } catch (_) {}
+  }
+
   // Trigger flip wave animation briefly
   const FLIP_STEP = 70;   // must match BoardView's per-row delay
   const FLIP_DUR = 420;   // ms for a single cell flip
@@ -670,6 +694,15 @@ function onCellClick(r, c) {
   if (expect && expect.r === r && expect.c === c) {
     state.correctSet.add(`${r}-${c}`);
     state.nextIndex++;
+    // Versus: publish progress after each correct step
+    if (state.mode === 'versus') {
+      try {
+        const me = playerId.value || ensurePlayerId();
+        const len = state.path.length || 1;
+        const prog = Math.max(0, Math.min(1, state.nextIndex / len));
+        if (versusCode.value) setPlayerProgress(versusCode.value, me, prog).then(updated => { if (updated) versusRoom.value = updated; }).catch(() => {});
+      } catch (_) {}
+    }
     if (state.nextIndex === state.path.length) {
       state.statusText = t('status.bravo');
       state.inPlay = false;
@@ -800,6 +833,8 @@ function onCellClick(r, c) {
             else if (room.guest_id && room.guest_id !== me) opponent = room.guest_id;
           }
         }
+        // Reset my live progress to 0 before restarting same path
+        try { if (versusCode.value) await setPlayerProgress(versusCode.value, me, 0).then(updated => { if (updated) versusRoom.value = updated; }); } catch (_) {}
         // Decrement my life; if busted, room finishes with opponent winner
         const updated = await reportLifeLoss(versusCode.value, me, opponent);
         if (updated) { versusRoom.value = updated; }

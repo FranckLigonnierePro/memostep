@@ -24,9 +24,21 @@
         <div class="reveal-fill" :style="{ transform: `scaleY(${revealComplete ? 1 : revealProgress})` }"></div>
       </div>
       <!-- Versus wins bar (5 segments) -->
-      <div v-if="mode === 'versus'" class="wins-bar" aria-hidden="true" :title="`Victoires: ${Number(versusWins)}/5 – Parcours en cours: ${(Number(versusProgress)*100).toFixed(0)}%`">
+      <div v-if="mode === 'versus'" class="wins-bar" :title="`Victoires: ${Number(versusWins)}/5 – Parcours en cours: ${(Number(versusProgress)*100).toFixed(0)}%`">
         <div v-for="i in 5" :key="i" class="wins-segment">
           <div class="wins-fill" :style="{ transform: `scaleY(${segmentFill(i)})` }"></div>
+        </div>
+        <!-- Player bubbles -->
+        <div class="wins-bubbles">
+          <div
+            v-for="p in (versusPlayers || [])"
+            :key="p.id || p.name"
+            class="wins-bubble"
+            :style="{ bottom: bubbleBottom(p) }"
+            :title="p.name"
+          >
+            {{ initial(p.name) }}
+          </div>
         </div>
       </div>
       <div class="flex flex-col items-center">
@@ -87,6 +99,7 @@ const props = defineProps({
   mode: { type: String, default: 'solo' },
   versusWins: { type: Number, default: 0 },
   versusProgress: { type: Number, default: 0 },
+  versusPlayers: { type: Array, default: () => [] },
   livesUsed: { type: Number, default: 0 },
   justLost: { type: Boolean, default: false },
   lastExtinguishedIndex: { type: Number, default: -1 },
@@ -110,16 +123,29 @@ function faceColorClass(r, c) {
 
 // Each segment = one parcours
 // - Segments <= versusWins are fully filled
-// - The next segment (wins+1) fills with current parcours progress (0..1)
 // - Remaining segments are empty
 function segmentFill(index) {
   const wins = Math.max(0, Math.min(5, Number(props.versusWins) || 0));
   if (index <= wins) return 1;
   if (index === wins + 1) {
-    const p = Math.max(0, Math.min(1, Number(props.versusProgress) || 0));
+    const raw = Number(props.versusProgress) || 0;
+    const p = Math.max(0, Math.min(1, raw));
     return p;
   }
   return 0;
+}
+
+function initial(name) {
+  const s = String(name || '').trim();
+  return s ? s[0].toUpperCase() : '?';
+}
+
+function bubbleBottom(p) {
+  const wins = Math.max(0, Math.min(5, Number(p && p.wins || 0)));
+  const prog = Math.max(0, Math.min(1, Number(p && p.progress || 0)));
+  const total = Math.max(0, Math.min(5, wins + prog));
+  const pct = (total / 5) * 100;
+  return `calc(${pct}% - 10px)`; // center bubble (approx height 20px)
 }
 </script>
 
@@ -180,6 +206,7 @@ function segmentFill(index) {
   margin-right: 8px;
   align-self: center; /* take full available height in the flex row */
   height: 95%;
+  position: relative; /* for bubbles absolute positioning */
 }
 .wins-segment {
   width: 10px;
@@ -198,6 +225,34 @@ function segmentFill(index) {
   transform-origin: bottom center;
   transform: scaleY(0);
   transition: transform 100ms linear;
+}
+
+.wins-bubbles {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  bottom: 0;
+  width: 0; /* collapse width so bubbles center over bar */
+  pointer-events: none; /* bubbles non-interactives */
+}
+.wins-bubble {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0f1020;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #2a2e52;
+  box-shadow: 0 1px 0 #1a1c30;
+  pointer-events: none;
 }
 
 .side-actions {
