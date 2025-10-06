@@ -134,7 +134,7 @@ function subscribeToRoom(code) {
     if (room.status === 'playing' && typeof room.seed === 'number' && typeof room.start_at_ms === 'number') {
       // Inform parent (App) to start the versus game, and pass code/room
       emit('begin', { seed: room.seed, startAtMs: room.start_at_ms, code: versusCode.value, room });
-      cleanupSub();
+      // Do NOT cleanup here; let App.vue keep the subscription alive during gameplay
     }
   }
   unsub = subscribeRoom(code, async (room) => {

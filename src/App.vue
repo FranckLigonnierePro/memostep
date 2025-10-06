@@ -200,9 +200,8 @@ const realLogoUrl = (() => {
 
 const logoSrc = computed(() => (typeof realLogoUrl === 'string' && realLogoUrl) ? realLogoUrl : '');
 
-// Versus auto-publish ticker (100ms)
+// Versus auto-publish ticker (100ms) - publish continuously so others see real-time updates
 let progressTicker = null;
-let lastSentProgress = -1;
 function startProgressAutoPublish() {
   stopProgressAutoPublish();
   if (state.mode !== 'versus') return;
@@ -213,15 +212,14 @@ function startProgressAutoPublish() {
       const me = playerId.value || ensurePlayerId();
       const len = state.path.length || 1;
       const prog = Math.max(0, Math.min(1, state.nextIndex / len));
-      if (prog === lastSentProgress) return;
-      lastSentProgress = prog;
+      // Always publish so other players see updates in real-time
+      console.log('[App] Publishing progress:', prog);
       setPlayerProgress(versusCode.value, me, prog).then(updated => { if (updated) versusRoom.value = updated; }).catch(() => {});
     } catch (_) {}
   }, 100);
 }
 function stopProgressAutoPublish() {
   if (progressTicker) { clearInterval(progressTicker); progressTicker = null; }
-  lastSentProgress = -1;
 }
 
 // Root scale (scale the whole content like your snippet)
@@ -976,6 +974,8 @@ function handleBeginVersusFromLobby(payload) {
       if (typeof payload.seed === 'number' && typeof payload.startAtMs === 'number') {
         beginVersus(payload.seed, payload.startAtMs);
       }
+      // VersusView keeps its subscription alive; App.vue will also subscribe to ensure updates during gameplay
+      if (versusCode.value && !versusUnsub) subscribeToRoom(versusCode.value);
     }
   } finally {
     showVersusView.value = false;
@@ -1019,11 +1019,17 @@ function subscribeToRoom(code) {
   // Shared handler to process any room snapshot (from realtime or initial fetch)
   async function handleRoomUpdate(room) {
     if (!room) return;
+    console.log('[App] Room update received:', room.status, room.players?.map(p => ({ id: p.id?.slice(0,4), progress: p.progress })));
     versusRoom.value = room;
-    // When playing, both clients begin simultaneously
+    // When playing, both clients begin simultaneously. Guard to avoid re-triggering on each players[] update.
     if (room.status === 'playing' && typeof room.seed === 'number' && typeof room.start_at_ms === 'number') {
-      beginVersus(room.seed, room.start_at_ms);
-      closeVersus();
+      const alreadyStartedSameRound = (state.mode === 'versus' && typeof versusStartAtMs.value === 'number' && versusStartAtMs.value === room.start_at_ms);
+      if (!alreadyStartedSameRound) {
+        beginVersus(room.seed, room.start_at_ms);
+        // Do not toggle back to home; just hide the VersusView so BoardView shows
+        showVersusView.value = false;
+        state.showHome = false;
+      }
       return;
     }
     // If finished, decide win/lose locally based on winner_id
