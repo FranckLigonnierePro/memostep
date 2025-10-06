@@ -34,7 +34,7 @@
             v-for="p in (versusPlayers || [])"
             :key="p.id || p.name"
             class="wins-bubble"
-            :style="{ bottom: bubbleBottom(p) }"
+            :style="{ bottom: bubbleBottom(p), background: p.color || '#ffffff', color: bubbleTextColor(p.color) }"
             :title="p.name"
           >
             {{ initial(p.name) }}
@@ -147,6 +147,18 @@ function bubbleBottom(p) {
   const pct = (total / 5) * 100;
   return `calc(${pct}% - 10px)`; // center bubble (approx height 20px)
 }
+
+function bubbleTextColor(bg) {
+  const c = String(bg || '').replace('#', '');
+  if (c.length === 6) {
+    const r = parseInt(c.slice(0,2), 16);
+    const g = parseInt(c.slice(2,4), 16);
+    const b = parseInt(c.slice(4,6), 16);
+    const luminance = (0.299*r + 0.587*g + 0.114*b) / 255;
+    return luminance > 0.6 ? '#0f1020' : '#ffffff';
+  }
+  return '#0f1020';
+}
 </script>
 
 <style scoped>
@@ -250,7 +262,7 @@ function bubbleBottom(p) {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #2a2e52;
+  border: 2px solid rgba(0,0,0,0.2);
   box-shadow: 0 1px 0 #1a1c30;
   pointer-events: none;
 }

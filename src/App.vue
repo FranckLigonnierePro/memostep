@@ -364,7 +364,8 @@ const versusPlayers = computed(() => {
     const storedProg = Number(p && p.progress != null ? p.progress : 0);
     const progress = (p && p.id === me) ? (Number(versusProgress.value) || 0) : storedProg;
     const name = (p && p.name) ? String(p.name) : 'Player';
-    return { id: p.id, name, wins, progress };
+    const color = (p && p.color) ? String(p.color) : '#ffffff';
+    return { id: p.id, name, wins, progress, color };
   });
 });
 const livesUsed = computed(() => {

@@ -14,10 +14,30 @@ export function initRealtime() {
   return supabase;
 }
 
+// Fixed 8-color palette used across the app
+export const PLAYER_COLORS = [
+  '#e74c3c', // red
+  '#e67e22', // orange
+  '#f1c40f', // yellow
+  '#2ecc71', // green
+  '#1abc9c', // teal
+  '#3498db', // blue
+  '#9b59b6', // purple
+  '#fd79a8', // pink
+];
+
+function pickAvailableColor(usedColors = []) {
+  const used = new Set((usedColors || []).filter(Boolean).map(c => String(c).toLowerCase()));
+  for (const c of PLAYER_COLORS) {
+    if (!used.has(c.toLowerCase())) return c;
+  }
+  // Fallback: palette exhausted, pick random from palette
+  return PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)];
+}
+
 // Report a round result with both winner and loser. This increments the winner's
-// score and decrements the loser's lives (starting from 3 if absent). If the
-// winner reaches 5 OR the loser reaches 0 lives, the room is finished with
-// winner_id. Otherwise, it schedules a next round like reportRoundWin.
+// score, decrements the loser's lives. If winner reaches 5 or loser hits 0 lives,
+// the room finishes. Otherwise a new round is scheduled and returned.
 export async function reportRoundResult(code, winnerId, loserId, timeMs) {
   initRealtime();
   const { data: room, error: getErr } = await supabase
@@ -29,20 +49,21 @@ export async function reportRoundResult(code, winnerId, loserId, timeMs) {
   if (!room) throw new Error('Room not found');
 
   const players = Array.isArray(room.players) ? room.players.slice() : [];
-  const ensureEntry = (id) => {
-    let i = players.findIndex(p => p && p.id === id);
-    if (i === -1) { players.push({ id, name: 'Player', score: 0, lives: 3 }); i = players.length - 1; }
-    const cur = players[i] || {};
-    const normalized = { id: cur.id || id, name: cur.name || 'Player', score: Number(cur.score || 0), lives: Number(cur.lives ?? 3) };
-    players[i] = normalized;
-    return i;
-  };
-  const wi = ensureEntry(winnerId);
-  const li = ensureEntry(loserId);
-
-  // Update stats
-  players[wi] = { ...players[wi], score: players[wi].score + 1 };
-  players[li] = { ...players[li], lives: Math.max(0, players[li].lives - 1) };
+  // winner
+  let wi = players.findIndex(p => p && p.id === winnerId);
+  if (wi === -1) { players.push({ id: winnerId, name: 'Player', score: 0, lives: 3 }); wi = players.length - 1; }
+  const wc = players[wi] || {};
+  const usedColors = players.map(p => p && p.color).filter(Boolean);
+  const wcolor = wc.color || pickAvailableColor(usedColors);
+  const wscore = Number(wc.score || 0) + 1;
+  players[wi] = { ...wc, score: wscore, color: wcolor };
+  // loser
+  let li = players.findIndex(p => p && p.id === loserId);
+  if (li === -1) { players.push({ id: loserId, name: 'Player', score: 0, lives: 3 }); li = players.length - 1; }
+  const lc = players[li] || {};
+  const lcolor = lc.color || pickAvailableColor(usedColors);
+  const llives = Math.max(0, Number(lc.lives ?? 3) - 1);
+  players[li] = { ...lc, lives: llives, color: lcolor };
 
   const winnerReached = players[wi].score >= 5;
   const loserBusted = players[li].lives <= 0;
@@ -83,10 +104,17 @@ export async function setPlayerProgress(code, playerId, progress) {
   if (getErr) throw getErr;
   if (!room) throw new Error('Room not found');
   const players = Array.isArray(room.players) ? room.players.slice() : [];
-  let i = players.findIndex(pl => pl && pl.id === playerId);
-  if (i === -1) { players.push({ id: playerId, name: 'Player', score: 0, lives: 3, progress: p }); i = players.length - 1; }
-  const cur = players[i] || {};
-  players[i] = { ...cur, progress: p };
+  let idx = players.findIndex(p => p && p.id === playerId);
+  if (idx !== -1) {
+    const used = players.map(p => p && p.color).filter(Boolean);
+    const existing = players[idx] || {};
+    const color = existing.color || pickAvailableColor(used);
+    players[idx] = { ...existing, name: existing.name || 'Player', score: existing.score || 0, lives: existing.lives || 3, color, progress: p };
+  } else {
+    const used = players.map(p => p && p.color).filter(Boolean);
+    const color = pickAvailableColor(used);
+    players.push({ id: playerId, name: 'Player', score: 0, lives: 3, color, progress: p });
+  }
   const { data, error: upErr } = await supabase
     .from('rooms')
     .update({ players })
@@ -95,6 +123,31 @@ export async function setPlayerProgress(code, playerId, progress) {
     .single();
   if (upErr) throw upErr;
   return data;
+}
+
+export async function joinRoom(code, playerId, name) {
+  initRealtime();
+  const { data: room, error } = await supabase.from('rooms').select('*').eq('code', code).single();
+  if (error) throw error;
+  if (!room) throw new Error('Room not found');
+  const players = Array.isArray(room.players) ? room.players.slice() : [];
+  const idx = players.findIndex(p => p && p.id === playerId);
+  if (idx !== -1) {
+    const used = players.map(p => p && p.color).filter(Boolean);
+    const existing = players[idx] || {};
+    const color = existing.color || pickAvailableColor(used);
+    players[idx] = { ...existing, name: name || existing.name || 'Player', color };
+  } else {
+    const used = players.map(p => p && p.color).filter(Boolean);
+    const color = pickAvailableColor(used);
+    players.push({ id: playerId, name: name || 'Player', score: 0, lives: 3, color });
+  }
+  const { error: upErr } = await supabase
+    .from('rooms')
+    .update({ players })
+    .eq('code', code);
+  if (upErr) throw upErr;
+  return true;
 }
 
 function randomCode(len = 6) {
@@ -107,46 +160,15 @@ function randomCode(len = 6) {
 export async function createRoom(hostId, hostName) {
   initRealtime();
   const code = randomCode(6);
-  const players = [{ id: hostId, name: hostName || 'Player' }];
-  const { error } = await supabase.from('rooms').insert({
-    code,
-    // keep legacy columns for compatibility, but primary roster is in players
-    host_id: hostId,
-    guest_id: null,
-    status: 'waiting',
-    seed: null,
-    start_at_ms: null,
-    players,
-  });
+  const hostColor = pickAvailableColor([]);
+  const { error } = await supabase
+    .from('rooms')
+    .insert([{ code, status: 'waiting', host_id: hostId, players: [{ id: hostId, name: hostName || 'Player', score: 0, lives: 3, color: hostColor }] }]);
   if (error) throw error;
   return code;
 }
 
-export async function joinRoom(code, playerId, playerName) {
-  initRealtime();
-  const { data, error } = await supabase
-    .from('rooms')
-    .select('*')
-    .eq('code', code)
-    .single();
-  if (error) throw error;
-  if (!data) throw new Error('Room not found');
-  if (data.status !== 'waiting') throw new Error('Room not joinable');
-  const players = Array.isArray(data.players) ? data.players.slice() : [];
-  // Already in room
-  if (players.find(p => p && p.id === playerId)) return true;
-  if (players.length >= 8) throw new Error('Room full');
-  players.push({ id: playerId, name: playerName || 'Player' });
-  const update = { players };
-  // keep legacy guest_id for 2-player compatibility if empty
-  if (!data.guest_id) update.guest_id = playerId;
-  const { error: upErr } = await supabase
-    .from('rooms')
-    .update(update)
-    .eq('code', code);
-  if (upErr) throw upErr;
-  return true;
-}
+// (joinRoom above already assigns colors; keep single definition)
 
 export async function startRoom(code, seed, startAtMs) {
   initRealtime();

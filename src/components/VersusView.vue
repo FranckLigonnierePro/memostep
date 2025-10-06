@@ -16,14 +16,18 @@
       <button class="btn" @click="closeLobby">Retour</button>
       </div>
       <div v-else class="flex flex-col mt-4 w-full grow justify-center">
-        <div style="font-size:24px; letter-spacing:3px;">{{ versusCode }}</div>
+        <div style="display:flex; gap:8px; align-items:center; justify-content:center;">
+          <button class="btn" @click="copyJoinLink">Copier le lien d'invitation</button>
+          <span v-if="copied" style="font-size:12px; color:#12b886;">Lien copié</span>
+        </div>
         <div style="margin:10px 0; font-weight:600;">Joueurs ({{ (versusRoom?.players || defaultPlayers).length }}/8)</div>
         <div class="slots">
           <div v-for="i in 8" :key="i" class="slot">
-            <div class="badge">{{ i }}</div>
+            <div class="badge" :style="{ background: slotColor(i-1), borderColor: slotColor(i-1) }">{{ i }}</div>
             <div class="name">
               {{ slotName(i-1) }}
             </div>
+            <Crown v-if="isHostSlot(i-1)" class="slot-crown" :size="16" aria-label="Hôte" />
           </div>
         </div>
         <div v-if="versusIsHost" style="margin-top:12px; display:flex; gap:8px; justify-content:center;">
@@ -39,7 +43,7 @@
 import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import { ensurePlayerId } from '../lib/storage.js';
 import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, getRoom } from '../lib/realtime.js';
-import { User } from 'lucide-vue-next';
+import { User, Crown } from 'lucide-vue-next';
 
 const emit = defineEmits(['close', 'begin']);
 
@@ -82,6 +86,16 @@ function slotName(idx) {
   return s.name || 'Player';
 }
 
+function slotColor(idx) {
+  const s = slots.value[idx];
+  return (s && s.color) ? String(s.color) : '#1a1c30';
+}
+
+function isHostSlot(idx) {
+  const s = slots.value[idx];
+  return !!(s && versusRoom.value && s.id === versusRoom.value.host_id);
+}
+
 function closeLobby() {
   cleanupSub();
   emit('close');
@@ -91,6 +105,24 @@ function cleanupSub() {
   if (unsub) {
     try { unsub(); } catch (_) {}
     unsub = null;
+  }
+}
+
+// Join link and copy handler
+const copied = ref(false);
+const shareLink = computed(() => {
+  const origin = window.location.origin;
+  const path = window.location.pathname || '/';
+  const code = (versusCode.value || '').trim();
+  return `${origin}${path}?join=${encodeURIComponent(code)}`;
+});
+async function copyJoinLink() {
+  try {
+    await navigator.clipboard.writeText(shareLink.value);
+    copied.value = true;
+    setTimeout(() => { copied.value = false; }, 1500);
+  } catch (e) {
+    versusError.value = 'Impossible de copier le lien';
   }
 }
 
