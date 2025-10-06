@@ -23,6 +23,12 @@
       <div class="reveal-bar" aria-hidden="true">
         <div class="reveal-fill" :style="{ transform: `scaleY(${revealComplete ? 1 : revealProgress})` }"></div>
       </div>
+      <!-- Versus wins bar (5 segments) -->
+      <div v-if="mode === 'versus'" class="wins-bar" aria-hidden="true" :title="`Progression parcours: ${(Number(versusProgress)*100).toFixed(0)}%`">
+        <div v-for="i in 5" :key="i" class="wins-segment">
+          <div class="wins-fill" :style="{ transform: `scaleY(${segmentFill(i)})` }"></div>
+        </div>
+      </div>
       <div class="flex flex-col items-center">
         <div class="side-actions">
           <div v-if="mode === 'solo'" class="card">
@@ -79,6 +85,8 @@ const props = defineProps({
   timeText: { type: String, default: '00:00' },
   score: { type: Number, default: 0 },
   mode: { type: String, default: 'solo' },
+  versusWins: { type: Number, default: 0 },
+  versusProgress: { type: Number, default: 0 },
   livesUsed: { type: Number, default: 0 },
   justLost: { type: Boolean, default: false },
   lastExtinguishedIndex: { type: Number, default: -1 },
@@ -98,6 +106,15 @@ function faceColorClass(r, c) {
   const v = props.faceColors && props.faceColors[key];
   if (!v) return null;
   return `face-${v}`;
+}
+
+// Return per-segment fill (0..1). There are 5 segments; each covers 1/5 of progress.
+function segmentFill(index) {
+  const p = Math.max(0, Math.min(1, Number(props.versusProgress) || 0));
+  const perSeg = p * 5; // 0..5
+  const segStart = index - 1; // 0-based
+  const raw = perSeg - segStart; // amount into this segment
+  return Math.max(0, Math.min(1, raw));
 }
 </script>
 
@@ -144,6 +161,31 @@ function faceColorClass(r, c) {
   background: linear-gradient(180deg, var(--accent), #7b2cff);
   transform-origin: bottom center;
   will-change: transform;
+  transition: transform 100ms linear;
+}
+
+/* Wins bar next to reveal bar */
+.wins-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 12px 2px 12px 0;
+}
+.wins-segment {
+  width: 12px;
+  height: 18px;
+  border-radius: 4px;
+  background: #1b1e34;
+  border: 1px solid #2a2e52;
+  overflow: hidden;
+}
+.wins-fill {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #12b886; /* ok green */
+  transform-origin: bottom center;
+  transform: scaleY(0);
   transition: transform 100ms linear;
 }
 

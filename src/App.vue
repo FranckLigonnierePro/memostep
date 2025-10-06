@@ -45,6 +45,8 @@
       :timeText="chronoText"
       :score="soloLevel"
       :mode="state.mode"
+      :versusWins="versusWins"
+      :versusProgress="versusProgress"
       :livesUsed="livesUsed"
       :justLost="justLost"
       :lastExtinguishedIndex="lastExtinguishedIndex"
@@ -333,6 +335,21 @@ const versusLivesUsed = computed(() => {
   const meEntry = roster.find(p => p && p.id === me);
   const lives = Number(meEntry && meEntry.lives != null ? meEntry.lives : 3);
   return Math.min(3, Math.max(0, 3 - lives));
+});
+const versusWins = computed(() => {
+  if (state.mode !== 'versus') return 0;
+  const room = versusRoom.value;
+  const me = playerId.value || ensurePlayerId();
+  const roster = (room && Array.isArray(room.players)) ? room.players : [];
+  const meEntry = roster.find(p => p && p.id === me);
+  return Number(meEntry && meEntry.score != null ? meEntry.score : 0);
+});
+// Progress within the current path (0..1) for versus
+const versusProgress = computed(() => {
+  if (state.mode !== 'versus') return 0;
+  if (!state.inPlay) return 0;
+  const len = state.path.length || 1;
+  return Math.max(0, Math.min(1, state.nextIndex / len));
 });
 const livesUsed = computed(() => {
   if (state.mode === 'daily') return Math.min(3, dailyAttempts.value);
