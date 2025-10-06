@@ -14,12 +14,18 @@
       @start="newGame"
       @daily="() => startMode('daily')"
       @solo="() => startMode('solo')"
-      @versus="openVersus"
+      @versus="openVersusView"
       @battle="() => startMode('battle')"
       @help="openHelp"
       @settings="openSettings"
       @stats="openStats"
       @openLang="openLang"
+    />
+
+    <VersusView
+      v-else-if="showVersusView"
+      @close="handleCloseVersusView"
+      @begin="handleBeginVersusFromLobby"
     />
 
     <BoardView
@@ -157,40 +163,7 @@
       </div>
     </div>
 
-    <!-- Versus modal -->
-    <div v-if="showVersus" class="modal-overlay" @click.self="closeOverlays">
-      <div class="modal-card">
-        <h2 class="modal-title">Versus</h2>
-        <div class="modal-body" style="display:flex; flex-direction:column; gap:8px;">
-          <div v-if="!versusCode">
-            <div style="display:flex; gap:6px; justify-content:center; align-items:center;">
-              <input v-model="usernameInput" placeholder="Pseudo" style="padding:8px; border-radius:8px; border:1px solid #2a2e52; background:#0f1020; color:#fff;" />
-            </div>
-            <button class="modal-btn" @click="handleCreateRoom">Créer une partie</button>
-            <div style="display:flex; gap:6px; justify-content:center; align-items:center;">
-              <input v-model="joinInput" placeholder="Code" style="padding:8px; border-radius:8px; border:1px solid #2a2e52; background:#0f1020; color:#fff; text-transform:uppercase;" />
-              <button class="modal-btn" @click="handleJoinRoom">Rejoindre</button>
-            </div>
-            <div v-if="versusError" style="color:#ff5a8a; font-size:12px;">{{ versusError }}</div>
-          </div>
-          <div v-else>
-            <div style="margin:8px 0;">Code de salle</div>
-            <div style="font-size:24px; letter-spacing:3px;">{{ versusCode }}</div>
-            <div style="margin:10px 0; font-weight:600;">Joueurs ({{ (versusRoom?.players || []).length || 1 }}/8)</div>
-            <ul style="list-style:none; padding:0; margin:0; display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">
-              <li v-for="p in (versusRoom?.players || defaultPlayers)" :key="p.id" style="padding:6px 10px; border:1px solid #2a2e52; border-radius:8px;">{{ p.name || 'Player' }}</li>
-            </ul>
-            <div v-if="versusIsHost" style="margin-top:12px; display:flex; gap:8px; justify-content:center;">
-              <button class="modal-btn" :disabled="((versusRoom?.players || defaultPlayers).length < 2)" @click="handleStartVersus">Démarrer</button>
-            </div>
-            <div v-if="versusError" style="color:#ff5a8a; font-size:12px;">{{ versusError }}</div>
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button class="modal-btn" @click="closeVersus">Fermer</button>
-        </div>
-      </div>
-    </div>
+    
   </template>
 
 <script setup>
@@ -198,6 +171,7 @@ import { onMounted, onBeforeUnmount, reactive, ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import HomeView from './components/HomeView.vue';
 import BoardView from './components/BoardView.vue';
+import VersusView from './components/VersusView.vue';
 // Import flag assets so Vite resolves URLs correctly
 import frFlag from './assets/fr.png';
 import enFlag from './assets/en.png';
@@ -298,7 +272,8 @@ const showSettings = ref(false);
 const showStats = ref(false);
 const showLang = ref(false);
 // Versus UI state
-const showVersus = ref(false);
+const showVersus = ref(false); // legacy modal (unused now)
+const showVersusView = ref(false); // new dedicated screen
 const versusCode = ref('');
 const joinInput = ref('');
 const usernameInput = ref('');
@@ -854,21 +829,30 @@ function openStats() {
   showStats.value = true;
 }
 
-function openVersus() {
-  showVersus.value = true;
-  versusCode.value = '';
-  versusIsHost.value = false;
-  versusError.value = '';
-  joinInput.value = '';
-  if (!playerId.value) {
-    try { playerId.value = ensurePlayerId(); } catch (_) {}
-  }
-  try { initRealtime(); } catch (e) { versusError.value = 'Supabase non configuré'; }
+function openVersus() { /* legacy */ openVersusView(); }
+function openVersusView() {
+  showVersusView.value = true;
+  state.showHome = false;
 }
 
-function closeVersus() {
-  showVersus.value = false;
-  if (versusUnsub) { try { versusUnsub(); } catch (_) {} versusUnsub = null; }
+function closeVersus() { /* legacy */ handleCloseVersusView(); }
+function handleCloseVersusView() {
+  showVersusView.value = false;
+  state.showHome = true;
+}
+
+function handleBeginVersusFromLobby(payload) {
+  try {
+    if (payload && typeof payload === 'object') {
+      if (payload.code) versusCode.value = payload.code;
+      if (payload.room) versusRoom.value = payload.room;
+      if (typeof payload.seed === 'number' && typeof payload.startAtMs === 'number') {
+        beginVersus(payload.seed, payload.startAtMs);
+      }
+    }
+  } finally {
+    showVersusView.value = false;
+  }
 }
 
 async function handleCreateRoom() {
