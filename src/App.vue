@@ -759,37 +759,88 @@ function onCellClick(r, c) {
           // Immediately start next game
           newGame();
           return;
-        } else {
-          // Versus or other modes: in versus, report round result (first to 5 or hearts KO)
+        } else if (state.mode === 'versus') {
+          // Versus: increment score, check if reached 5, otherwise continue to next path
           try {
-            if (state.mode === 'versus') {
-              const me = playerId.value || ensurePlayerId();
-              // Identify opponent (2-player assumption)
-              const snapshot = await getRoom(versusCode.value).catch(() => versusRoom.value);
-              const room = snapshot || versusRoom.value;
-              let opponent = null;
-              if (room) {
-                const roster = Array.isArray(room.players) ? room.players : [];
-                const other = roster.find(p => p && p.id && p.id !== me);
-                opponent = other?.id || null;
-                if (!opponent) {
-                  if (room.host_id && room.host_id !== me) opponent = room.host_id;
-                  else if (room.guest_id && room.guest_id !== me) opponent = room.guest_id;
-                }
+            const me = playerId.value || ensurePlayerId();
+            // Identify an opponent. Prefer an alive opponent (lives > 0) when available.
+            const snapshot = await getRoom(versusCode.value).catch(() => versusRoom.value);
+            const room = snapshot || versusRoom.value;
+            let opponent = null;
+            if (room) {
+              const roster = Array.isArray(room.players) ? room.players : [];
+              const candidates = roster.filter(p => p && p.id && p.id !== me);
+              // Prefer someone with remaining lives
+              const alive = candidates.find(p => (p.lives ?? 3) > 0);
+              opponent = (alive || candidates[0])?.id || null;
+              // Legacy fallback to host/guest ids
+              if (!opponent) {
+                if (room.host_id && room.host_id !== me) opponent = room.host_id;
+                else if (room.guest_id && room.guest_id !== me) opponent = room.guest_id;
               }
-              const updated = await reportRoundResult(versusCode.value, me, opponent, chronoMs.value);
-              if (updated) { versusRoom.value = updated; }
-              // If room finished with me as winner, show win modal
-              if (updated && updated.status === 'finished' && updated.winner_id === me) {
+            }
+            // Report round result to update scores and lives
+            let updated = null;
+            if (opponent) {
+              updated = await reportRoundResult(versusCode.value, me, opponent, chronoMs.value);
+            } else {
+              updated = await reportRoundWin(versusCode.value, me, chronoMs.value);
+            }
+            if (updated) { versusRoom.value = updated; }
+            // If room finished (someone reached 5 or lost all lives), show win/lose modal
+            if (updated && updated.status === 'finished') {
+              if (updated.winner_id === me) {
                 winActive.value = true;
+              } else {
+                loseActive.value = true;
               }
             } else {
-              winActive.value = true;
+              // Continue to next path: generate new seed and start immediately
+              const seed = Math.floor(Math.random() * 1e9);
+              const rng = seededRng(seed);
+              state.path = randomPathWithRng(rng);
+              state.nextIndex = 0;
+              state.correctSet.clear();
+              state.wrongSet.clear();
+              faceDownActive.value = false;
+              stopChrono();
+              chronoMs.value = 0;
+              // Start next path after a short delay
+              setTimeout(() => { showPath(); }, 350);
             }
           } catch (_) {
-            // Fallback: show modal
-            winActive.value = true;
+            // If network/db error occurs, try a minimal fallback to advance.
+            try {
+              const me = playerId.value || ensurePlayerId();
+              const updated = await reportRoundWin(versusCode.value, me, chronoMs.value);
+              if (updated) { versusRoom.value = updated; }
+              if (updated && updated.status === 'finished') {
+                if (updated.winner_id === me) {
+                  winActive.value = true;
+                } else {
+                  loseActive.value = true;
+                }
+              } else {
+                // Continue to next path
+                const seed = Math.floor(Math.random() * 1e9);
+                const rng = seededRng(seed);
+                state.path = randomPathWithRng(rng);
+                state.nextIndex = 0;
+                state.correctSet.clear();
+                state.wrongSet.clear();
+                faceDownActive.value = false;
+                stopChrono();
+                chronoMs.value = 0;
+                setTimeout(() => { showPath(); }, 350);
+              }
+            } catch (__){
+              // Final fallback: show modal
+              winActive.value = true;
+            }
           }
+        } else {
+          // Other modes: show win modal
+          winActive.value = true;
         }
       }, backTotal);
     }
