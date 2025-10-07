@@ -185,6 +185,12 @@
       </div>
     </div>
 
+    <!-- Power Wheel for Versus mode -->
+    <PowerWheel
+      :visible="showPowerWheel"
+      @powerSelected="handlePowerSelected"
+      @close="closePowerWheel"
+    />
     
   </template>
 
@@ -194,6 +200,7 @@ import { useI18n } from 'vue-i18n';
 import HomeView from './components/HomeView.vue';
 import BoardView from './components/BoardView.vue';
 import VersusView from './components/VersusView.vue';
+import PowerWheel from './components/PowerWheel.vue';
 // Import flag assets so Vite resolves URLs correctly
 import frFlag from './assets/fr.png';
 import enFlag from './assets/en.png';
@@ -318,6 +325,8 @@ const showLang = ref(false);
 // Versus UI state
 const showVersus = ref(false); // legacy modal (unused now)
 const showVersusView = ref(false); // new dedicated screen
+const showPowerWheel = ref(false); // power wheel overlay for versus mode
+const selectedPower = ref(null); // currently selected power
 const versusCode = ref('');
 const joinInput = ref('');
 const usernameInput = ref('');
@@ -1194,12 +1203,26 @@ function beginVersus(seed, startAtMs) {
   faceDownActive.value = false;
   stopChrono();
   chronoMs.value = 0;
+  
+  // Show power wheel overlay first
+  showPowerWheel.value = true;
+  
   // Schedule reveal to start exactly at startAtMs
   const delay = Math.max(0, startAtMs - Date.now());
   if (state.timerId) clearTimeout(state.timerId);
   state.timerId = setTimeout(() => {
     showPath();
   }, delay);
+}
+
+function handlePowerSelected(power) {
+  selectedPower.value = power;
+  console.log('Power selected:', power);
+  // Pour l'instant, on ne fait rien avec le pouvoir
+}
+
+function closePowerWheel() {
+  showPowerWheel.value = false;
 }
 
 async function handleShare() {
