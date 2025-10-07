@@ -221,11 +221,20 @@ export async function reportRoundWin(code, winnerId, timeMs) {
   const nextScore = Number(current.score || 0) + 1;
   players[idx] = { ...current, score: nextScore };
 
-  // If winner reaches 5, finish the room
-  if (nextScore >= 5) {
+  // Check if match should end:
+  // 1. All players finished (score >= 5)
+  // 2. OR only one player has lives remaining
+  const allFinished = players.every(p => Number(p.score || 0) >= 5);
+  const playersWithLives = players.filter(p => Number(p.lives ?? 3) > 0);
+  const onlyOneAlive = playersWithLives.length <= 1;
+
+  if (allFinished || onlyOneAlive) {
+    // Determine winner: highest score, or last one alive
+    const sortedByScore = players.slice().sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+    const winner = sortedByScore[0];
     const { data, error: upErr } = await supabase
       .from('rooms')
-      .update({ status: 'finished', winner_id: winnerId, winner_time_ms: timeMs, players })
+      .update({ status: 'finished', winner_id: winner?.id || winnerId, winner_time_ms: timeMs, players })
       .eq('code', code)
       .select('*')
       .single();

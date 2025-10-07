@@ -26,7 +26,12 @@
       <!-- Versus wins bar (5 segments) -->
       <div v-if="mode === 'versus'" class="wins-bar" :title="`Victoires: ${Number(versusWins)}/5 – Parcours en cours: ${(Number(versusProgress)*100).toFixed(0)}%`">
         <div v-for="i in 5" :key="i" class="wins-segment">
-          <div class="wins-fill" :style="{ transform: `scaleY(${segmentFill(i)})` }"></div>
+          <div
+            v-for="p in (versusPlayers || [])"
+            :key="p.id || p.name"
+            class="wins-fill"
+            :style="{ transform: `scaleY(${playerSegmentFill(p, i)})`, background: p.color || '#12b886' }"
+          ></div>
         </div>
         <!-- Player bubbles -->
         <div class="wins-bubbles">
@@ -121,17 +126,12 @@ function faceColorClass(r, c) {
   return `face-${v}`;
 }
 
-// Each segment = one parcours
-// - Segments <= versusWins are fully filled
-// - Remaining segments are empty
-function segmentFill(index) {
-  const wins = Math.max(0, Math.min(5, Number(props.versusWins) || 0));
-  if (index <= wins) return 1;
-  if (index === wins + 1) {
-    const raw = Number(props.versusProgress) || 0;
-    const p = Math.max(0, Math.min(1, raw));
-    return p;
-  }
+// Each segment fill per player
+function playerSegmentFill(player, segmentIndex) {
+  const wins = Math.max(0, Math.min(5, Number(player.wins) || 0));
+  const prog = Math.max(0, Math.min(1, Number(player.progress) || 0));
+  if (segmentIndex <= wins) return 1;
+  if (segmentIndex === wins + 1) return prog;
   return 0;
 }
 
@@ -143,9 +143,12 @@ function initial(name) {
 function bubbleBottom(p) {
   const wins = Math.max(0, Math.min(5, Number(p && p.wins || 0)));
   const prog = Math.max(0, Math.min(1, Number(p && p.progress || 0)));
-  const total = Math.max(0, Math.min(5, wins + prog));
-  const pct = (total / 5) * 100;
-  return `calc(${pct}% - 10px)`; // center bubble (approx height 20px)
+  // Position bubble at the start of current segment + progress within that segment
+  // Each segment = 20% of total height (100% / 5)
+  const segmentBase = (wins / 5) * 100; // Start of current segment
+  const segmentProgress = (prog / 5) * 100; // Progress within current segment
+  const pct = segmentBase + segmentProgress;
+  return `calc(${pct}%)`;
 }
 
 function bubbleTextColor(bg) {
@@ -228,10 +231,13 @@ function bubbleTextColor(bg) {
   background: #1b1e34;
   border: 1px solid #2a2e52;
   overflow: hidden;
+  position: relative; /* for absolute positioned fills */
 }
 .wins-fill {
-  position: relative;
-  width: 100%;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   height: 100%;
   background: #12b886; /* ok green */
   transform-origin: bottom center;

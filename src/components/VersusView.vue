@@ -17,8 +17,7 @@
       </div>
       <div v-else class="flex flex-col mt-4 w-full grow justify-center">
         <div style="display:flex; gap:8px; align-items:center; justify-content:center;">
-          <button class="btn" @click="copyJoinLink">Copier le lien d'invitation</button>
-          <span v-if="copied" style="font-size:12px; color:#12b886;">Lien copié</span>
+          <button class="btn" @click="copyJoinLink">{{ copied ? 'Code copié' : 'Copier le code d\'invitation' }}</button>
         </div>
         <div style="margin:10px 0; font-weight:600;">Joueurs ({{ (versusRoom?.players || defaultPlayers).length }}/8)</div>
         <div class="slots">
@@ -118,11 +117,12 @@ const shareLink = computed(() => {
 });
 async function copyJoinLink() {
   try {
-    await navigator.clipboard.writeText(shareLink.value);
+    const code = (versusCode.value || '').trim();
+    await navigator.clipboard.writeText(code);
     copied.value = true;
     setTimeout(() => { copied.value = false; }, 1500);
   } catch (e) {
-    versusError.value = 'Impossible de copier le lien';
+    versusError.value = 'Impossible de copier le code';
   }
 }
 

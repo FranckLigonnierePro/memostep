@@ -83,8 +83,27 @@
         <div class="flex justify-center">
           <img src="./assets/winner.png" alt="win" class="modal-img" width="200" height="100"/>
         </div>
-        <div>
+        <div v-if="state.mode !== 'versus'">
           {{ $t('modals.time') }}: {{ chronoText }}
+        </div>
+        <!-- Versus ranking -->
+        <div v-if="state.mode === 'versus'" style="margin-top:12px; width:100%;">
+          <div style="font-weight:600; margin-bottom:8px;">Classement</div>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div
+              v-for="(p, idx) in versusRanking"
+              :key="p.id"
+              style="display:flex; align-items:center; gap:8px; padding:6px 8px; background:#1a1c30; border-radius:8px; border:1px solid #2a2e52;"
+            >
+              <div style="font-weight:700; font-size:16px; min-width:24px;">{{ idx + 1 }}.</div>
+              <div
+                style="width:20px; height:20px; border-radius:999px; border:2px solid rgba(0,0,0,0.2);"
+                :style="{ background: p.color || '#ffffff' }"
+              ></div>
+              <div style="flex:1; font-weight:600;">{{ p.name }}</div>
+              <div style="font-size:14px; color:#12b886;">{{ p.score }}/5</div>
+            </div>
+          </div>
         </div>
         <div class="modal-actions">
           <button class="modal-btn" @click="handleShare">{{ $t('modals.share') }}</button>
@@ -309,6 +328,7 @@ const versusSeed = ref(null);
 const versusStartAtMs = ref(null);
 const playerId = ref(null);
 const versusRoom = ref(null); // latest room snapshot
+const versusLastProgress = ref(0); // Keep last progress to avoid bubble drop between rounds
 const defaultPlayers = computed(() => [{ id: playerId.value || ensurePlayerId(), name: (usernameInput.value || 'Player') }]);
 
 // Language state
@@ -369,10 +389,12 @@ const versusWins = computed(() => {
 });
 // Progress within the current path (0..1) for versus
 const versusProgress = computed(() => {
-  if (state.mode !== 'versus') return 0;
-  if (!state.inPlay) return 0;
+  if (state.mode !== 'versus') return versusLastProgress.value;
+  if (!state.inPlay) return versusLastProgress.value;
   const len = state.path.length || 1;
-  return Math.max(0, Math.min(1, state.nextIndex / len));
+  const current = Math.max(0, Math.min(1, state.nextIndex / len));
+  versusLastProgress.value = current; // Update last known progress
+  return current;
 });
 // Players list with wins and progress (progress only known locally for self)
 const versusPlayers = computed(() => {
@@ -389,6 +411,20 @@ const versusPlayers = computed(() => {
     const color = (p && p.color) ? String(p.color) : '#ffffff';
     return { id: p.id, name, wins, progress, color };
   });
+});
+// Versus ranking sorted by score (descending)
+const versusRanking = computed(() => {
+  if (state.mode !== 'versus') return [];
+  const room = versusRoom.value;
+  const roster = (room && Array.isArray(room.players)) ? room.players : [];
+  return roster
+    .map(p => ({
+      id: p.id,
+      name: (p && p.name) ? String(p.name) : 'Player',
+      score: Number(p && p.score != null ? p.score : 0),
+      color: (p && p.color) ? String(p.color) : '#ffffff',
+    }))
+    .sort((a, b) => b.score - a.score); // Sort by score descending
 });
 const livesUsed = computed(() => {
   if (state.mode === 'daily') return Math.min(3, dailyAttempts.value);
@@ -693,12 +729,8 @@ function hidePath() {
   chronoMs.value = 0;
   startChrono();
 
-  // Versus: reset and publish per-round progress to 0 at start of play
+  // Versus: start auto-publish ticker (don't reset progress to 0, keep it at previous value)
   if (state.mode === 'versus') {
-    try {
-      const me = playerId.value || ensurePlayerId();
-      if (versusCode.value) setPlayerProgress(versusCode.value, me, 0).then(updated => { if (updated) versusRoom.value = updated; }).catch(() => {});
-    } catch (_) {}
     // Start auto-publish ticker
     startProgressAutoPublish();
   }
@@ -779,23 +811,31 @@ function onCellClick(r, c) {
                 else if (room.guest_id && room.guest_id !== me) opponent = room.guest_id;
               }
             }
-            // Report round result to update scores and lives
-            let updated = null;
-            if (opponent) {
-              updated = await reportRoundResult(versusCode.value, me, opponent, chronoMs.value);
-            } else {
-              updated = await reportRoundWin(versusCode.value, me, chronoMs.value);
-            }
+            // Report round win to increment score
+            const updated = await reportRoundWin(versusCode.value, me, chronoMs.value);
             if (updated) { versusRoom.value = updated; }
-            // If room finished (someone reached 5 or lost all lives), show win/lose modal
+            
+            // Check my current score
+            const myPlayer = updated?.players?.find(p => p && p.id === me);
+            const myScore = Number(myPlayer?.score || 0);
+            
+            // If room finished (all finished or only one alive), show win/lose modal
             if (updated && updated.status === 'finished') {
               if (updated.winner_id === me) {
                 winActive.value = true;
               } else {
                 loseActive.value = true;
               }
+            } else if (myScore >= 5) {
+              // I finished my 5 rounds, but match continues for others
+              // Stop playing and wait for match to finish
+              state.inPlay = false;
+              stopChrono();
+              stopProgressAutoPublish();
+              // Show a waiting message or just idle state
             } else {
               // Continue to next path: generate new seed and start immediately
+              versusLastProgress.value = 0; // Reset progress to start of new segment
               const seed = Math.floor(Math.random() * 1e9);
               const rng = seededRng(seed);
               state.path = randomPathWithRng(rng);
@@ -814,14 +854,24 @@ function onCellClick(r, c) {
               const me = playerId.value || ensurePlayerId();
               const updated = await reportRoundWin(versusCode.value, me, chronoMs.value);
               if (updated) { versusRoom.value = updated; }
+              
+              const myPlayer = updated?.players?.find(p => p && p.id === me);
+              const myScore = Number(myPlayer?.score || 0);
+              
               if (updated && updated.status === 'finished') {
                 if (updated.winner_id === me) {
                   winActive.value = true;
                 } else {
                   loseActive.value = true;
                 }
+              } else if (myScore >= 5) {
+                // I finished, wait for others
+                state.inPlay = false;
+                stopChrono();
+                stopProgressAutoPublish();
               } else {
                 // Continue to next path
+                versusLastProgress.value = 0; // Reset progress to start of new segment
                 const seed = Math.floor(Math.random() * 1e9);
                 const rng = seededRng(seed);
                 state.path = randomPathWithRng(rng);
@@ -912,6 +962,7 @@ function onCellClick(r, c) {
           }
         }
         // Reset my live progress to 0 before restarting same path
+        versusLastProgress.value = 0; // Reset local progress display
         try { if (versusCode.value) await setPlayerProgress(versusCode.value, me, 0).then(updated => { if (updated) versusRoom.value = updated; }); } catch (_) {}
         // Decrement my life; if busted, room finishes with opponent winner
         const updated = await reportLifeLoss(versusCode.value, me, opponent);
