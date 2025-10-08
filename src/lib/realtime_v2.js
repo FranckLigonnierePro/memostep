@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 
 let supabase = null;
 let roomSubscription = null;
+// Cache local de la dernière snapshot de room par code pour des mises à jour optimistes
+const roomCache = new Map();
 
 export function initRealtime() {
   if (supabase) return supabase;
@@ -44,7 +46,7 @@ async function getRoomPlayers(roomCode) {
     .order('created_at', { ascending: true });
   
   if (error) throw error;
-  return (data || []).map(p => ({
+  const players = (data || []).map(p => ({
     id: p.player_id,
     name: p.name,
     color: p.color,
@@ -52,6 +54,8 @@ async function getRoomPlayers(roomCode) {
     lives: p.lives,
     progress: p.progress
   }));
+  console.log('[getRoomPlayers] Joueurs récupérés:', players.map(p => ({ id: p.id?.slice(0,6), progress: p.progress })));
+  return players;
 }
 
 // Helper: Récupérer une room avec ses joueurs
@@ -66,7 +70,10 @@ async function getRoomWithPlayers(roomCode) {
   if (!room) throw new Error('Room not found');
   
   const players = await getRoomPlayers(roomCode);
-  return { ...room, players };
+  const full = { ...room, players };
+  roomCache.set(roomCode, full);
+  console.log('[getRoomWithPlayers] Room complète:', { code: roomCode, playerCount: players.length });
+  return full;
 }
 
 // Report a round result with both winner and loser. This increments the winner's
@@ -140,17 +147,18 @@ export async function setPlayerProgress(code, playerId, progress) {
   
   // Stratégie: Essayer d'abord une mise à jour, si aucune ligne affectée, créer le joueur
   // Cela évite une lecture préalable et est plus performant
-  const { error: upErr, count } = await supabase
+  const { data: updated, error: upErr } = await supabase
     .from('players')
     .update({ progress: p })
     .eq('room_code', code)
     .eq('player_id', playerId)
-    .select('id', { count: 'exact', head: true });
+    .select();
   
   if (upErr) throw upErr;
   
   // Si aucune ligne n'a été mise à jour, le joueur n'existe pas encore
-  if (count === 0) {
+  if (!updated || updated.length === 0) {
+    console.log('[setPlayerProgress] Joueur non trouvé, création...');
     // Récupérer les couleurs utilisées pour en choisir une nouvelle
     const players = await getRoomPlayers(code);
     const usedColors = players.map(pl => pl.color);
@@ -169,6 +177,9 @@ export async function setPlayerProgress(code, playerId, progress) {
         progress: p
       }]);
     if (insErr) throw insErr;
+    console.log('[setPlayerProgress] Joueur créé avec progression:', p);
+  } else {
+    console.log('[setPlayerProgress] Progression mise à jour:', { playerId, progress: p });
   }
   
   // Retourner null pour éviter une requête coûteuse
@@ -418,7 +429,8 @@ export function subscribeRoom(code, callback) {
       // Quand la room change, récupérer les joueurs et envoyer le tout
       const room = await getRoomWithPlayers(code).catch((err) => {
         console.error('[subscribeRoom] Erreur getRoomWithPlayers:', err);
-        return payload.new || payload.old || null;
+        const cached = roomCache.get(code);
+        return cached || payload.new || payload.old || null;
       });
       console.log('[subscribeRoom] Room mise à jour:', room);
       callback(room);
@@ -430,13 +442,45 @@ export function subscribeRoom(code, callback) {
       filter: `room_code=eq.${code}` 
     }, async (payload) => {
       console.log('[subscribeRoom] Changement détecté dans players:', payload);
-      // Quand un joueur change, récupérer toute la room avec les joueurs
-      const room = await getRoomWithPlayers(code).catch((err) => {
-        console.error('[subscribeRoom] Erreur getRoomWithPlayers:', err);
+      // Mise à jour optimiste immédiate à partir du payload
+      try {
+        const cached = roomCache.get(code);
+        if (cached && (payload?.new || payload?.old)) {
+          const row = payload.new || payload.old;
+          const pid = row.player_id;
+          const idx = Array.isArray(cached.players) ? cached.players.findIndex(p => p && p.id === pid) : -1;
+          const updatedPlayer = {
+            id: row.player_id,
+            name: row.name ?? (cached.players?.[idx]?.name || 'Player'),
+            color: row.color ?? (cached.players?.[idx]?.color || '#ffffff'),
+            score: row.score ?? (cached.players?.[idx]?.score || 0),
+            lives: row.lives ?? (cached.players?.[idx]?.lives || 3),
+            progress: row.progress ?? (cached.players?.[idx]?.progress || 0),
+          };
+          const nextPlayers = Array.isArray(cached.players) ? [...cached.players] : [];
+          if (idx >= 0) {
+            nextPlayers[idx] = updatedPlayer;
+          } else {
+            nextPlayers.push(updatedPlayer);
+          }
+          const optimistic = { ...cached, players: nextPlayers };
+          roomCache.set(code, optimistic);
+          console.log('[subscribeRoom] Optimistic room update from payload:', { playerId: pid, progress: updatedPlayer.progress });
+          callback(optimistic);
+        }
+      } catch (e) {
+        console.warn('[subscribeRoom] Optimistic merge error:', e);
+      }
+
+      // Puis rafraîchir en arrière-plan pour garantir la cohérence
+      const fresh = await getRoomWithPlayers(code).catch((err) => {
+        console.error('[subscribeRoom] Erreur getRoomWithPlayers (refresh):', err);
         return null;
       });
-      console.log('[subscribeRoom] Room après changement joueur:', room);
-      if (room) callback(room);
+      if (fresh) {
+        console.log('[subscribeRoom] Room après refresh joueur:', fresh);
+        callback(fresh);
+      }
     })
     .subscribe((status) => {
       console.log('[subscribeRoom] Statut de la subscription:', status);

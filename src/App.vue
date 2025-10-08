@@ -226,11 +226,13 @@ const realLogoUrl = (() => {
 
 const logoSrc = computed(() => (typeof realLogoUrl === 'string' && realLogoUrl) ? realLogoUrl : '');
 
-// Versus auto-publish ticker (100ms) - publish continuously so others see real-time updates
+// Versus auto-publish ticker (100ms) - publish only when progress changes
 let progressTicker = null;
+let lastPublishedProgress = -1; // Cache de la dernière progression publiée
 function startProgressAutoPublish() {
   stopProgressAutoPublish();
   if (state.mode !== 'versus') return;
+  lastPublishedProgress = -1; // Reset du cache
   progressTicker = setInterval(() => {
     try {
       if (!versusCode.value) return;
@@ -238,14 +240,20 @@ function startProgressAutoPublish() {
       const me = playerId.value || ensurePlayerId();
       const len = state.path.length || 1;
       const prog = Math.max(0, Math.min(1, state.nextIndex / len));
-      // Always publish so other players see updates in real-time
-      console.log('[App] Publishing progress:', prog);
-      setPlayerProgress(versusCode.value, me, prog).then(updated => { if (updated) versusRoom.value = updated; }).catch(() => {});
+      
+      // Ne publier QUE si la progression a changé (arrondi à 2 décimales pour éviter les micro-changements)
+      const roundedProg = Math.round(prog * 100) / 100;
+      if (roundedProg !== lastPublishedProgress) {
+        console.log('[App] Publishing progress:', roundedProg, '(was:', lastPublishedProgress, ')');
+        lastPublishedProgress = roundedProg;
+        setPlayerProgress(versusCode.value, me, roundedProg).then(updated => { if (updated) versusRoom.value = updated; }).catch(() => {});
+      }
     } catch (_) {}
   }, 100);
 }
 function stopProgressAutoPublish() {
   if (progressTicker) { clearInterval(progressTicker); progressTicker = null; }
+  lastPublishedProgress = -1; // Reset du cache
 }
 
 // Root scale (scale the whole content like your snippet)
@@ -411,6 +419,7 @@ const versusPlayers = computed(() => {
   const room = versusRoom.value;
   const me = playerId.value || ensurePlayerId();
   const roster = (room && Array.isArray(room.players)) ? room.players : [];
+  console.log('[versusPlayers] Room players:', roster.map(p => ({ id: p?.id?.slice(0,6), progress: p?.progress })));
   return roster.map(p => {
     const wins = Number(p && p.score != null ? p.score : 0);
     // Prefer live local progress for self, otherwise use stored progress
@@ -418,6 +427,7 @@ const versusPlayers = computed(() => {
     const progress = (p && p.id === me) ? (Number(versusProgress.value) || 0) : storedProg;
     const name = (p && p.name) ? String(p.name) : 'Player';
     const color = (p && p.color) ? String(p.color) : '#ffffff';
+    console.log('[versusPlayers] Player:', { id: p?.id?.slice(0,6), name, progress, storedProg, isMe: p?.id === me });
     return { id: p.id, name, wins, progress, color };
   });
 });
