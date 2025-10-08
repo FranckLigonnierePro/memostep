@@ -41,7 +41,7 @@
 <script setup>
 import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import { ensurePlayerId } from '../lib/storage.js';
-import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, getRoom } from '../lib/realtime.js';
+import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, getRoom } from '../lib/realtime_v2.js';
 import { User, Crown } from 'lucide-vue-next';
 
 const emit = defineEmits(['close', 'begin']);

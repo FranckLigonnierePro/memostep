@@ -185,12 +185,12 @@
       </div>
     </div>
 
-    <!-- Power Wheel for Versus mode -->
-    <PowerWheel
+    <!-- Power Wheel for Versus mode (DISABLED) -->
+    <!-- <PowerWheel
       :visible="showPowerWheel"
       @powerSelected="handlePowerSelected"
       @close="closePowerWheel"
-    />
+    /> -->
     
   </template>
 
@@ -214,7 +214,7 @@ import {
   markDailyAttempt,
   getState,
 } from './lib/storage.js';
-import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult, reportLifeLoss, setPlayerProgress } from './lib/realtime.js';
+import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult, reportLifeLoss, setPlayerProgress } from './lib/realtime_v2.js';
 
 // Try to load a real logo from assets if present (supports memostep or memostep-logo)
 const logoModules = import.meta.glob('./assets/{memostep,memostep-logo}.{png,jpg,jpeg,webp,svg}', { eager: true });
@@ -1204,8 +1204,8 @@ function beginVersus(seed, startAtMs) {
   stopChrono();
   chronoMs.value = 0;
   
-  // Show power wheel overlay first
-  showPowerWheel.value = true;
+  // Show power wheel overlay first (DISABLED)
+  // showPowerWheel.value = true;
   
   // Schedule reveal to start exactly at startAtMs
   const delay = Math.max(0, startAtMs - Date.now());
