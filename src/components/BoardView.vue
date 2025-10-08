@@ -12,9 +12,13 @@
               :data-c="cell.c"
               @click="emit('cellClick', cell.r, cell.c)"
             >
-              <div class="cell-inner" :class="{ flipping: flipActive, revealing: flipBackActive, facedown: faceDownActive }" :style="cellStyle(cell.r, cell.c)">
+              <div class="cell-inner" :class="{ flipping: flipActive, revealing: flipBackActive, facedown: faceDownActive, frozen: isFrozen(cell.r) }" :style="cellStyle(cell.r, cell.c)">
                 <div class="cell-face front" :class="cellClass(cell.r, cell.c)" />
                 <div class="cell-face back" :class="[ faceDownActive ? faceColorClass(cell.r, cell.c) : null, cellClass(cell.r, cell.c) ]" />
+                <!-- Ice overlay for frozen row -->
+                <div v-if="isFrozen(cell.r)" class="ice-overlay">
+                  <div class="ice-clicks">{{ frozenClicksLeft }}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -78,6 +82,15 @@
             <Heart />
             </div>
           </div>
+          <!-- Freeze power indicator (versus only) -->
+          <div
+            v-if="mode === 'versus'"
+            :class="['power-card', { available: powerAvailable && !revealComplete, used: !powerAvailable || !revealComplete }]"
+            :title="!revealComplete ? 'Attendez la fin de la mémorisation' : (powerAvailable ? 'Pouvoir de gel disponible (Espace)' : 'Pouvoir déjà utilisé')"
+            style="margin-top: 8px;"
+          >
+            <Snowflake :size="24" />
+          </div>
         </div>
       </div>
     </div>
@@ -85,7 +98,7 @@
 </template>
 
 <script setup>
-import { Home, RotateCcw, Heart } from 'lucide-vue-next';
+import { Home, RotateCcw, Heart, Snowflake } from 'lucide-vue-next';
 const props = defineProps({
   cells: { type: Array, required: true },
   boardStyle: { type: Object, required: true },
@@ -108,6 +121,9 @@ const props = defineProps({
   livesUsed: { type: Number, default: 0 },
   justLost: { type: Boolean, default: false },
   lastExtinguishedIndex: { type: Number, default: -1 },
+  frozenRow: { type: Number, default: null },
+  frozenClicksLeft: { type: Number, default: 0 },
+  powerAvailable: { type: Boolean, default: true },
 });
 const emit = defineEmits(['cellClick', 'goHome']);
 
@@ -124,6 +140,10 @@ function faceColorClass(r, c) {
   const v = props.faceColors && props.faceColors[key];
   if (!v) return null;
   return `face-${v}`;
+}
+
+function isFrozen(row) {
+  return props.frozenRow !== null && row === props.frozenRow;
 }
 
 // Each segment fill per player
@@ -418,10 +438,52 @@ function bubbleTextColor(bg) {
 /* Reverse flip (face-down -> face-up) */
 .cell-inner.revealing {
   animation: cellFlipBack 420ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-  animation-delay: var(--delay, 0ms);
 }
 
-@keyframes cellFlip {
+/* Heart blink animation for power card */
+.heart.blink {
+  animation: heartBlink 0.9s ease-in-out;
+}
+
+/* Power card (freeze indicator) */
+.power-card {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  border: 2px solid #2a2e52;
+  background: #1a1c30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.power-card.available {
+  background: linear-gradient(135deg, #1a3d5c 0%, #2a5d8c 100%);
+  border-color: #3a8dcc;
+  color: #aaddff;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(58, 141, 204, 0.4);
+  animation: powerPulse 2s ease-in-out infinite;
+}
+
+.power-card.used {
+  background: #1a1c30;
+  border-color: #2a2e52;
+  color: #4a4e72;
+  opacity: 0.5;
+}
+
+@keyframes powerPulse {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(58, 141, 204, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(58, 141, 204, 0.7);
+  }
+}
+
+@keyframes heartBlink {
   0% { transform: rotateX(0deg); }
   100% { transform: rotateX(180deg); }
 }
@@ -446,6 +508,38 @@ function bubbleTextColor(bg) {
 /* Override random color when the cell is marked correct/wrong during play */
 .cell-face.back.correct { background: #1a3d2e; border-color: var(--ok); }
 .cell-face.back.wrong   { background: #3a1c2e; border-color: var(--bad); }
+
+/* Ice overlay for frozen cells */
+.ice-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(173, 216, 230, 0.7);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  backdrop-filter: blur(2px);
+  animation: iceShimmer 2s ease-in-out infinite;
+  z-index: 10;
+}
+
+.ice-clicks {
+  font-size: 18px;
+  font-weight: 900;
+  color: #0a4d6e;
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+  pointer-events: none;
+}
+
+.cell-inner.frozen {
+  cursor: pointer;
+}
+
+@keyframes iceShimmer {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.9; }
+}
 
 .progress {
   width: 100%;

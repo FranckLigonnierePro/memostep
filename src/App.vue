@@ -52,6 +52,9 @@
       :livesUsed="livesUsed"
       :justLost="justLost"
       :lastExtinguishedIndex="lastExtinguishedIndex"
+      :frozenRow="state.frozenRow"
+      :frozenClicksLeft="state.frozenClicksLeft"
+      :powerAvailable="!state.powerUsed"
       @cellClick="onCellClick"
       @goHome="goHome"
       @newGame="newGame"
@@ -224,7 +227,14 @@ import {
   markDailyAttempt,
   getState,
 } from './lib/storage.js';
-import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult, reportLifeLoss, setPlayerProgress, resetRoom } from './lib/realtime_v2.js';
+import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult, reportLifeLoss, setPlayerProgress, resetRoom, usePower } from './lib/realtime_v2.js';
+
+// Get supabase instance for direct updates
+let supabase = null;
+function getSupabase() {
+  if (!supabase) supabase = initRealtime();
+  return supabase;
+}
 
 // Try to load a real logo from assets if present (supports memostep or memostep-logo)
 const logoModules = import.meta.glob('./assets/{memostep,memostep-logo}.{png,jpg,jpeg,webp,svg}', { eager: true });
@@ -318,6 +328,10 @@ const state = reactive({
   soloPath: [],
   // Solo decoy cells (adjacent to path), active from level >= 5
   decoys: new Set(), // 'r-c'
+  // Freeze power state (versus mode)
+  frozenRow: null,      // which row is frozen (null = none)
+  frozenClicksLeft: 0,  // how many clicks left to break ice
+  powerUsed: false,     // whether freeze power has been used this round
 });
 
 // Flip wave animation control (top -> bottom)
@@ -417,6 +431,9 @@ const versusWins = computed(() => {
 // Progress within the current path (0..1) for versus
 const versusProgress = computed(() => {
   if (state.mode !== 'versus') return versusLastProgress.value;
+  // During memorization (revealed=true, inPlay=false), keep last progress to avoid bubble jump
+  if (state.revealed && !state.inPlay) return versusLastProgress.value;
+  // During active play, calculate live progress
   if (!state.inPlay) return versusLastProgress.value;
   const len = state.path.length || 1;
   const current = Math.max(0, Math.min(1, state.nextIndex / len));
@@ -441,6 +458,52 @@ const versusPlayers = computed(() => {
     return { id: p.id, name, wins, progress, color };
   });
 });
+
+// Update local freeze state from room data
+function updateFreezeState() {
+  if (state.mode !== 'versus') return;
+  const room = versusRoom.value;
+  const me = playerId.value || ensurePlayerId();
+  const myPlayer = (room && Array.isArray(room.players)) ? room.players.find(p => p && p.id === me) : null;
+  if (myPlayer) {
+    state.frozenRow = myPlayer.frozen_row ?? null;
+    state.frozenClicksLeft = myPlayer.frozen_clicks ?? 0;
+    
+    // Check if there's a pending freeze to apply
+    if (myPlayer.pending_freeze && state.inPlay && !state.revealed) {
+      applyPendingFreeze();
+    }
+  }
+}
+
+// Apply pending freeze when memorization ends
+async function applyPendingFreeze() {
+  if (!versusCode.value) return;
+  const me = playerId.value || ensurePlayerId();
+  
+  // Calculate current row to freeze based on progress
+  const ROWS = 10;
+  const stepsCompleted = Math.floor((state.nextIndex / state.path.length) * ROWS);
+  const frozenRow = ROWS - 1 - stepsCompleted;
+  
+  console.log('[applyPendingFreeze] Applying pending freeze at row:', frozenRow);
+  
+  try {
+    const sb = getSupabase();
+    await sb.from('players')
+      .update({ 
+        frozen_row: frozenRow,
+        frozen_clicks: 4,
+        pending_freeze: false
+      })
+      .eq('room_code', versusCode.value)
+      .eq('player_id', me);
+    
+    console.log('[applyPendingFreeze] ❄️ Pending freeze applied!');
+  } catch (err) {
+    console.error('[applyPendingFreeze] Error:', err);
+  }
+}
 // Versus ranking sorted by score (descending)
 const versusRanking = computed(() => {
   if (state.mode !== 'versus') return [];
@@ -727,8 +790,14 @@ function showPath() {
   state.revealed = true;
   state.inPlay = false;
   state.statusText = t('status.memorize');
-  // reset chrono display during reveal so timeText shows 00:00 immediately
-  chronoMs.value = 0;
+  // In versus mode, pause chrono during memorization (don't reset to 0)
+  // In other modes, reset chrono to 0 at the start
+  if (state.mode !== 'versus') {
+    chronoMs.value = 0;
+  } else {
+    // Pause chrono during versus memorization
+    stopChrono();
+  }
   if (state.timerId) clearTimeout(state.timerId);
   // programme la fin d'exposition et démarre le compteur visuel
   state.revealEndAt = Date.now() + REVEAL_MS;
@@ -738,11 +807,14 @@ function showPath() {
   faceDownActive.value = false;
   // reset bar fill state at start
   revealComplete.value = false;
+  // Reset power availability for new round
+  state.powerUsed = false;
 }
 
 function hidePath() {
   // Keep revealed=true during the flip so the path remains visible on the front face
   state.inPlay = true;
+  // Reset nextIndex to 0 for new path, but versusLastProgress keeps previous value during transition
   state.nextIndex = 0;
   state.correctSet.clear();
   state.wrongSet.clear();
@@ -754,8 +826,11 @@ function hidePath() {
   faceDownActive.value = true;
   // mark bar as fully filled
   revealComplete.value = true;
-  // reset and start chrono
-  chronoMs.value = 0;
+  // In versus mode, resume chrono (don't reset)
+  // In other modes, reset and start chrono
+  if (state.mode !== 'versus') {
+    chronoMs.value = 0;
+  }
   startChrono();
 
   // Versus: start auto-publish ticker (don't reset progress to 0, keep it at previous value)
@@ -779,6 +854,41 @@ function onCellClick(r, c) {
   const keyAlready = `${r}-${c}`;
   // Ignore repeated clicks on cells already validated as correct
   if (state.correctSet.has(keyAlready)) return;
+  
+  // Check if clicking on frozen row (versus mode)
+  if (state.mode === 'versus' && state.frozenRow !== null && r === state.frozenRow && state.frozenClicksLeft > 0) {
+    // Decrement frozen clicks locally and update server
+    state.frozenClicksLeft = Math.max(0, state.frozenClicksLeft - 1);
+    if (versusCode.value) {
+      const me = playerId.value || ensurePlayerId();
+      const sb = getSupabase();
+      sb.from('players')
+        .update({ frozen_clicks: state.frozenClicksLeft })
+        .eq('room_code', versusCode.value)
+        .eq('player_id', me)
+        .then(() => {});
+    }
+    // If ice broken, clear frozen state
+    if (state.frozenClicksLeft === 0) {
+      state.frozenRow = null;
+      if (versusCode.value) {
+        const me = playerId.value || ensurePlayerId();
+        const sb = getSupabase();
+        sb.from('players')
+          .update({ frozen_row: null, frozen_clicks: 0 })
+          .eq('room_code', versusCode.value)
+          .eq('player_id', me)
+          .then(() => {});
+      }
+    }
+    return; // Don't process as normal cell click
+  }
+  
+  // Block clicks if row is frozen
+  if (state.mode === 'versus' && state.frozenRow !== null && r === state.frozenRow) {
+    return; // Can't click path cells while frozen
+  }
+  
   const expect = state.path[state.nextIndex];
   if (expect && expect.r === r && expect.c === c) {
     state.correctSet.add(`${r}-${c}`);
@@ -1168,6 +1278,7 @@ function subscribeToRoom(code) {
     if (!room) return;
     console.log('[App] Room update received:', room.status, room.players?.map(p => ({ id: p.id?.slice(0,4), progress: p.progress })));
     versusRoom.value = room;
+    updateFreezeState();
     // When playing, check if we need to start/restart based on our current_round
     if (room.status === 'playing' && typeof room.seed === 'number' && typeof room.start_at_ms === 'number') {
       const me = playerId.value || ensurePlayerId();
@@ -1406,6 +1517,58 @@ function cellClass(r, c) {
   return classes;
 }
 
+// Handle spacebar for freeze power in versus mode
+function handleKeyDown(e) {
+  if (e.code === 'Space') {
+    console.log('[handleKeyDown] Space pressed:', {
+      mode: state.mode,
+      inPlay: state.inPlay,
+      revealed: state.revealed,
+      powerUsed: state.powerUsed,
+      versusCode: !!versusCode.value
+    });
+    
+    if (state.mode === 'versus' && state.inPlay && !state.revealed) {
+      e.preventDefault();
+      handleFreezePower();
+    }
+  }
+}
+
+async function handleFreezePower() {
+  console.log('[handleFreezePower] Called with state:', {
+    inPlay: state.inPlay,
+    revealed: state.revealed,
+    powerUsed: state.powerUsed,
+    versusCode: versusCode.value
+  });
+  
+  // Only allow power during active gameplay (not during memorization)
+  if (!state.inPlay || state.revealed) {
+    console.log('[handleFreezePower] ❌ Blocked: not in play or revealed');
+    return;
+  }
+  if (!versusCode.value) {
+    console.log('[handleFreezePower] ❌ Blocked: no versus code');
+    return;
+  }
+  if (state.powerUsed) {
+    console.log('[handleFreezePower] ❌ Blocked: power already used');
+    return;
+  }
+  
+  console.log('[handleFreezePower] ✅ Activating freeze power...');
+  const me = playerId.value || ensurePlayerId();
+  try {
+    const updated = await usePower(versusCode.value, me, 'freeze');
+    if (updated) versusRoom.value = updated;
+    state.powerUsed = true; // Mark power as used
+    console.log('[handleFreezePower] ✅ Freeze power activated!');
+  } catch (err) {
+    console.error('[handleFreezePower] ❌ Error:', err);
+  }
+}
+
 onMounted(() => {
   // Sync flag with current i18n locale
   try { currentLang.value = String(locale.value || 'fr'); } catch (_) {}
@@ -1415,6 +1578,7 @@ onMounted(() => {
   window.addEventListener('orientationchange', fitBoard);
   window.addEventListener('resize', fitRootScale);
   window.addEventListener('orientationchange', fitRootScale);
+  window.addEventListener('keydown', handleKeyDown);
   // Ensure a player id exists for tracking
   try { ensurePlayerId(); } catch (_) {}
 });
@@ -1424,6 +1588,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('orientationchange', fitBoard);
   window.removeEventListener('resize', fitRootScale);
   window.removeEventListener('orientationchange', fitRootScale);
+  window.removeEventListener('keydown', handleKeyDown);
   if (state.timerId) clearTimeout(state.timerId);
   stopRevealTicker();
 });

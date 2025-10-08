@@ -53,7 +53,10 @@ async function getRoomPlayers(roomCode) {
     score: p.score,
     lives: p.lives,
     progress: p.progress,
-    current_round: p.current_round || 1
+    current_round: p.current_round || 1,
+    frozen_row: p.frozen_row ?? null,
+    frozen_clicks: p.frozen_clicks ?? 0,
+    pending_freeze: p.pending_freeze ?? false
   }));
   console.log('[getRoomPlayers] Joueurs récupérés:', players.map(p => ({ id: p.id?.slice(0,6), round: p.current_round, progress: p.progress })));
   return players;
@@ -156,6 +159,47 @@ export async function resetRoom(code) {
   if (roomErr) throw roomErr;
 
   return await getRoomWithPlayers(code);
+}
+
+// Use freeze power: apply frozen_row to all opponents via PostgreSQL function
+export async function usePower(code, playerId, powerType) {
+  initRealtime();
+  
+  if (powerType !== 'freeze') {
+    throw new Error('Unknown power type');
+  }
+  
+  console.log('[usePower] Activating freeze power for player:', playerId, 'in room:', code);
+  
+  try {
+    // Call PostgreSQL function to apply freeze power server-side
+    // This ensures all players have permission to freeze opponents
+    const { data, error } = await supabase.rpc('apply_freeze_power', {
+      p_room_code: code,
+      p_player_id: playerId
+    });
+    
+    if (error) {
+      console.error('[usePower] ❌ RPC error:', error);
+      throw error;
+    }
+    
+    console.log('[usePower] ✅ Freeze power applied via RPC');
+  } catch (err) {
+    console.error('[usePower] ❌ Error calling apply_freeze_power:', err);
+    throw err;
+  }
+  
+  // Fetch updated room state
+  const updated = await getRoomWithPlayers(code);
+  console.log('[usePower] ❄️ Updated room:', updated.players.map(p => ({ 
+    id: p.id?.slice(0,6), 
+    frozen_row: p.frozen_row, 
+    frozen_clicks: p.frozen_clicks,
+    pending_freeze: p.pending_freeze 
+  })));
+  
+  return updated;
 }
 
 // Update a player's per-round progress (0..1) without changing seed/start/status.
@@ -494,6 +538,9 @@ export function subscribeRoom(code, callback) {
             lives: row.lives ?? (cached.players?.[idx]?.lives || 3),
             progress: row.progress ?? (cached.players?.[idx]?.progress || 0),
             current_round: row.current_round ?? (cached.players?.[idx]?.current_round || 1),
+            frozen_row: row.frozen_row ?? (cached.players?.[idx]?.frozen_row ?? null),
+            frozen_clicks: row.frozen_clicks ?? (cached.players?.[idx]?.frozen_clicks ?? 0),
+            pending_freeze: row.pending_freeze ?? (cached.players?.[idx]?.pending_freeze ?? false),
           };
           const nextPlayers = Array.isArray(cached.players) ? [...cached.players] : [];
           if (idx >= 0) {
