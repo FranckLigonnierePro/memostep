@@ -138,6 +138,26 @@ export async function reportRoundResult(code, winnerId, loserId, timeMs) {
   return await getRoomWithPlayers(code);
 }
 
+// Reset the room to a fresh lobby state: reset all players' lives/scores/progress and clear seed
+export async function resetRoom(code) {
+  initRealtime();
+  // Reset players
+  const { error: playersErr } = await supabase
+    .from('players')
+    .update({ lives: 3, score: 0, progress: 0, current_round: 1 })
+    .eq('room_code', code);
+  if (playersErr) throw playersErr;
+
+  // Reset room status and clear seed/start
+  const { error: roomErr } = await supabase
+    .from('rooms')
+    .update({ status: 'waiting', seed: null, start_at_ms: null, winner_id: null, winner_time_ms: null })
+    .eq('code', code);
+  if (roomErr) throw roomErr;
+
+  return await getRoomWithPlayers(code);
+}
+
 // Update a player's per-round progress (0..1) without changing seed/start/status.
 // This enables realtime UI for bubbles.
 // Chaque joueur est mis à jour indépendamment dans sa propre ligne.

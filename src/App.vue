@@ -24,6 +24,7 @@
 
     <VersusView
       v-else-if="showVersusView"
+      :code="versusCode"
       @close="handleCloseVersusView"
       @begin="handleBeginVersusFromLobby"
     />
@@ -67,8 +68,15 @@
         </div>
         <div v-if="state.mode === 'solo'" style="margin-top:6px;">{{ $t('modals.score') }}: {{ soloLevel }}</div>
         <div class="modal-actions">
+          <!-- Versus replay returns to room lobby -->
           <button
-            v-if="!((state.mode === 'daily' && dailyAttempts >= 3) || (state.mode === 'solo' && soloLivesUsed >= 3))"
+            v-if="state.mode === 'versus'"
+            class="modal-btn"
+            @click="handleVersusReplay"
+          >{{ $t('modals.replay') }}</button>
+          <!-- Non-versus replay keeps existing logic/limits -->
+          <button
+            v-if="state.mode !== 'versus' && !((state.mode === 'daily' && dailyAttempts >= 3) || (state.mode === 'solo' && soloLivesUsed >= 3))"
             class="modal-btn"
             @click="handleReplay"
           >{{ $t('modals.replay') }}</button>
@@ -106,6 +114,8 @@
           </div>
         </div>
         <div class="modal-actions">
+          <!-- Versus replay returns to room lobby -->
+          <button v-if="state.mode === 'versus'" class="modal-btn" @click="handleVersusReplay">{{ $t('modals.replay') }}</button>
           <button class="modal-btn" @click="handleShare">{{ $t('modals.share') }}</button>
           <button class="modal-btn" @click="handleWinReturn">{{ $t('modals.back') }}</button>
         </div>
@@ -214,7 +224,7 @@ import {
   markDailyAttempt,
   getState,
 } from './lib/storage.js';
-import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult, reportLifeLoss, setPlayerProgress } from './lib/realtime_v2.js';
+import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult, reportLifeLoss, setPlayerProgress, resetRoom } from './lib/realtime_v2.js';
 
 // Try to load a real logo from assets if present (supports memostep or memostep-logo)
 const logoModules = import.meta.glob('./assets/{memostep,memostep-logo}.{png,jpg,jpeg,webp,svg}', { eager: true });
@@ -766,6 +776,9 @@ function hidePath() {
 
 function onCellClick(r, c) {
   if (!state.inPlay) return;
+  const keyAlready = `${r}-${c}`;
+  // Ignore repeated clicks on cells already validated as correct
+  if (state.correctSet.has(keyAlready)) return;
   const expect = state.path[state.nextIndex];
   if (expect && expect.r === r && expect.c === c) {
     state.correctSet.add(`${r}-${c}`);
@@ -853,19 +866,13 @@ function onCellClick(r, c) {
               stopProgressAutoPublish();
               // Show a waiting message or just idle state
             } else {
-              // Continue to next path: generate new seed and start immediately
-              versusLastProgress.value = 0; // Reset progress to start of new segment
-              const seed = Math.floor(Math.random() * 1e9);
-              const rng = seededRng(seed);
-              state.path = randomPathWithRng(rng);
-              state.nextIndex = 0;
-              state.correctSet.clear();
-              state.wrongSet.clear();
-              faceDownActive.value = false;
+              // Do NOT locally reseed. Wait for server-driven beginVersus using room.seed + current_round.
+              // Reset local playing state and auto-publish; subscription will trigger the next round.
+              versusLastProgress.value = 0;
+              state.inPlay = false;
               stopChrono();
-              chronoMs.value = 0;
-              // Start next path after a short delay
-              setTimeout(() => { showPath(); }, 350);
+              stopProgressAutoPublish();
+              // Keep board idle until subscribeRoom(handleRoomUpdate) starts the next round.
             }
           } catch (_) {
             // If network/db error occurs, try a minimal fallback to advance.
@@ -889,18 +896,11 @@ function onCellClick(r, c) {
                 stopChrono();
                 stopProgressAutoPublish();
               } else {
-                // Continue to next path
-                versusLastProgress.value = 0; // Reset progress to start of new segment
-                const seed = Math.floor(Math.random() * 1e9);
-                const rng = seededRng(seed);
-                state.path = randomPathWithRng(rng);
-                state.nextIndex = 0;
-                state.correctSet.clear();
-                state.wrongSet.clear();
-                faceDownActive.value = false;
+                // Do NOT locally reseed. Wait for server-driven beginVersus using room.seed + current_round.
+                versusLastProgress.value = 0;
+                state.inPlay = false;
                 stopChrono();
-                chronoMs.value = 0;
-                setTimeout(() => { showPath(); }, 350);
+                stopProgressAutoPublish();
               }
             } catch (__){
               // Final fallback: show modal
@@ -1032,6 +1032,32 @@ function handleWinReturn() {
   winActive.value = false;
   stopChrono();
   goHome();
+}
+
+// Return to versus room lobby to allow starting a new match
+async function handleVersusReplay() {
+  // Close any modal
+  loseActive.value = false;
+  winActive.value = false;
+  // Stop timers/publishing and leave gameplay state idle
+  stopChrono();
+  stopProgressAutoPublish();
+  state.inPlay = false;
+  faceDownActive.value = false;
+  // Reset per-round local markers
+  versusLastProgress.value = 0;
+  versusStartAtMs.value = null;
+  versusSeed.value = null;
+  // Reset server-side room (hearts, scores, progress, round, seed) if available
+  try {
+    if (versusCode.value) {
+      const updated = await resetRoom(versusCode.value);
+      if (updated) versusRoom.value = updated;
+    }
+  } catch (_) {}
+  // Show the Versus lobby view (keep current versusCode and subscription)
+  showVersusView.value = true;
+  state.showHome = false;
 }
 
 function closeOverlays() {

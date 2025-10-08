@@ -29,9 +29,9 @@
             <Crown v-if="isHostSlot(i-1)" class="slot-crown" :size="16" aria-label="Hôte" />
           </div>
         </div>
-        <div v-if="versusIsHost" style="margin-top:12px; display:flex; gap:8px; justify-content:center;">
+        <div style="margin-top:12px; display:flex; gap:8px; justify-content:center;">
           <button class="btn" @click="closeLobby">Retour</button>
-          <button class="btn" :disabled="((versusRoom?.players || defaultPlayers).length < 2)" @click="handleStartVersus">Démarrer</button>
+          <button v-if="versusIsHost" class="btn" :disabled="((versusRoom?.players || defaultPlayers).length < 2)" @click="handleStartVersus">Démarrer</button>
         </div>
         <div v-if="versusError" class="error">{{ versusError }}</div>
       </div>
@@ -45,6 +45,10 @@ import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, getRoom }
 import { User, Crown } from 'lucide-vue-next';
 
 const emit = defineEmits(['close', 'begin']);
+
+const props = defineProps({
+  code: { type: String, default: '' },
+});
 
 const usernameInput = ref('');
 const joinInput = ref('');
@@ -62,6 +66,16 @@ onMounted(() => {
     const saved = localStorage.getItem(USERNAME_STORAGE_KEY);
     if (saved) usernameInput.value = saved;
   } catch (_) {}
+  // Ensure we have a stable player id
+  if (!playerId.value) {
+    try { playerId.value = ensurePlayerId(); } catch (_) {}
+  }
+  // If a code is provided by parent (App.vue), preload and subscribe
+  const initial = (props.code || '').trim();
+  if (initial) {
+    versusCode.value = initial;
+    subscribeToRoom(initial);
+  }
 });
 watch(() => usernameInput.value, (v) => {
   try { localStorage.setItem(USERNAME_STORAGE_KEY, String(v || '')); } catch (_) {}
@@ -131,6 +145,11 @@ function subscribeToRoom(code) {
   async function handleRoomUpdate(room) {
     if (!room) return;
     versusRoom.value = room;
+    // Update host flag based on room host_id
+    try {
+      const me = playerId.value || ensurePlayerId();
+      versusIsHost.value = !!(room && room.host_id && room.host_id === me);
+    } catch (_) { versusIsHost.value = false; }
     if (room.status === 'playing' && typeof room.seed === 'number' && typeof room.start_at_ms === 'number') {
       // Inform parent (App) to start the versus game, and pass code/room
       emit('begin', { seed: room.seed, startAtMs: room.start_at_ms, code: versusCode.value, room });
