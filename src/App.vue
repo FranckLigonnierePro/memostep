@@ -1151,21 +1151,21 @@ function subscribeToRoom(code) {
       // Calculer le seed pour mon round actuel
       const myRoundSeed = room.seed + (myRound - 1) * 1000000;
       
-      // Ne redémarrer que si:
-      // 1. On n'a pas encore démarré ce round spécifique (seed différent)
-      // 2. OU on n'est pas en train de jouer (state.inPlay === false)
+      // Ne redémarrer que si on n'a pas encore démarré ce round spécifique
+      // Vérifier le seed ET le mode versus pour éviter de redémarrer pendant le jeu
       const alreadyStartedThisRound = (
         state.mode === 'versus' && 
-        versusSeed.value === myRoundSeed &&
-        state.inPlay === true
+        versusSeed.value === myRoundSeed
       );
       
       if (!alreadyStartedThisRound) {
-        console.log('[App] Démarrage du round', myRound, 'pour le joueur', me, '(inPlay:', state.inPlay, ')');
+        console.log('[App] Démarrage du round', myRound, 'pour le joueur', me, '(seed:', myRoundSeed, 'vs', versusSeed.value, ')');
         beginVersus(room.seed, room.start_at_ms, myRound);
         // Do not toggle back to home; just hide the VersusView so BoardView shows
         showVersusView.value = false;
         state.showHome = false;
+      } else {
+        console.log('[App] Round', myRound, 'déjà démarré, skip');
       }
       return;
     }
