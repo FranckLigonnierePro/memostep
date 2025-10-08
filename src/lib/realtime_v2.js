@@ -52,9 +52,10 @@ async function getRoomPlayers(roomCode) {
     color: p.color,
     score: p.score,
     lives: p.lives,
-    progress: p.progress
+    progress: p.progress,
+    current_round: p.current_round || 1
   }));
-  console.log('[getRoomPlayers] Joueurs récupérés:', players.map(p => ({ id: p.id?.slice(0,6), progress: p.progress })));
+  console.log('[getRoomPlayers] Joueurs récupérés:', players.map(p => ({ id: p.id?.slice(0,6), round: p.current_round, progress: p.progress })));
   return players;
 }
 
@@ -174,12 +175,13 @@ export async function setPlayerProgress(code, playerId, progress) {
         color,
         score: 0,
         lives: 3,
-        progress: p
+        progress: p,
+        current_round: 1
       }]);
     if (insErr) throw insErr;
     console.log('[setPlayerProgress] Joueur créé avec progression:', p);
   } else {
-    console.log('[setPlayerProgress] Progression mise à jour:', { playerId, progress: p });
+    console.log('[setPlayerProgress] ✅ Progression mise à jour:', { playerId: playerId.slice(0,8), progress: p });
   }
   
   // Retourner null pour éviter une requête coûteuse
@@ -250,7 +252,8 @@ export async function joinRoom(code, playerId, name) {
         color,
         score: 0,
         lives: 3,
-        progress: 0
+        progress: 0,
+        current_round: 1
       }]);
     if (insErr) {
       console.error('[joinRoom] Erreur lors de l\'insertion:', insErr);
@@ -259,11 +262,14 @@ export async function joinRoom(code, playerId, name) {
     console.log('[joinRoom] Joueur créé avec succès');
   }
   
-  // Vérifier que le joueur a bien été ajouté
+  // Vérifier que le joueur a bien été ajouté et retourner la room complète
   const finalPlayers = await getRoomPlayers(code);
   console.log('[joinRoom] Joueurs dans la room après join:', finalPlayers);
   
-  return true;
+  // Retourner la room complète pour forcer une mise à jour de l'UI
+  const fullRoom = await getRoomWithPlayers(code);
+  console.log('[joinRoom] ✅ Join réussi, room complète:', { code, playerCount: fullRoom.players.length });
+  return fullRoom;
 }
 
 function randomCode(len = 6) {
@@ -391,16 +397,24 @@ export async function reportRoundWin(code, winnerId, timeMs) {
       return await getRoomWithPlayers(code);
     }
     
-    // Otherwise schedule next round with a new deterministic seed and start time
-    const seed = Math.floor(Math.random() * 1e9);
-    const startAtMs = Date.now() + 1500;
+    // Chaque joueur avance à son propre rythme
+    // Quand un joueur finit son round, il passe au suivant
+    // Les autres continuent leur round actuel
     
-    const { error: upErr } = await supabase
-      .from('rooms')
-      .update({ status: 'playing', seed, start_at_ms: startAtMs })
-      .eq('code', code);
+    // Incrémenter le current_round du joueur gagnant et réinitialiser sa progression
+    const { error: roundErr } = await supabase
+      .from('players')
+      .update({ 
+        current_round: (winner.current_round || 1) + 1,
+        progress: 0 
+      })
+      .eq('room_code', code)
+      .eq('player_id', winnerId);
     
-    if (upErr) throw upErr;
+    if (roundErr) throw roundErr;
+    
+    console.log('[reportRoundWin] Joueur', winnerId, 'passe au round', (winner.current_round || 1) + 1);
+    
     return await getRoomWithPlayers(code);
   }
   
@@ -445,10 +459,13 @@ export function subscribeRoom(code, callback) {
       // Mise à jour optimiste immédiate à partir du payload
       try {
         const cached = roomCache.get(code);
+        console.log('[subscribeRoom] Cache disponible:', !!cached, 'Payload:', !!payload?.new);
         if (cached && (payload?.new || payload?.old)) {
           const row = payload.new || payload.old;
           const pid = row.player_id;
+          console.log('[subscribeRoom] Mise à jour du joueur:', pid, 'progress:', row.progress);
           const idx = Array.isArray(cached.players) ? cached.players.findIndex(p => p && p.id === pid) : -1;
+          console.log('[subscribeRoom] Index du joueur dans le cache:', idx, 'Total joueurs:', cached.players?.length);
           const updatedPlayer = {
             id: row.player_id,
             name: row.name ?? (cached.players?.[idx]?.name || 'Player'),
@@ -456,6 +473,7 @@ export function subscribeRoom(code, callback) {
             score: row.score ?? (cached.players?.[idx]?.score || 0),
             lives: row.lives ?? (cached.players?.[idx]?.lives || 3),
             progress: row.progress ?? (cached.players?.[idx]?.progress || 0),
+            current_round: row.current_round ?? (cached.players?.[idx]?.current_round || 1),
           };
           const nextPlayers = Array.isArray(cached.players) ? [...cached.players] : [];
           if (idx >= 0) {
@@ -465,11 +483,17 @@ export function subscribeRoom(code, callback) {
           }
           const optimistic = { ...cached, players: nextPlayers };
           roomCache.set(code, optimistic);
-          console.log('[subscribeRoom] Optimistic room update from payload:', { playerId: pid, progress: updatedPlayer.progress });
+          console.log('[subscribeRoom] ✅ Optimistic room update from payload:', { 
+            playerId: pid, 
+            progress: updatedPlayer.progress,
+            allPlayers: nextPlayers.map(p => ({ id: p.id?.slice(0,6), progress: p.progress }))
+          });
           callback(optimistic);
+        } else {
+          console.warn('[subscribeRoom] ⚠️ Pas de cache ou payload vide, skip optimistic update');
         }
       } catch (e) {
-        console.warn('[subscribeRoom] Optimistic merge error:', e);
+        console.error('[subscribeRoom] ❌ Optimistic merge error:', e);
       }
 
       // Puis rafraîchir en arrière-plan pour garantir la cohérence

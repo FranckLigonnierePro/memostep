@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Realtime Supabase</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #1a1c30;
+      color: #e7e7ee;
+    }
+    .status {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 8px;
+      background: #2a2e52;
+    }
+    .success { background: #12b886; color: white; }
+    .error { background: #ff2e5f; color: white; }
+    .warning { background: #ffa94d; color: white; }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      border-radius: 8px;
+      background: #6F08EF;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover {
+      background: #8b3aff;
+    }
+    .log {
+      background: #0f1020;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .log-entry {
+      margin: 5px 0;
+      padding: 5px;
+      border-left: 3px solid #6F08EF;
+      padding-left: 10px;
+    }
+    input {
+      padding: 10px;
+      margin: 5px;
+      border: 2px solid #2a2e52;
+      border-radius: 8px;
+      background: #17192c;
+      color: #e7e7ee;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test Realtime Supabase</h1>
+  
+  <div class="status" id="status">
+    ⏳ En attente de configuration...
+  </div>
+
+  <div>
+    <h3>Configuration</h3>
+    <input type="text" id="supabaseUrl" placeholder="URL Supabase" style="width: 300px;">
+    <input type="text" id="supabaseKey" placeholder="Clé Anon" style="width: 300px;">
+    <br>
+    <button onclick="initSupabase()">Initialiser</button>
+  </div>
+
+  <div id="controls" style="display: none;">
+    <h3>Tests</h3>
+    <input type="text" id="roomCode" placeholder="Code room (ex: TEST01)" value="TEST01">
+    <input type="text" id="playerId" placeholder="Player ID" value="test-player-1">
+    <br>
+    <button onclick="createTestRoom()">1. Créer Room Test</button>
+    <button onclick="addTestPlayer()">2. Ajouter Joueur</button>
+    <button onclick="updateProgress()">3. Mettre à jour Progression</button>
+    <button onclick="subscribeToRoom()">4. S'abonner aux changements</button>
+    <br>
+    <button onclick="clearLogs()">Effacer les logs</button>
+  </div>
+
+  <div class="log" id="logs"></div>
+
+  <script>
+    let supabase = null;
+    let subscription = null;
+
+    function log(message, type = 'info') {
+      const logs = document.getElementById('logs');
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      const timestamp = new Date().toLocaleTimeString();
+      entry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+      if (type === 'error') entry.style.borderLeftColor = '#ff2e5f';
+      if (type === 'success') entry.style.borderLeftColor = '#12b886';
+      logs.appendChild(entry);
+      logs.scrollTop = logs.scrollHeight;
+    }
+
+    function setStatus(message, type = 'info') {
+      const status = document.getElementById('status');
+      status.textContent = message;
+      status.className = 'status ' + type;
+    }
+
+    function initSupabase() {
+      const url = document.getElementById('supabaseUrl').value || import.meta.env?.VITE_SUPABASE_URL;
+      const key = document.getElementById('supabaseKey').value || import.meta.env?.VITE_SUPABASE_ANON_KEY;
+
+      if (!url || !key) {
+        setStatus('❌ URL et clé Supabase requises', 'error');
+        log('Erreur: URL et clé manquantes', 'error');
+        return;
+      }
+
+      try {
+        supabase = window.supabase.createClient(url, key, {
+          auth: { persistSession: false }
+        });
+        setStatus('✅ Supabase initialisé', 'success');
+        log('Supabase initialisé avec succès', 'success');
+        document.getElementById('controls').style.display = 'block';
+      } catch (error) {
+        setStatus('❌ Erreur d\'initialisation', 'error');
+        log('Erreur: ' + error.message, 'error');
+      }
+    }
+
+    async function createTestRoom() {
+      const code = document.getElementById('roomCode').value;
+      log(`Création de la room ${code}...`);
+      
+      try {
+        const { data, error } = await supabase
+          .from('rooms')
+          .upsert([{
+            code: code,
+            status: 'waiting',
+            host_id: 'test-host',
+            guest_id: null
+          }], { onConflict: 'code' })
+          .select();
+        
+        if (error) throw error;
+        log(`✅ Room créée: ${JSON.stringify(data)}`, 'success');
+        setStatus('✅ Room créée', 'success');
+      } catch (error) {
+        log(`❌ Erreur: ${error.message}`, 'error');
+        setStatus('❌ Erreur création room', 'error');
+      }
+    }
+
+    async function addTestPlayer() {
+      const code = document.getElementById('roomCode').value;
+      const playerId = document.getElementById('playerId').value;
+      log(`Ajout du joueur ${playerId} à la room ${code}...`);
+      
+      try {
+        const { data, error } = await supabase
+          .from('players')
+          .upsert([{
+            room_code: code,
+            player_id: playerId,
+            name: 'Test Player',
+            color: '#e74c3c',
+            score: 0,
+            lives: 3,
+            progress: 0.0
+          }], { onConflict: 'room_code,player_id' })
+          .select();
+        
+        if (error) throw error;
+        log(`✅ Joueur ajouté: ${JSON.stringify(data)}`, 'success');
+        setStatus('✅ Joueur ajouté', 'success');
+      } catch (error) {
+        log(`❌ Erreur: ${error.message}`, 'error');
+        setStatus('❌ Erreur ajout joueur', 'error');
+      }
+    }
+
+    async function updateProgress() {
+      const code = document.getElementById('roomCode').value;
+      const playerId = document.getElementById('playerId').value;
+      const progress = Math.random();
+      log(`Mise à jour progression de ${playerId} à ${progress.toFixed(2)}...`);
+      
+      try {
+        const { data, error } = await supabase
+          .from('players')
+          .update({ progress: progress })
+          .eq('room_code', code)
+          .eq('player_id', playerId)
+          .select();
+        
+        if (error) throw error;
+        log(`✅ Progression mise à jour: ${JSON.stringify(data)}`, 'success');
+        setStatus(`✅ Progression: ${(progress * 100).toFixed(0)}%`, 'success');
+      } catch (error) {
+        log(`❌ Erreur: ${error.message}`, 'error');
+        setStatus('❌ Erreur mise à jour', 'error');
+      }
+    }
+
+    async function subscribeToRoom() {
+      const code = document.getElementById('roomCode').value;
+      
+      if (subscription) {
+        log('Désabonnement de la subscription précédente...');
+        await supabase.removeChannel(subscription);
+      }
+
+      log(`Abonnement aux changements de la room ${code}...`);
+      
+      subscription = supabase
+        .channel(`room:${code}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'rooms',
+          filter: `code=eq.${code}`
+        }, (payload) => {
+          log(`🔔 Changement ROOMS détecté: ${payload.eventType}`, 'success');
+          log(`Données: ${JSON.stringify(payload.new || payload.old)}`, 'success');
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'players',
+          filter: `room_code=eq.${code}`
+        }, (payload) => {
+          log(`🔔 Changement PLAYERS détecté: ${payload.eventType}`, 'success');
+          log(`Données: ${JSON.stringify(payload.new || payload.old)}`, 'success');
+        })
+        .subscribe((status) => {
+          log(`📡 Statut subscription: ${status}`);
+          if (status === 'SUBSCRIBED') {
+            setStatus('✅ Abonné aux changements', 'success');
+          }
+        });
+    }
+
+    function clearLogs() {
+      document.getElementById('logs').innerHTML = '';
+    }
+
+    // Auto-init si les variables d'environnement sont disponibles
+    window.addEventListener('load', () => {
+      log('Page chargée. Configurez Supabase pour commencer.');
+    });
+  </script>
+</body>
+</html>

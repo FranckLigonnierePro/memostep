@@ -137,14 +137,25 @@ function subscribeToRoom(code) {
       // Do NOT cleanup here; let App.vue keep the subscription alive during gameplay
     }
   }
-  unsub = subscribeRoom(code, async (room) => {
-    await handleRoomUpdate(room);
-  });
+  // Charger d'abord la room pour initialiser le cache, PUIS s'abonner
   (async () => {
     try {
+      console.log('[VersusView] Chargement initial de la room:', code);
       const snapshot = await getRoom(code);
+      console.log('[VersusView] Room chargée, initialisation du cache:', snapshot?.players?.length, 'joueurs');
       await handleRoomUpdate(snapshot);
-    } catch (_) {}
+      // Maintenant que le cache est initialisé, on peut s'abonner
+      console.log('[VersusView] Création de la subscription...');
+      unsub = subscribeRoom(code, async (room) => {
+        await handleRoomUpdate(room);
+      });
+    } catch (err) {
+      console.error('[VersusView] Erreur lors du chargement de la room:', err);
+      // En cas d'erreur, on s'abonne quand même
+      unsub = subscribeRoom(code, async (room) => {
+        await handleRoomUpdate(room);
+      });
+    }
   })();
 }
 
@@ -179,11 +190,19 @@ async function handleJoinRoom() {
   } catch (e) { versusError.value = 'Supabase non configuré'; return; }
   try {
     const pid = playerId.value || ensurePlayerId();
-    await joinRoom(code, pid, name);
+    console.log('[VersusView] Tentative de rejoindre la room:', code);
+    const room = await joinRoom(code, pid, name);
+    console.log('[VersusView] Join réussi, room reçue avec', room?.players?.length, 'joueurs');
     versusCode.value = code;
     versusIsHost.value = false;
+    // Mettre à jour immédiatement versusRoom avec la room retournée
+    if (room) {
+      versusRoom.value = room;
+      console.log('[VersusView] versusRoom mis à jour:', versusRoom.value.players?.length, 'joueurs');
+    }
     subscribeToRoom(code);
   } catch (e) {
+    console.error('[VersusView] Erreur lors du join:', e);
     versusError.value = String((e && e.message) || e);
   }
 }

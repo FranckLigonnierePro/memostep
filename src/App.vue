@@ -1142,11 +1142,27 @@ function subscribeToRoom(code) {
     if (!room) return;
     console.log('[App] Room update received:', room.status, room.players?.map(p => ({ id: p.id?.slice(0,4), progress: p.progress })));
     versusRoom.value = room;
-    // When playing, both clients begin simultaneously. Guard to avoid re-triggering on each players[] update.
+    // When playing, check if we need to start/restart based on our current_round
     if (room.status === 'playing' && typeof room.seed === 'number' && typeof room.start_at_ms === 'number') {
-      const alreadyStartedSameRound = (state.mode === 'versus' && typeof versusStartAtMs.value === 'number' && versusStartAtMs.value === room.start_at_ms);
-      if (!alreadyStartedSameRound) {
-        beginVersus(room.seed, room.start_at_ms);
+      const me = playerId.value || ensurePlayerId();
+      const myPlayer = room.players?.find(p => p && p.id === me);
+      const myRound = myPlayer?.current_round || 1;
+      
+      // Calculer le seed pour mon round actuel
+      const myRoundSeed = room.seed + (myRound - 1) * 1000000;
+      
+      // Ne redémarrer que si:
+      // 1. On n'a pas encore démarré ce round spécifique (seed différent)
+      // 2. OU on n'est pas en train de jouer (state.inPlay === false)
+      const alreadyStartedThisRound = (
+        state.mode === 'versus' && 
+        versusSeed.value === myRoundSeed &&
+        state.inPlay === true
+      );
+      
+      if (!alreadyStartedThisRound) {
+        console.log('[App] Démarrage du round', myRound, 'pour le joueur', me, '(inPlay:', state.inPlay, ')');
+        beginVersus(room.seed, room.start_at_ms, myRound);
         // Do not toggle back to home; just hide the VersusView so BoardView shows
         showVersusView.value = false;
         state.showHome = false;
@@ -1168,18 +1184,24 @@ function subscribeToRoom(code) {
     }
   }
 
-  // Subscribe to realtime updates
-  versusUnsub = subscribeRoom(code, async (room) => {
-    await handleRoomUpdate(room);
-  });
-
-  // Immediately fetch current state to avoid missing an update that happened before subscribing
+  // Charger d'abord la room pour initialiser le cache, PUIS s'abonner aux updates
   (async () => {
     try {
+      console.log('[App] Chargement initial de la room pour le cache:', code);
       const snapshot = await getRoom(code);
+      console.log('[App] Room chargée, cache initialisé avec', snapshot?.players?.length, 'joueurs');
       await handleRoomUpdate(snapshot);
-    } catch (_) {
-      // ignore fetch errors; realtime may still deliver updates
+      // Maintenant que le cache est prêt, on peut s'abonner
+      console.log('[App] Création de la subscription realtime...');
+      versusUnsub = subscribeRoom(code, async (room) => {
+        await handleRoomUpdate(room);
+      });
+    } catch (err) {
+      console.error('[App] Erreur lors du chargement initial:', err);
+      // En cas d'erreur, on s'abonne quand même
+      versusUnsub = subscribeRoom(code, async (room) => {
+        await handleRoomUpdate(room);
+      });
     }
   })();
 }
@@ -1199,7 +1221,11 @@ async function handleStartVersus() {
   }
 }
 
-function beginVersus(seed, startAtMs) {
+function beginVersus(baseSeed, startAtMs, currentRound = 1) {
+  // Calculer le seed pour ce round spécifique
+  // Tous les joueurs au même round auront le même parcours
+  const seed = baseSeed + (currentRound - 1) * 1000000;
+  
   versusSeed.value = seed;
   versusStartAtMs.value = startAtMs;
   state.mode = 'versus';
@@ -1213,6 +1239,8 @@ function beginVersus(seed, startAtMs) {
   faceDownActive.value = false;
   stopChrono();
   chronoMs.value = 0;
+  
+  console.log('[beginVersus] Round', currentRound, 'avec seed', seed, '(base:', baseSeed, ')');
   
   // Show power wheel overlay first (DISABLED)
   // showPowerWheel.value = true;
