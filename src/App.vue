@@ -52,8 +52,9 @@
       :livesUsed="livesUsed"
       :justLost="justLost"
       :lastExtinguishedIndex="lastExtinguishedIndex"
-      :frozenRow="state.frozenRow"
+      :frozenGrid="state.frozenGrid"
       :frozenClicksLeft="state.frozenClicksLeft"
+      :showSnowstorm="state.showSnowstorm"
       :powerAvailable="!state.powerUsed"
       @cellClick="onCellClick"
       @goHome="goHome"
@@ -329,9 +330,10 @@ const state = reactive({
   // Solo decoy cells (adjacent to path), active from level >= 5
   decoys: new Set(), // 'r-c'
   // Freeze power state (versus mode)
-  frozenRow: null,      // which row is frozen (null = none)
-  frozenClicksLeft: 0,  // how many clicks left to break ice
+  frozenGrid: false,    // whether entire grid is frozen
+  frozenClicksLeft: 0,  // how many clicks left to break ice (starts at 8)
   powerUsed: false,     // whether freeze power has been used this round
+  showSnowstorm: false, // whether to show snowstorm animation
 });
 
 // Flip wave animation control (top -> bottom)
@@ -466,8 +468,17 @@ function updateFreezeState() {
   const me = playerId.value || ensurePlayerId();
   const myPlayer = (room && Array.isArray(room.players)) ? room.players.find(p => p && p.id === me) : null;
   if (myPlayer) {
-    state.frozenRow = myPlayer.frozen_row ?? null;
+    const wasFrozen = state.frozenGrid;
+    state.frozenGrid = (myPlayer.frozen_clicks ?? 0) > 0;
     state.frozenClicksLeft = myPlayer.frozen_clicks ?? 0;
+    
+    // Show snowstorm animation when freeze is first applied
+    if (!wasFrozen && state.frozenGrid) {
+      state.showSnowstorm = true;
+      setTimeout(() => {
+        state.showSnowstorm = false;
+      }, 2000);
+    }
     
     // Check if there's a pending freeze to apply
     if (myPlayer.pending_freeze && state.inPlay && !state.revealed) {
@@ -481,25 +492,19 @@ async function applyPendingFreeze() {
   if (!versusCode.value) return;
   const me = playerId.value || ensurePlayerId();
   
-  // Calculate current row to freeze based on progress
-  const ROWS = 10;
-  const stepsCompleted = Math.floor((state.nextIndex / state.path.length) * ROWS);
-  const frozenRow = ROWS - 1 - stepsCompleted;
-  
-  console.log('[applyPendingFreeze] Applying pending freeze at row:', frozenRow);
+  console.log('[applyPendingFreeze] Applying pending freeze to entire grid');
   
   try {
     const sb = getSupabase();
     await sb.from('players')
       .update({ 
-        frozen_row: frozenRow,
-        frozen_clicks: 4,
+        frozen_clicks: 8, // 8 clicks to break the ice
         pending_freeze: false
       })
       .eq('room_code', versusCode.value)
       .eq('player_id', me);
     
-    console.log('[applyPendingFreeze] ❄️ Pending freeze applied!');
+    console.log('[applyPendingFreeze] ❄️ Pending freeze applied to entire grid!');
   } catch (err) {
     console.error('[applyPendingFreeze] Error:', err);
   }
@@ -855,8 +860,8 @@ function onCellClick(r, c) {
   // Ignore repeated clicks on cells already validated as correct
   if (state.correctSet.has(keyAlready)) return;
   
-  // Check if clicking on frozen row (versus mode)
-  if (state.mode === 'versus' && state.frozenRow !== null && r === state.frozenRow && state.frozenClicksLeft > 0) {
+  // Check if grid is frozen (versus mode) - any click breaks ice progressively
+  if (state.mode === 'versus' && state.frozenGrid && state.frozenClicksLeft > 0) {
     // Decrement frozen clicks locally and update server
     state.frozenClicksLeft = Math.max(0, state.frozenClicksLeft - 1);
     if (versusCode.value) {
@@ -870,23 +875,14 @@ function onCellClick(r, c) {
     }
     // If ice broken, clear frozen state
     if (state.frozenClicksLeft === 0) {
-      state.frozenRow = null;
-      if (versusCode.value) {
-        const me = playerId.value || ensurePlayerId();
-        const sb = getSupabase();
-        sb.from('players')
-          .update({ frozen_row: null, frozen_clicks: 0 })
-          .eq('room_code', versusCode.value)
-          .eq('player_id', me)
-          .then(() => {});
-      }
+      state.frozenGrid = false;
     }
-    return; // Don't process as normal cell click
+    return; // Don't process as normal cell click while frozen
   }
   
-  // Block clicks if row is frozen
-  if (state.mode === 'versus' && state.frozenRow !== null && r === state.frozenRow) {
-    return; // Can't click path cells while frozen
+  // Block all clicks if grid is frozen
+  if (state.mode === 'versus' && state.frozenGrid) {
+    return; // Can't click any cells while frozen
   }
   
   const expect = state.path[state.nextIndex];

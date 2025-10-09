@@ -85,7 +85,6 @@ async function getRoomPlayers(roomCode) {
     lives: p.lives,
     progress: p.progress,
     current_round: p.current_round || 1,
-    frozen_row: p.frozen_row ?? null,
     frozen_clicks: p.frozen_clicks ?? 0,
     pending_freeze: p.pending_freeze ?? false
   }));
@@ -217,7 +216,7 @@ export async function resetRoom(code) {
 
 /**
  * Use a power-up (currently only freeze is supported)
- * Applies frozen_row to all opponents via PostgreSQL function
+ * Applies freeze to entire grid of all opponents via PostgreSQL function
  * @param {string} code - Room code
  * @param {string} playerId - Player ID using the power
  * @param {string} powerType - Type of power ('freeze')
@@ -578,7 +577,6 @@ export function subscribeRoom(code, callback) {
             lives: row.lives ?? (cached.players?.[idx]?.lives || GAME_CONFIG.INITIAL_LIVES),
             progress: row.progress ?? (cached.players?.[idx]?.progress || 0),
             current_round: row.current_round ?? (cached.players?.[idx]?.current_round || 1),
-            frozen_row: row.frozen_row ?? (cached.players?.[idx]?.frozen_row ?? null),
             frozen_clicks: row.frozen_clicks ?? (cached.players?.[idx]?.frozen_clicks ?? 0),
             pending_freeze: row.pending_freeze ?? (cached.players?.[idx]?.pending_freeze ?? false),
           };

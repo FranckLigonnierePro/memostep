@@ -1,5 +1,9 @@
 <template>
   <div class="board-wrap">
+    <!-- Snowstorm animation overlay -->
+    <div v-if="showSnowstorm" class="snowstorm-overlay">
+      <div v-for="i in 50" :key="i" class="snowflake" :style="snowflakeStyle(i)"></div>
+    </div>
     <div class="flex w-full h-full" style="justify-content: center;">
       <div class="w-2/3 flex-col h-full">
         <div class="panel">
@@ -12,15 +16,22 @@
               :data-c="cell.c"
               @click="emit('cellClick', cell.r, cell.c)"
             >
-              <div class="cell-inner" :class="{ flipping: flipActive, revealing: flipBackActive, facedown: faceDownActive, frozen: isFrozen(cell.r) }" :style="cellStyle(cell.r, cell.c)">
+              <div class="cell-inner" :class="{ flipping: flipActive, revealing: flipBackActive, facedown: faceDownActive, frozen: frozenGrid }" :style="cellStyle(cell.r, cell.c)">
                 <div class="cell-face front" :class="cellClass(cell.r, cell.c)" />
                 <div class="cell-face back" :class="[ faceDownActive ? faceColorClass(cell.r, cell.c) : null, cellClass(cell.r, cell.c) ]" />
-                <!-- Ice overlay for frozen row -->
-                <div v-if="isFrozen(cell.r)" class="ice-overlay">
-                  <div class="ice-clicks">{{ frozenClicksLeft }}</div>
+                <!-- Ice overlay for frozen grid -->
+                <div v-if="frozenGrid" class="ice-overlay" :class="{ cracking: frozenClicksLeft <= 4 }">
+                  <div class="ice-cracks" v-if="frozenClicksLeft <= 4">
+                    <div v-for="n in (8 - frozenClicksLeft)" :key="n" class="crack" :style="crackStyle(n)"></div>
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
+          <!-- Frozen clicks counter (centered over grid) -->
+          <div v-if="frozenGrid" class="frozen-counter">
+            <Snowflake :size="32" />
+            <div class="frozen-text">{{ frozenClicksLeft }}</div>
           </div>
         </div>
       </div>
@@ -121,9 +132,10 @@ const props = defineProps({
   livesUsed: { type: Number, default: 0 },
   justLost: { type: Boolean, default: false },
   lastExtinguishedIndex: { type: Number, default: -1 },
-  frozenRow: { type: Number, default: null },
+  frozenGrid: { type: Boolean, default: false },
   frozenClicksLeft: { type: Number, default: 0 },
   powerAvailable: { type: Boolean, default: true },
+  showSnowstorm: { type: Boolean, default: false },
 });
 const emit = defineEmits(['cellClick', 'goHome']);
 
@@ -142,8 +154,34 @@ function faceColorClass(r, c) {
   return `face-${v}`;
 }
 
-function isFrozen(row) {
-  return props.frozenRow !== null && row === props.frozenRow;
+// Generate random snowflake animation styles
+function snowflakeStyle(index) {
+  const left = Math.random() * 100;
+  const animationDelay = Math.random() * 2;
+  const animationDuration = 2 + Math.random() * 3;
+  const size = 4 + Math.random() * 8;
+  return {
+    left: `${left}%`,
+    animationDelay: `${animationDelay}s`,
+    animationDuration: `${animationDuration}s`,
+    width: `${size}px`,
+    height: `${size}px`,
+  };
+}
+
+// Generate crack patterns
+function crackStyle(crackIndex) {
+  const patterns = [
+    { top: '20%', left: '10%', width: '80%', height: '2px', transform: 'rotate(45deg)' },
+    { top: '50%', left: '5%', width: '90%', height: '2px', transform: 'rotate(-30deg)' },
+    { top: '70%', left: '15%', width: '70%', height: '2px', transform: 'rotate(60deg)' },
+    { top: '30%', left: '20%', width: '60%', height: '2px', transform: 'rotate(-45deg)' },
+    { top: '60%', left: '30%', width: '50%', height: '2px', transform: 'rotate(20deg)' },
+    { top: '40%', left: '25%', width: '55%', height: '2px', transform: 'rotate(-60deg)' },
+    { top: '80%', left: '10%', width: '75%', height: '2px', transform: 'rotate(35deg)' },
+    { top: '15%', left: '35%', width: '45%', height: '2px', transform: 'rotate(-20deg)' },
+  ];
+  return patterns[(crackIndex - 1) % patterns.length];
 }
 
 // Each segment fill per player
@@ -201,7 +239,7 @@ function bubbleTextColor(bg) {
   max-height: 100%;
   display: flex;
   justify-content: center;
-  position: relative; /* for vertical progress bar positioning */
+  position: relative;
   padding: 8px;
   box-sizing: border-box;
   overflow: hidden;
@@ -509,27 +547,46 @@ function bubbleTextColor(bg) {
 .cell-face.back.correct { background: #1a3d2e; border-color: var(--ok); }
 .cell-face.back.wrong   { background: #3a1c2e; border-color: var(--bad); }
 
-/* Ice overlay for frozen cells */
+/* Ice overlay for frozen grid */
 .ice-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(173, 216, 230, 0.7);
+  background: linear-gradient(135deg, rgba(173, 216, 230, 0.85) 0%, rgba(135, 206, 250, 0.75) 50%, rgba(173, 216, 230, 0.85) 100%);
   border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   pointer-events: none;
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(3px);
   animation: iceShimmer 2s ease-in-out infinite;
   z-index: 10;
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.5);
 }
 
-.ice-clicks {
-  font-size: 18px;
-  font-weight: 900;
-  color: #0a4d6e;
-  text-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
-  pointer-events: none;
+.ice-overlay.cracking {
+  background: linear-gradient(135deg, rgba(173, 216, 230, 0.6) 0%, rgba(135, 206, 250, 0.5) 50%, rgba(173, 216, 230, 0.6) 100%);
+}
+
+.ice-cracks {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.crack {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+  transform-origin: center;
+  animation: crackAppear 0.3s ease-out;
+}
+
+@keyframes crackAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .cell-inner.frozen {
@@ -537,8 +594,73 @@ function bubbleTextColor(bg) {
 }
 
 @keyframes iceShimmer {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 0.9; }
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}
+
+/* Frozen counter overlay */
+.frozen-counter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 20;
+  pointer-events: none;
+  color: #0a4d6e;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 0 20px rgba(173, 216, 230, 0.8);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.frozen-text {
+  font-size: 48px;
+  font-weight: 900;
+  color: #0a4d6e;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 0 20px rgba(173, 216, 230, 0.8);
+}
+
+@keyframes pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.1); }
+}
+
+/* Snowstorm overlay */
+.snowstorm-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.snowflake {
+  position: absolute;
+  top: -10px;
+  background: white;
+  border-radius: 50%;
+  opacity: 0.8;
+  animation: snowfall linear infinite;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+@keyframes snowfall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.8;
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(100vh) rotate(360deg);
+    opacity: 0;
+  }
 }
 
 .progress {
