@@ -1,22 +1,41 @@
-// Supabase Realtime client for Versus mode - Version 2 avec table players séparée
-// Requires env vars: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+/**
+ * Supabase Realtime client for Versus mode - Version 2 with separate players table
+ * Requires env vars: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+ */
 import { createClient } from '@supabase/supabase-js';
+
+// Game constants
+const GAME_CONFIG = {
+  MAX_SCORE: 5,
+  INITIAL_LIVES: 3,
+  ROUND_DELAY_MS: 1500,
+  CODE_LENGTH: 6,
+};
 
 let supabase = null;
 let roomSubscription = null;
-// Cache local de la dernière snapshot de room par code pour des mises à jour optimistes
+// Local cache of the last room snapshot by code for optimistic updates
 const roomCache = new Map();
 
+/**
+ * Initialize Supabase client (singleton pattern)
+ * @returns {Object} Supabase client instance
+ * @throws {Error} If environment variables are missing
+ */
 export function initRealtime() {
   if (supabase) return supabase;
   const url = import.meta.env.VITE_SUPABASE_URL;
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  if (!url || !key) throw new Error('Missing Supabase env (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)');
+  if (!url || !key) {
+    throw new Error('Missing Supabase env (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)');
+  }
   supabase = createClient(url, key, { auth: { persistSession: false } });
   return supabase;
 }
 
-// Fixed 8-color palette used across the app
+/**
+ * Fixed 8-color palette used across the app
+ */
 export const PLAYER_COLORS = [
   '#e74c3c', // red
   '#e67e22', // orange
@@ -28,8 +47,15 @@ export const PLAYER_COLORS = [
   '#fd79a8', // pink
 ];
 
+/**
+ * Pick an available color from the palette, avoiding already used colors
+ * @param {string[]} usedColors - Array of colors already in use
+ * @returns {string} Available color hex code
+ */
 function pickAvailableColor(usedColors = []) {
-  const used = new Set((usedColors || []).filter(Boolean).map(c => String(c).toLowerCase()));
+  const used = new Set(
+    (usedColors || []).filter(Boolean).map(c => String(c).toLowerCase())
+  );
   for (const c of PLAYER_COLORS) {
     if (!used.has(c.toLowerCase())) return c;
   }
@@ -37,7 +63,11 @@ function pickAvailableColor(usedColors = []) {
   return PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)];
 }
 
-// Helper: Récupérer tous les joueurs d'une room
+/**
+ * Fetch all players for a given room
+ * @param {string} roomCode - Room code
+ * @returns {Promise<Array>} Array of player objects
+ */
 async function getRoomPlayers(roomCode) {
   const { data, error } = await supabase
     .from('players')
@@ -46,7 +76,8 @@ async function getRoomPlayers(roomCode) {
     .order('created_at', { ascending: true });
   
   if (error) throw error;
-  const players = (data || []).map(p => ({
+  
+  return (data || []).map(p => ({
     id: p.player_id,
     name: p.name,
     color: p.color,
@@ -58,11 +89,13 @@ async function getRoomPlayers(roomCode) {
     frozen_clicks: p.frozen_clicks ?? 0,
     pending_freeze: p.pending_freeze ?? false
   }));
-  console.log('[getRoomPlayers] Joueurs récupérés:', players.map(p => ({ id: p.id?.slice(0,6), round: p.current_round, progress: p.progress })));
-  return players;
 }
 
-// Helper: Récupérer une room avec ses joueurs
+/**
+ * Fetch a room with all its players and update cache
+ * @param {string} roomCode - Room code
+ * @returns {Promise<Object>} Room object with players array
+ */
 async function getRoomWithPlayers(roomCode) {
   const { data: room, error: roomErr } = await supabase
     .from('rooms')
@@ -76,25 +109,30 @@ async function getRoomWithPlayers(roomCode) {
   const players = await getRoomPlayers(roomCode);
   const full = { ...room, players };
   roomCache.set(roomCode, full);
-  console.log('[getRoomWithPlayers] Room complète:', { code: roomCode, playerCount: players.length });
   return full;
 }
 
-// Report a round result with both winner and loser. This increments the winner's
-// score, decrements the loser's lives. If winner reaches 5 or loser hits 0 lives,
-// the room finishes. Otherwise a new round is scheduled and returned.
+/**
+ * Report a round result with both winner and loser
+ * Increments winner's score, decrements loser's lives
+ * Finishes room if winner reaches max score or loser has no lives
+ * Otherwise schedules a new round
+ * @param {string} code - Room code
+ * @param {string} winnerId - Winner player ID
+ * @param {string} loserId - Loser player ID
+ * @param {number} timeMs - Time in milliseconds
+ * @returns {Promise<Object>} Updated room with players
+ */
 export async function reportRoundResult(code, winnerId, loserId, timeMs) {
   initRealtime();
   
-  // Récupérer la room et ses joueurs
   const room = await getRoomWithPlayers(code);
-  const players = room.players;
+  const { players } = room;
   
-  // Trouver le gagnant et le perdant
   const winner = players.find(p => p.id === winnerId);
   const loser = players.find(p => p.id === loserId);
   
-  // Mettre à jour le score du gagnant
+  // Update winner's score
   if (winner) {
     const { error: winErr } = await supabase
       .from('players')
@@ -104,7 +142,7 @@ export async function reportRoundResult(code, winnerId, loserId, timeMs) {
     if (winErr) throw winErr;
   }
   
-  // Mettre à jour les vies du perdant
+  // Update loser's lives
   if (loser) {
     const newLives = Math.max(0, loser.lives - 1);
     const { error: loseErr } = await supabase
@@ -115,53 +153,76 @@ export async function reportRoundResult(code, winnerId, loserId, timeMs) {
     if (loseErr) throw loseErr;
   }
   
-  const winnerReached = winner && winner.score + 1 >= 5;
+  const winnerReached = winner && winner.score + 1 >= GAME_CONFIG.MAX_SCORE;
   const loserBusted = loser && loser.lives - 1 <= 0;
   
+  // Check if game should end
   if (winnerReached || loserBusted) {
-    const { data, error: upErr } = await supabase
+    const { error: upErr } = await supabase
       .from('rooms')
       .update({ status: 'finished', winner_id: winnerId, winner_time_ms: timeMs })
-      .eq('code', code)
-      .select('*')
-      .single();
+      .eq('code', code);
     if (upErr) throw upErr;
     return await getRoomWithPlayers(code);
   }
   
+  // Schedule next round
   const seed = Math.floor(Math.random() * 1e9);
-  const startAtMs = Date.now() + 1500;
-  const { data, error: upErr } = await supabase
+  const startAtMs = Date.now() + GAME_CONFIG.ROUND_DELAY_MS;
+  const { error: upErr } = await supabase
     .from('rooms')
     .update({ status: 'playing', seed, start_at_ms: startAtMs })
-    .eq('code', code)
-    .select('*')
-    .single();
+    .eq('code', code);
   if (upErr) throw upErr;
+  
   return await getRoomWithPlayers(code);
 }
 
-// Reset the room to a fresh lobby state: reset all players' lives/scores/progress and clear seed
+/**
+ * Reset room to fresh lobby state
+ * Resets all players' lives/scores/progress and clears seed
+ * @param {string} code - Room code
+ * @returns {Promise<Object>} Updated room with players
+ */
 export async function resetRoom(code) {
   initRealtime();
-  // Reset players
+  
+  // Reset all players
   const { error: playersErr } = await supabase
     .from('players')
-    .update({ lives: 3, score: 0, progress: 0, current_round: 1 })
+    .update({ 
+      lives: GAME_CONFIG.INITIAL_LIVES, 
+      score: 0, 
+      progress: 0, 
+      current_round: 1 
+    })
     .eq('room_code', code);
   if (playersErr) throw playersErr;
 
-  // Reset room status and clear seed/start
+  // Reset room status
   const { error: roomErr } = await supabase
     .from('rooms')
-    .update({ status: 'waiting', seed: null, start_at_ms: null, winner_id: null, winner_time_ms: null })
+    .update({ 
+      status: 'waiting', 
+      seed: null, 
+      start_at_ms: null, 
+      winner_id: null, 
+      winner_time_ms: null 
+    })
     .eq('code', code);
   if (roomErr) throw roomErr;
 
   return await getRoomWithPlayers(code);
 }
 
-// Use freeze power: apply frozen_row to all opponents via PostgreSQL function
+/**
+ * Use a power-up (currently only freeze is supported)
+ * Applies frozen_row to all opponents via PostgreSQL function
+ * @param {string} code - Room code
+ * @param {string} playerId - Player ID using the power
+ * @param {string} powerType - Type of power ('freeze')
+ * @returns {Promise<Object>} Updated room with players
+ */
 export async function usePower(code, playerId, powerType) {
   initRealtime();
   
@@ -169,49 +230,31 @@ export async function usePower(code, playerId, powerType) {
     throw new Error('Unknown power type');
   }
   
-  console.log('[usePower] Activating freeze power for player:', playerId, 'in room:', code);
+  // Call PostgreSQL function to apply freeze power server-side
+  // This ensures all players have permission to freeze opponents
+  const { error } = await supabase.rpc('apply_freeze_power', {
+    p_room_code: code,
+    p_player_id: playerId
+  });
   
-  try {
-    // Call PostgreSQL function to apply freeze power server-side
-    // This ensures all players have permission to freeze opponents
-    const { data, error } = await supabase.rpc('apply_freeze_power', {
-      p_room_code: code,
-      p_player_id: playerId
-    });
-    
-    if (error) {
-      console.error('[usePower] ❌ RPC error:', error);
-      throw error;
-    }
-    
-    console.log('[usePower] ✅ Freeze power applied via RPC');
-  } catch (err) {
-    console.error('[usePower] ❌ Error calling apply_freeze_power:', err);
-    throw err;
-  }
+  if (error) throw error;
   
-  // Fetch updated room state
-  const updated = await getRoomWithPlayers(code);
-  console.log('[usePower] ❄️ Updated room:', updated.players.map(p => ({ 
-    id: p.id?.slice(0,6), 
-    frozen_row: p.frozen_row, 
-    frozen_clicks: p.frozen_clicks,
-    pending_freeze: p.pending_freeze 
-  })));
-  
-  return updated;
+  return await getRoomWithPlayers(code);
 }
 
-// Update a player's per-round progress (0..1) without changing seed/start/status.
-// This enables realtime UI for bubbles.
-// Chaque joueur est mis à jour indépendamment dans sa propre ligne.
-// AUCUN risque d'écraser les données des autres joueurs.
+/**
+ * Update a player's per-round progress (0..1) without changing seed/start/status
+ * Enables realtime UI for bubbles. Each player is updated independently.
+ * @param {string} code - Room code
+ * @param {string} playerId - Player ID
+ * @param {number} progress - Progress value (0..1)
+ * @returns {Promise<null>} Returns null to avoid costly query (realtime handles UI)
+ */
 export async function setPlayerProgress(code, playerId, progress) {
   initRealtime();
   const p = Math.max(0, Math.min(1, Number(progress) || 0));
   
-  // Stratégie: Essayer d'abord une mise à jour, si aucune ligne affectée, créer le joueur
-  // Cela évite une lecture préalable et est plus performant
+  // Try update first (more performant than read-then-write)
   const { data: updated, error: upErr } = await supabase
     .from('players')
     .update({ progress: p })
@@ -221,15 +264,12 @@ export async function setPlayerProgress(code, playerId, progress) {
   
   if (upErr) throw upErr;
   
-  // Si aucune ligne n'a été mise à jour, le joueur n'existe pas encore
+  // If no rows updated, player doesn't exist yet - create it
   if (!updated || updated.length === 0) {
-    console.log('[setPlayerProgress] Joueur non trouvé, création...');
-    // Récupérer les couleurs utilisées pour en choisir une nouvelle
     const players = await getRoomPlayers(code);
     const usedColors = players.map(pl => pl.color);
     const color = pickAvailableColor(usedColors);
     
-    // Créer le joueur avec la progression initiale
     const { error: insErr } = await supabase
       .from('players')
       .insert([{
@@ -238,42 +278,39 @@ export async function setPlayerProgress(code, playerId, progress) {
         name: 'Player',
         color,
         score: 0,
-        lives: 3,
+        lives: GAME_CONFIG.INITIAL_LIVES,
         progress: p,
         current_round: 1
       }]);
     if (insErr) throw insErr;
-    console.log('[setPlayerProgress] Joueur créé avec progression:', p);
-  } else {
-    console.log('[setPlayerProgress] ✅ Progression mise à jour:', { playerId: playerId.slice(0,8), progress: p });
   }
   
-  // Retourner null pour éviter une requête coûteuse
-  // Le realtime subscription mettra à jour l'UI automatiquement
+  // Return null to avoid costly query - realtime subscription updates UI
   return null;
 }
 
+/**
+ * Join a room as a player
+ * Creates player if new, updates name if existing
+ * @param {string} code - Room code
+ * @param {string} playerId - Player ID
+ * @param {string} name - Player name
+ * @returns {Promise<Object>} Updated room with players
+ */
 export async function joinRoom(code, playerId, name) {
   initRealtime();
   
-  console.log('[joinRoom] Tentative de rejoindre:', { code, playerId, name });
-  
-  // Vérifier que la room existe
+  // Verify room exists
   const { data: room, error } = await supabase
     .from('rooms')
     .select('*')
     .eq('code', code)
     .single();
   
-  if (error) {
-    console.error('[joinRoom] Erreur lors de la récupération de la room:', error);
-    throw error;
-  }
+  if (error) throw error;
   if (!room) throw new Error('Room not found');
   
-  console.log('[joinRoom] Room trouvée:', room);
-  
-  // Vérifier si le joueur existe déjà
+  // Check if player already exists
   const { data: existing, error: getErr } = await supabase
     .from('players')
     .select('*')
@@ -281,31 +318,21 @@ export async function joinRoom(code, playerId, name) {
     .eq('player_id', playerId)
     .maybeSingle();
   
-  if (getErr) {
-    console.error('[joinRoom] Erreur lors de la vérification du joueur:', getErr);
-    throw getErr;
-  }
+  if (getErr) throw getErr;
   
   if (existing) {
-    console.log('[joinRoom] Joueur existe déjà, mise à jour du nom');
-    // Mettre à jour le nom du joueur
+    // Update existing player's name
     const { error: upErr } = await supabase
       .from('players')
       .update({ name: name || existing.name || 'Player' })
       .eq('room_code', code)
       .eq('player_id', playerId);
-    if (upErr) {
-      console.error('[joinRoom] Erreur lors de la mise à jour:', upErr);
-      throw upErr;
-    }
+    if (upErr) throw upErr;
   } else {
-    console.log('[joinRoom] Nouveau joueur, création...');
-    // Créer un nouveau joueur
+    // Create new player
     const players = await getRoomPlayers(code);
     const usedColors = players.map(p => p.color);
     const color = pickAvailableColor(usedColors);
-    
-    console.log('[joinRoom] Couleur choisie:', color);
     
     const { error: insErr } = await supabase
       .from('players')
@@ -315,40 +342,42 @@ export async function joinRoom(code, playerId, name) {
         name: name || 'Player',
         color,
         score: 0,
-        lives: 3,
+        lives: GAME_CONFIG.INITIAL_LIVES,
         progress: 0,
         current_round: 1
       }]);
-    if (insErr) {
-      console.error('[joinRoom] Erreur lors de l\'insertion:', insErr);
-      throw insErr;
-    }
-    console.log('[joinRoom] Joueur créé avec succès');
+    if (insErr) throw insErr;
   }
   
-  // Vérifier que le joueur a bien été ajouté et retourner la room complète
-  const finalPlayers = await getRoomPlayers(code);
-  console.log('[joinRoom] Joueurs dans la room après join:', finalPlayers);
-  
-  // Retourner la room complète pour forcer une mise à jour de l'UI
-  const fullRoom = await getRoomWithPlayers(code);
-  console.log('[joinRoom] ✅ Join réussi, room complète:', { code, playerCount: fullRoom.players.length });
-  return fullRoom;
+  return await getRoomWithPlayers(code);
 }
 
-function randomCode(len = 6) {
+/**
+ * Generate a random room code
+ * @param {number} len - Length of code (default: 6)
+ * @returns {string} Random code
+ */
+function randomCode(len = GAME_CONFIG.CODE_LENGTH) {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let out = '';
-  for (let i = 0; i < len; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  for (let i = 0; i < len; i++) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
   return out;
 }
 
+/**
+ * Create a new room with host player
+ * @param {string} hostId - Host player ID
+ * @param {string} hostName - Host player name
+ * @returns {Promise<string>} Generated room code
+ */
 export async function createRoom(hostId, hostName) {
   initRealtime();
-  const code = randomCode(6);
+  const code = randomCode();
   const hostColor = pickAvailableColor([]);
   
-  // Créer la room (avec guest_id à null)
+  // Create room
   const { error: roomErr } = await supabase
     .from('rooms')
     .insert([{ 
@@ -360,7 +389,7 @@ export async function createRoom(hostId, hostName) {
   
   if (roomErr) throw roomErr;
   
-  // Créer le joueur hôte
+  // Create host player
   const { error: playerErr } = await supabase
     .from('players')
     .insert([{
@@ -369,7 +398,7 @@ export async function createRoom(hostId, hostName) {
       name: hostName || 'Player',
       color: hostColor,
       score: 0,
-      lives: 3,
+      lives: GAME_CONFIG.INITIAL_LIVES,
       progress: 0
     }]);
   
@@ -378,10 +407,17 @@ export async function createRoom(hostId, hostName) {
   return code;
 }
 
+/**
+ * Start a room game
+ * Resets all players' progress and updates room status
+ * @param {string} code - Room code
+ * @param {number} seed - Random seed for game
+ * @param {number} startAtMs - Start timestamp in milliseconds
+ */
 export async function startRoom(code, seed, startAtMs) {
   initRealtime();
   
-  // Réinitialiser la progression de tous les joueurs
+  // Reset all players' progress
   const { error: resetErr } = await supabase
     .from('players')
     .update({ progress: 0 })
@@ -389,7 +425,7 @@ export async function startRoom(code, seed, startAtMs) {
   
   if (resetErr) throw resetErr;
   
-  // Mettre à jour la room
+  // Update room status
   const { error } = await supabase
     .from('rooms')
     .update({ status: 'playing', seed, start_at_ms: startAtMs })
@@ -398,6 +434,12 @@ export async function startRoom(code, seed, startAtMs) {
   if (error) throw error;
 }
 
+/**
+ * Finish a room game
+ * @param {string} code - Room code
+ * @param {string} winnerId - Winner player ID
+ * @param {number} timeMs - Completion time in milliseconds
+ */
 export async function finishRoom(code, winnerId, timeMs) {
   initRealtime();
   const { error } = await supabase
@@ -407,84 +449,87 @@ export async function finishRoom(code, winnerId, timeMs) {
   if (error) throw error;
 }
 
-// Report a round win in versus mode. Increments the winner's score.
-// If the winner reaches 5, finishes the room. Otherwise, schedules
-// a new round by updating a fresh seed and synchronized start_at_ms while keeping
-// status to 'playing'. Returns the updated room snapshot with players.
+/**
+ * Report a round win in versus mode
+ * Increments winner's score and advances their round
+ * Finishes room if winner reaches max score or only one player has lives
+ * Each player advances at their own pace
+ * @param {string} code - Room code
+ * @param {string} winnerId - Winner player ID
+ * @param {number} timeMs - Completion time in milliseconds
+ * @returns {Promise<Object>} Updated room with players
+ */
 export async function reportRoundWin(code, winnerId, timeMs) {
   initRealtime();
   
-  // Récupérer la room et ses joueurs
   const room = await getRoomWithPlayers(code);
-  const players = room.players;
+  const { players } = room;
   
-  // Trouver le joueur gagnant
   const winner = players.find(p => p.id === winnerId);
+  if (!winner) return room;
   
-  if (winner) {
-    const nextScore = winner.score + 1;
+  const nextScore = winner.score + 1;
+  
+  // Update winner's score
+  const { error: scoreErr } = await supabase
+    .from('players')
+    .update({ score: nextScore })
+    .eq('room_code', code)
+    .eq('player_id', winnerId);
+  
+  if (scoreErr) throw scoreErr;
+  
+  // Refresh players after update
+  const updatedPlayers = await getRoomPlayers(code);
+  
+  // Check if match should end:
+  // 1. All players finished (score >= MAX_SCORE)
+  // 2. OR only one player has lives remaining
+  const allFinished = updatedPlayers.every(p => p.score >= GAME_CONFIG.MAX_SCORE);
+  const playersWithLives = updatedPlayers.filter(p => p.lives > 0);
+  const onlyOneAlive = playersWithLives.length <= 1;
+  
+  if (allFinished || onlyOneAlive) {
+    // Determine winner: highest score, or last one alive
+    const sortedByScore = [...updatedPlayers].sort((a, b) => b.score - a.score);
+    const finalWinner = sortedByScore[0];
     
-    // Mettre à jour le score
-    const { error: scoreErr } = await supabase
-      .from('players')
-      .update({ score: nextScore })
-      .eq('room_code', code)
-      .eq('player_id', winnerId);
-    
-    if (scoreErr) throw scoreErr;
-    
-    // Rafraîchir les joueurs après mise à jour
-    const updatedPlayers = await getRoomPlayers(code);
-    
-    // Check if match should end:
-    // 1. All players finished (score >= 5)
-    // 2. OR only one player has lives remaining
-    const allFinished = updatedPlayers.every(p => p.score >= 5);
-    const playersWithLives = updatedPlayers.filter(p => p.lives > 0);
-    const onlyOneAlive = playersWithLives.length <= 1;
-    
-    if (allFinished || onlyOneAlive) {
-      // Determine winner: highest score, or last one alive
-      const sortedByScore = updatedPlayers.slice().sort((a, b) => b.score - a.score);
-      const finalWinner = sortedByScore[0];
-      
-      const { error: upErr } = await supabase
-        .from('rooms')
-        .update({ 
-          status: 'finished', 
-          winner_id: finalWinner?.id || winnerId, 
-          winner_time_ms: timeMs 
-        })
-        .eq('code', code);
-      
-      if (upErr) throw upErr;
-      return await getRoomWithPlayers(code);
-    }
-    
-    // Chaque joueur avance à son propre rythme
-    // Quand un joueur finit son round, il passe au suivant
-    // Les autres continuent leur round actuel
-    
-    // Incrémenter le current_round du joueur gagnant et réinitialiser sa progression
-    const { error: roundErr } = await supabase
-      .from('players')
+    const { error: upErr } = await supabase
+      .from('rooms')
       .update({ 
-        current_round: (winner.current_round || 1) + 1,
-        progress: 0 
+        status: 'finished', 
+        winner_id: finalWinner?.id || winnerId, 
+        winner_time_ms: timeMs 
       })
-      .eq('room_code', code)
-      .eq('player_id', winnerId);
+      .eq('code', code);
     
-    if (roundErr) throw roundErr;
-    
-    console.log('[reportRoundWin] Joueur', winnerId, 'passe au round', (winner.current_round || 1) + 1);
-    
+    if (upErr) throw upErr;
     return await getRoomWithPlayers(code);
   }
   
-  return room;
+  // Each player advances at their own pace
+  // Increment winner's current_round and reset their progress
+  const { error: roundErr } = await supabase
+    .from('players')
+    .update({ 
+      current_round: (winner.current_round || 1) + 1,
+      progress: 0 
+    })
+    .eq('room_code', code)
+    .eq('player_id', winnerId);
+  
+  if (roundErr) throw roundErr;
+  
+  return await getRoomWithPlayers(code);
 }
 
+/**
+ * Subscribe to room changes via Supabase realtime
+ * Listens to both room and player table changes
+ * @param {string} code - Room code
+ * @param {Function} callback - Callback function to receive room updates
+ * @returns {Function} Unsubscribe function
+ */
 export function subscribeRoom(code, callback) {
   initRealtime();
   if (roomSubscription) {
@@ -492,9 +537,7 @@ export function subscribeRoom(code, callback) {
     roomSubscription = null;
   }
   
-  console.log('[subscribeRoom] Abonnement à la room:', code);
-  
-  // S'abonner aux changements de la room ET des joueurs
+  // Subscribe to room and player changes
   roomSubscription = supabase
     .channel(`room:${code}`)
     .on('postgres_changes', { 
@@ -503,14 +546,12 @@ export function subscribeRoom(code, callback) {
       table: 'rooms', 
       filter: `code=eq.${code}` 
     }, async (payload) => {
-      console.log('[subscribeRoom] Changement détecté dans rooms:', payload);
-      // Quand la room change, récupérer les joueurs et envoyer le tout
+      // When room changes, fetch players and send complete room
       const room = await getRoomWithPlayers(code).catch((err) => {
-        console.error('[subscribeRoom] Erreur getRoomWithPlayers:', err);
+        console.error('[subscribeRoom] Error fetching room:', err);
         const cached = roomCache.get(code);
         return cached || payload.new || payload.old || null;
       });
-      console.log('[subscribeRoom] Room mise à jour:', room);
       callback(room);
     })
     .on('postgres_changes', { 
@@ -519,82 +560,79 @@ export function subscribeRoom(code, callback) {
       table: 'players', 
       filter: `room_code=eq.${code}` 
     }, async (payload) => {
-      console.log('[subscribeRoom] Changement détecté dans players:', payload);
-      // Mise à jour optimiste immédiate à partir du payload
+      // Optimistic update from payload
       try {
         const cached = roomCache.get(code);
-        console.log('[subscribeRoom] Cache disponible:', !!cached, 'Payload:', !!payload?.new);
         if (cached && (payload?.new || payload?.old)) {
           const row = payload.new || payload.old;
           const pid = row.player_id;
-          console.log('[subscribeRoom] Mise à jour du joueur:', pid, 'progress:', row.progress);
-          const idx = Array.isArray(cached.players) ? cached.players.findIndex(p => p && p.id === pid) : -1;
-          console.log('[subscribeRoom] Index du joueur dans le cache:', idx, 'Total joueurs:', cached.players?.length);
+          const idx = Array.isArray(cached.players) 
+            ? cached.players.findIndex(p => p && p.id === pid) 
+            : -1;
+          
           const updatedPlayer = {
             id: row.player_id,
             name: row.name ?? (cached.players?.[idx]?.name || 'Player'),
             color: row.color ?? (cached.players?.[idx]?.color || '#ffffff'),
             score: row.score ?? (cached.players?.[idx]?.score || 0),
-            lives: row.lives ?? (cached.players?.[idx]?.lives || 3),
+            lives: row.lives ?? (cached.players?.[idx]?.lives || GAME_CONFIG.INITIAL_LIVES),
             progress: row.progress ?? (cached.players?.[idx]?.progress || 0),
             current_round: row.current_round ?? (cached.players?.[idx]?.current_round || 1),
             frozen_row: row.frozen_row ?? (cached.players?.[idx]?.frozen_row ?? null),
             frozen_clicks: row.frozen_clicks ?? (cached.players?.[idx]?.frozen_clicks ?? 0),
             pending_freeze: row.pending_freeze ?? (cached.players?.[idx]?.pending_freeze ?? false),
           };
+          
           const nextPlayers = Array.isArray(cached.players) ? [...cached.players] : [];
           if (idx >= 0) {
             nextPlayers[idx] = updatedPlayer;
           } else {
             nextPlayers.push(updatedPlayer);
           }
+          
           const optimistic = { ...cached, players: nextPlayers };
           roomCache.set(code, optimistic);
-          console.log('[subscribeRoom] ✅ Optimistic room update from payload:', { 
-            playerId: pid, 
-            progress: updatedPlayer.progress,
-            allPlayers: nextPlayers.map(p => ({ id: p.id?.slice(0,6), progress: p.progress }))
-          });
           callback(optimistic);
-        } else {
-          console.warn('[subscribeRoom] ⚠️ Pas de cache ou payload vide, skip optimistic update');
         }
       } catch (e) {
-        console.error('[subscribeRoom] ❌ Optimistic merge error:', e);
+        console.error('[subscribeRoom] Optimistic merge error:', e);
       }
 
-      // Puis rafraîchir en arrière-plan pour garantir la cohérence
-      const fresh = await getRoomWithPlayers(code).catch((err) => {
-        console.error('[subscribeRoom] Erreur getRoomWithPlayers (refresh):', err);
-        return null;
-      });
-      if (fresh) {
-        console.log('[subscribeRoom] Room après refresh joueur:', fresh);
-        callback(fresh);
-      }
+      // Background refresh to ensure consistency
+      const fresh = await getRoomWithPlayers(code).catch(() => null);
+      if (fresh) callback(fresh);
     })
-    .subscribe((status) => {
-      console.log('[subscribeRoom] Statut de la subscription:', status);
-    });
+    .subscribe();
   
   return () => {
-    console.log('[subscribeRoom] Désabonnement de la room:', code);
     if (roomSubscription) supabase.removeChannel(roomSubscription);
     roomSubscription = null;
   };
 }
 
+/**
+ * Get a room by code
+ * @param {string} code - Room code
+ * @returns {Promise<Object>} Room with players
+ */
 export async function getRoom(code) {
   initRealtime();
   return await getRoomWithPlayers(code);
 }
 
-// Decrement lives for a given loser without awarding a round win or changing the
-// current round seed/start time. If lives reach 0, finish the room and set winner_id.
+/**
+ * Decrement lives for a given loser without awarding a round win
+ * Does not change current round seed/start time
+ * Finishes room if lives reach 0
+ * @param {string} code - Room code
+ * @param {string} loserId - Loser player ID
+ * @param {string} winnerIdIfBusted - Winner ID if loser is eliminated
+ * @returns {Promise<Object>} Updated room with players
+ */
 export async function reportLifeLoss(code, loserId, winnerIdIfBusted) {
   initRealtime();
   
-  // Récupérer le joueur
+  // Fetch player
   const { data: player, error: getErr } = await supabase
     .from('players')
     .select('*')
@@ -604,11 +642,11 @@ export async function reportLifeLoss(code, loserId, winnerIdIfBusted) {
   
   if (getErr) throw getErr;
   
-  const currentLives = player ? player.lives : 3;
+  const currentLives = player ? player.lives : GAME_CONFIG.INITIAL_LIVES;
   const newLives = Math.max(0, currentLives - 1);
   
   if (player) {
-    // Mettre à jour les vies
+    // Update lives
     const { error: upErr } = await supabase
       .from('players')
       .update({ lives: newLives })
@@ -617,7 +655,7 @@ export async function reportLifeLoss(code, loserId, winnerIdIfBusted) {
     
     if (upErr) throw upErr;
   } else {
-    // Créer le joueur s'il n'existe pas
+    // Create player if doesn't exist
     const players = await getRoomPlayers(code);
     const usedColors = players.map(p => p.color);
     const color = pickAvailableColor(usedColors);
@@ -637,6 +675,7 @@ export async function reportLifeLoss(code, loserId, winnerIdIfBusted) {
     if (insErr) throw insErr;
   }
   
+  // Finish room if player is eliminated
   if (newLives <= 0 && winnerIdIfBusted) {
     const { error: finishErr } = await supabase
       .from('rooms')
