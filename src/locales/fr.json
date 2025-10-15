@@ -58,7 +58,8 @@
   },
   "board": {
     "gridAria": "Plateau {cols} par {rows}",
-    "home": "Accueil"
+    "home": "Accueil",
+    "memorize": "Mémorise le chemin"
   },
   "alerts": {
     "shareCopied": "Résultat copié dans le presse-papiers !",

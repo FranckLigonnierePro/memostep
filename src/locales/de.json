@@ -58,7 +58,8 @@
   },
   "board": {
     "gridAria": "Brett {cols} mal {rows}",
-    "home": "Start"
+    "home": "Start",
+    "memorize": "Merke dir den Weg"
   },
   "alerts": {
     "shareCopied": "Ergebnis in die Zwischenablage kopiert!",

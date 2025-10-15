@@ -11,6 +11,7 @@
       :logoSrc="logoSrc"
       :dailyDone="dailyDone"
       :currentFlag="currentFlag"
+      :audioMuted="audioMuted"
       @start="newGame"
       @daily="() => startMode('daily')"
       @solo="() => startMode('solo')"
@@ -20,11 +21,14 @@
       @settings="openSettings"
       @stats="openStats"
       @openLang="openLang"
+      @toggleAudio="toggleAudio"
     />
 
     <VersusView
       v-else-if="showVersusView"
       :code="versusCode"
+      :pauseMainMusic="pauseMainMusic"
+      :resumeMainMusic="resumeMainMusic"
       @close="handleCloseVersusView"
       @begin="handleBeginVersusFromLobby"
     />
@@ -63,6 +67,8 @@
 
    
   </div>
+    <!-- Hidden audio element for background music -->
+    <audio ref="audioRef" :src="themeUrl" preload="auto" style="display:none"></audio>
     <!-- Loses modal -->
     <div v-if="loseActive" class="modal-overlay">
       <div class="modal-card">
@@ -220,6 +226,7 @@ import frFlag from './assets/fr.png';
 import enFlag from './assets/en.png';
 import esFlag from './assets/es.png';
 import deFlag from './assets/de.png';
+import themeUrl from './assets/memosteptheme.mp3';
 import {
   ensurePlayerId,
   setCurrentDay,
@@ -227,8 +234,10 @@ import {
   recordDailyWin,
   markDailyAttempt,
   getState,
+  getAudioMuted,
+  setAudioMuted,
 } from './lib/storage.js';
-import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult, reportLifeLoss, setPlayerProgress, resetRoom, usePower } from './lib/realtime_v2.js';
+import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult, reportLifeLoss, setPlayerProgress, resetRoom, usePower, leaveRoom } from './lib/realtime_v2.js';
 
 // Get supabase instance for direct updates
 let supabase = null;
@@ -408,6 +417,55 @@ function isDailyDoneToday() {
   }
 }
 const dailyDone = ref(isDailyDoneToday());
+
+// Background music
+const audioMuted = ref(true);
+const audioRef = ref(null);
+
+function ensureAudio() {
+  const el = audioRef.value;
+  if (!el) return;
+  el.muted = audioMuted.value;
+  el.loop = true;
+}
+
+async function tryPlay() {
+  const el = audioRef.value;
+  if (!el) return;
+  try {
+    await el.play();
+  } catch (_) {
+    // Autoplay might be blocked until user gesture
+  }
+}
+
+function toggleAudio() {
+  audioMuted.value = !audioMuted.value;
+  setAudioMuted(audioMuted.value);
+  ensureAudio();
+  if (!audioMuted.value) {
+    tryPlay();
+  } else {
+    const el = audioRef.value; if (el) el.pause();
+  }
+}
+
+function pauseMainMusic() {
+  const el = audioRef.value;
+  if (el) {
+    try {
+      el.pause();
+      el.currentTime = 0; // Reset to beginning
+    } catch (_) {}
+  }
+}
+
+function resumeMainMusic() {
+  const el = audioRef.value;
+  if (el && el.paused && !audioMuted.value) {
+    tryPlay();
+  }
+}
 
 // Hearts state for lose modal
 const justLost = ref(false);
@@ -1215,6 +1273,11 @@ function openVersusView() {
 
 function closeVersus() { /* legacy */ handleCloseVersusView(); }
 function handleCloseVersusView() {
+  // VersusView already handles leaveRoom in closeLobby
+  // Just clear local state and return home
+  versusCode.value = '';
+  versusRoom.value = null;
+  versusIsHost.value = false;
   showVersusView.value = false;
   state.showHome = true;
 }
@@ -1448,7 +1511,22 @@ function newGame() {
   showPath();
 }
 
-function goHome() {
+async function goHome() {
+  // Leave versus room if in one
+  if (state.mode === 'versus' && versusCode.value) {
+    try {
+      const me = playerId.value || ensurePlayerId();
+      await leaveRoom(versusCode.value, me);
+    } catch (err) {
+      console.error('[App] Error leaving room on goHome:', err);
+    }
+    // Clear versus state
+    versusCode.value = '';
+    versusRoom.value = null;
+    versusIsHost.value = false;
+    stopProgressAutoPublish();
+  }
+  
   // Réinitialise l'état comme au démarrage
   if (state.timerId) {
     clearTimeout(state.timerId);
@@ -1577,6 +1655,20 @@ onMounted(() => {
   window.addEventListener('keydown', handleKeyDown);
   // Ensure a player id exists for tracking
   try { ensurePlayerId(); } catch (_) {}
+  
+  // Initialize audio
+  audioMuted.value = getAudioMuted();
+  ensureAudio();
+  // Try to play if unmuted (may still require a user gesture)
+  if (!audioMuted.value) tryPlay();
+  // Fallback: start playback on first user interaction if unmuted
+  function onFirstInteract() {
+    if (!audioMuted.value) tryPlay();
+    window.removeEventListener('pointerdown', onFirstInteract, { capture: true });
+    window.removeEventListener('keydown', onFirstInteract, { capture: true });
+  }
+  window.addEventListener('pointerdown', onFirstInteract, { capture: true, once: true });
+  window.addEventListener('keydown', onFirstInteract, { capture: true, once: true });
 });
 
 onBeforeUnmount(() => {
@@ -1731,7 +1823,7 @@ html, body, #app {
   opacity: 0.45;
 }
 .heart.blink {
-  animation: heartExtinguish 640ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: heartExtinguish 640ms ease-in-out both;
 }
 @keyframes heartExtinguish {
   0%   { transform: scale(1); }

@@ -36,18 +36,23 @@
         <div v-if="versusError" class="error">{{ versusError }}</div>
       </div>
     </div>
+    <!-- Hidden audio element for waiting room music -->
+    <audio ref="waitingAudioRef" :src="waitingRoomUrl" preload="auto" loop style="display:none"></audio>
 </template>
 
 <script setup>
 import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import { ensurePlayerId } from '../lib/storage.js';
-import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, getRoom } from '../lib/realtime_v2.js';
+import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, getRoom, leaveRoom } from '../lib/realtime_v2.js';
 import { User, Crown } from 'lucide-vue-next';
+import waitingRoomUrl from '../assets/waitingRoom.mp3';
 
 const emit = defineEmits(['close', 'begin']);
 
 const props = defineProps({
   code: { type: String, default: '' },
+  pauseMainMusic: { type: Function, default: null },
+  resumeMainMusic: { type: Function, default: null },
 });
 
 const usernameInput = ref('');
@@ -58,6 +63,37 @@ const versusError = ref('');
 const versusRoom = ref(null);
 const playerId = ref(null);
 let unsub = null;
+
+// Waiting room audio
+const waitingAudioRef = ref(null);
+
+function playWaitingMusic() {
+  // Pause main music first
+  if (props.pauseMainMusic) {
+    try { props.pauseMainMusic(); } catch (_) {}
+  }
+  const el = waitingAudioRef.value;
+  if (!el) return;
+  try {
+    el.volume = 0.5; // Volume à 50%
+    el.play().catch(() => {
+      // Autoplay might be blocked
+    });
+  } catch (_) {}
+}
+
+function stopWaitingMusic() {
+  const el = waitingAudioRef.value;
+  if (!el) return;
+  try {
+    el.pause();
+    el.currentTime = 0;
+  } catch (_) {}
+  // Resume main music
+  if (props.resumeMainMusic) {
+    try { props.resumeMainMusic(); } catch (_) {}
+  }
+}
 
 // Persist username locally
 const USERNAME_STORAGE_KEY = 'memostep_username';
@@ -76,6 +112,8 @@ onMounted(() => {
     versusCode.value = initial;
     subscribeToRoom(initial);
   }
+  // Start waiting room music
+  playWaitingMusic();
 });
 watch(() => usernameInput.value, (v) => {
   try { localStorage.setItem(USERNAME_STORAGE_KEY, String(v || '')); } catch (_) {}
@@ -109,8 +147,23 @@ function isHostSlot(idx) {
   return !!(s && versusRoom.value && s.id === versusRoom.value.host_id);
 }
 
-function closeLobby() {
+async function closeLobby() {
+  // Leave the room before closing
+  console.log('[VersusView] closeLobby called, versusCode:', versusCode.value);
+  if (versusCode.value) {
+    try {
+      const me = playerId.value || ensurePlayerId();
+      console.log('[VersusView] Calling leaveRoom with code:', versusCode.value, 'playerId:', me);
+      await leaveRoom(versusCode.value, me);
+      console.log('[VersusView] leaveRoom completed successfully');
+    } catch (err) {
+      console.error('[VersusView] Error leaving room:', err);
+    }
+  } else {
+    console.warn('[VersusView] No versusCode, cannot leave room');
+  }
   cleanupSub();
+  stopWaitingMusic();
   emit('close');
 }
 
@@ -151,6 +204,8 @@ function subscribeToRoom(code) {
       versusIsHost.value = !!(room && room.host_id && room.host_id === me);
     } catch (_) { versusIsHost.value = false; }
     if (room.status === 'playing' && typeof room.seed === 'number' && typeof room.start_at_ms === 'number') {
+      // Stop waiting room music when game starts
+      stopWaitingMusic();
       // Inform parent (App) to start the versus game, and pass code/room
       emit('begin', { seed: room.seed, startAtMs: room.start_at_ms, code: versusCode.value, room });
       // Do NOT cleanup here; let App.vue keep the subscription alive during gameplay
@@ -243,6 +298,7 @@ async function handleStartVersus() {
 
 onBeforeUnmount(() => {
   cleanupSub();
+  stopWaitingMusic();
 });
 </script>
 

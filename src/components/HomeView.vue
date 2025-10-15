@@ -31,7 +31,7 @@
           <button class="menu-btn mr-2 w-11 h-11" @click="emit('settings')" :aria-label="$t('home.settings')" :title="$t('home.settings')">
             <Settings :size="20" />
           </button>
-          <button class="menu-btn mr-2 w-11 h-11" @click="toggleAudio" :aria-label="audioMuted ? $t('home.audioOn') : $t('home.audioOff')" :title="audioMuted ? $t('home.audioOn') : $t('home.audioOff')">
+          <button class="menu-btn mr-2 w-11 h-11" @click="emit('toggleAudio')" :aria-label="audioMuted ? $t('home.audioOn') : $t('home.audioOff')" :title="audioMuted ? $t('home.audioOn') : $t('home.audioOff')">
             <VolumeX v-if="audioMuted" :size="20" />
             <Volume2 v-else :size="20" />
           </button>
@@ -41,74 +41,19 @@
           </button>
         </div>
       </div>
-      <!-- Hidden audio element for background music -->
-      <audio ref="audioRef" :src="themeUrl" preload="auto" style="display:none"></audio>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { HelpCircle, Settings, Heart, VolumeX, Volume2 } from 'lucide-vue-next';
-import themeUrl from '../assets/memosteptheme.mp3';
-import { getAudioMuted, setAudioMuted } from '../lib/storage.js';
 
 const props = defineProps({
   logoSrc: { type: String, default: '' },
   dailyDone: { type: Boolean, default: false },
   currentFlag: { type: String, default: '@/assets/fr.png' },
+  audioMuted: { type: Boolean, default: true },
 });
-const emit = defineEmits(['start', 'daily', 'solo', 'versus', 'battle', 'openLang', 'help', 'settings', 'stats']);
-
-// Background music
-const audioMuted = ref(true);
-const audioRef = ref(null);
-
-function ensureAudio() {
-  const el = audioRef.value;
-  if (!el) return;
-  el.muted = audioMuted.value;
-  el.loop = true;
-}
-
-async function tryPlay() {
-  const el = audioRef.value;
-  if (!el) return;
-  try {
-    await el.play();
-  } catch (_) {
-    // Autoplay might be blocked until user gesture
-  }
-}
-
-function toggleAudio() {
-  audioMuted.value = !audioMuted.value;
-  setAudioMuted(audioMuted.value);
-  ensureAudio();
-  if (!audioMuted.value) {
-    tryPlay();
-  } else {
-    const el = audioRef.value; if (el) el.pause();
-  }
-}
-
-// help/settings handled by parent via emits
-
-onMounted(() => {
-  // init audio muted state from storage
-  audioMuted.value = getAudioMuted();
-  ensureAudio();
-  // Try to play if unmuted (may still require a user gesture)
-  if (!audioMuted.value) tryPlay();
-  // Fallback: start playback on first user interaction if unmuted
-  function onFirstInteract() {
-    if (!audioMuted.value) tryPlay();
-    window.removeEventListener('pointerdown', onFirstInteract, { capture: true });
-    window.removeEventListener('keydown', onFirstInteract, { capture: true });
-  }
-  window.addEventListener('pointerdown', onFirstInteract, { capture: true, once: true });
-  window.addEventListener('keydown', onFirstInteract, { capture: true, once: true });
-});
-onBeforeUnmount(() => {});
+const emit = defineEmits(['start', 'daily', 'solo', 'versus', 'battle', 'openLang', 'help', 'settings', 'stats', 'toggleAudio']);
 </script>
 
 <style scoped>

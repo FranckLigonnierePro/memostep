@@ -58,7 +58,8 @@
   },
   "board": {
     "gridAria": "Board {cols} by {rows}",
-    "home": "Home"
+    "home": "Home",
+    "memorize": "Memorize the path"
   },
   "alerts": {
     "shareCopied": "Result copied to clipboard!",

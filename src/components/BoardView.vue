@@ -33,6 +33,10 @@
             <Snowflake :size="32" />
             <div class="frozen-text">{{ frozenClicksLeft }}</div>
           </div>
+          <!-- Memorize popup (shown for 2 seconds at start) -->
+          <div v-if="showMemorizePopup" class="memorize-popup">
+            <div class="memorize-text">{{ $t('board.memorize') }}</div>
+          </div>
         </div>
       </div>
       <div class="reveal-bar" aria-hidden="true">
@@ -109,7 +113,12 @@
 </template>
 
 <script setup>
+import { ref, watch } from 'vue';
 import { Home, RotateCcw, Heart, Snowflake } from 'lucide-vue-next';
+
+const showMemorizePopup = ref(false);
+let memorizeTimeout = null;
+
 const props = defineProps({
   cells: { type: Array, required: true },
   boardStyle: { type: Object, required: true },
@@ -138,6 +147,29 @@ const props = defineProps({
   showSnowstorm: { type: Boolean, default: false },
 });
 const emit = defineEmits(['cellClick', 'goHome']);
+
+// Watch for revealProgress to show memorize popup at the start of memorization timer
+watch(() => props.revealProgress, (progress, oldProgress) => {
+  // Show popup when timer starts (progress goes from 0 to > 0)
+  if (progress > 0 && oldProgress === 0) {
+    if (memorizeTimeout) {
+      clearTimeout(memorizeTimeout);
+      memorizeTimeout = null;
+    }
+    showMemorizePopup.value = true;
+    memorizeTimeout = setTimeout(() => {
+      showMemorizePopup.value = false;
+    }, 2000);
+  }
+  // Hide popup when timer resets
+  if (progress === 0 && oldProgress > 0) {
+    if (memorizeTimeout) {
+      clearTimeout(memorizeTimeout);
+      memorizeTimeout = null;
+    }
+    showMemorizePopup.value = false;
+  }
+});
 
 function cellStyle(row, col) {
   const STEP = 70; // ms per diagonal delay
@@ -522,6 +554,14 @@ function bubbleTextColor(bg) {
 }
 
 @keyframes heartBlink {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.3); }
+  50% { transform: scale(0.9); }
+  75% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+@keyframes cellFlip {
   0% { transform: rotateX(0deg); }
   100% { transform: rotateX(180deg); }
 }
@@ -625,6 +665,40 @@ function bubbleTextColor(bg) {
 @keyframes pulse {
   0%, 100% { transform: translate(-50%, -50%) scale(1); }
   50% { transform: translate(-50%, -50%) scale(1.1); }
+}
+
+/* Memorize popup overlay */
+.memorize-popup {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 30;
+  pointer-events: none;
+  animation: memorizeAppear 0.4s ease-out;
+}
+
+.memorize-text {
+  background: linear-gradient(135deg, #6F08EF 0%, #8B2FFF 100%);
+  color: white;
+  padding: 20px 40px;
+  border-radius: 16px;
+  font-size: 24px;
+  font-weight: 700;
+  box-shadow: 0 8px 32px rgba(111, 8, 239, 0.4), 0 0 0 2px rgba(255, 255, 255, 0.1);
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+@keyframes memorizeAppear {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 /* Snowstorm overlay */

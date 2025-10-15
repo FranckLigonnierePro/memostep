@@ -559,46 +559,19 @@ export function subscribeRoom(code, callback) {
       table: 'players', 
       filter: `room_code=eq.${code}` 
     }, async (payload) => {
-      // Optimistic update from payload
-      try {
-        const cached = roomCache.get(code);
-        if (cached && (payload?.new || payload?.old)) {
-          const row = payload.new || payload.old;
-          const pid = row.player_id;
-          const idx = Array.isArray(cached.players) 
-            ? cached.players.findIndex(p => p && p.id === pid) 
-            : -1;
-          
-          const updatedPlayer = {
-            id: row.player_id,
-            name: row.name ?? (cached.players?.[idx]?.name || 'Player'),
-            color: row.color ?? (cached.players?.[idx]?.color || '#ffffff'),
-            score: row.score ?? (cached.players?.[idx]?.score || 0),
-            lives: row.lives ?? (cached.players?.[idx]?.lives || GAME_CONFIG.INITIAL_LIVES),
-            progress: row.progress ?? (cached.players?.[idx]?.progress || 0),
-            current_round: row.current_round ?? (cached.players?.[idx]?.current_round || 1),
-            frozen_clicks: row.frozen_clicks ?? (cached.players?.[idx]?.frozen_clicks ?? 0),
-            pending_freeze: row.pending_freeze ?? (cached.players?.[idx]?.pending_freeze ?? false),
-          };
-          
-          const nextPlayers = Array.isArray(cached.players) ? [...cached.players] : [];
-          if (idx >= 0) {
-            nextPlayers[idx] = updatedPlayer;
-          } else {
-            nextPlayers.push(updatedPlayer);
-          }
-          
-          const optimistic = { ...cached, players: nextPlayers };
-          roomCache.set(code, optimistic);
-          callback(optimistic);
-        }
-      } catch (e) {
-        console.error('[subscribeRoom] Optimistic merge error:', e);
+      console.log('[subscribeRoom] Players table event received:', payload.eventType);
+      
+      // Always do a full refresh to ensure consistency
+      // This is more reliable than optimistic updates for DELETE events
+      const fresh = await getRoomWithPlayers(code).catch((err) => {
+        console.error('[subscribeRoom] Error fetching room after player change:', err);
+        return null;
+      });
+      
+      if (fresh) {
+        console.log('[subscribeRoom] Fresh room fetched, players count:', fresh.players?.length);
+        callback(fresh);
       }
-
-      // Background refresh to ensure consistency
-      const fresh = await getRoomWithPlayers(code).catch(() => null);
-      if (fresh) callback(fresh);
     })
     .subscribe();
   
@@ -683,5 +656,85 @@ export async function reportLifeLoss(code, loserId, winnerIdIfBusted) {
     if (finishErr) throw finishErr;
   }
   
+  return await getRoomWithPlayers(code);
+}
+
+/**
+ * Leave a room - removes player from players table
+ * If the leaving player is the host, transfer host to the next player
+ * @param {string} code - Room code
+ * @param {string} playerId - Player ID leaving
+ * @returns {Promise<Object>} Updated room with players
+ */
+export async function leaveRoom(code, playerId) {
+  initRealtime();
+  console.log('[leaveRoom] Starting - code:', code, 'playerId:', playerId);
+  
+  // Get current room state
+  const room = await getRoomWithPlayers(code);
+  if (!room) {
+    console.error('[leaveRoom] Room not found:', code);
+    throw new Error('Room not found');
+  }
+  
+  const isHost = room.host_id === playerId;
+  const players = room.players || [];
+  console.log('[leaveRoom] Room state - isHost:', isHost, 'players count:', players.length);
+  
+  // If leaving player was host and there are other players, transfer host BEFORE deleting
+  if (isHost && players.length > 1) {
+    // Find next player (first player that is not the leaving one)
+    const nextHost = players.find(p => p.id !== playerId);
+    if (nextHost) {
+      console.log('[leaveRoom] Transferring host to:', nextHost.id);
+      const { error: updateErr } = await supabase
+        .from('rooms')
+        .update({ host_id: nextHost.id })
+        .eq('code', code);
+      
+      if (updateErr) {
+        console.error('[leaveRoom] Error transferring host:', updateErr);
+        throw updateErr;
+      }
+      console.log('[leaveRoom] Host transferred successfully');
+    }
+  }
+  
+  // Remove player from players table
+  console.log('[leaveRoom] Deleting player from players table');
+  const { error: deleteErr } = await supabase
+    .from('players')
+    .delete()
+    .eq('room_code', code)
+    .eq('player_id', playerId);
+  
+  if (deleteErr) {
+    console.error('[leaveRoom] Error deleting player:', deleteErr);
+    throw deleteErr;
+  }
+  console.log('[leaveRoom] Player deleted successfully');
+  
+  // Update room's updated_at to trigger realtime event (so other clients get notified)
+  // This is needed because the players table realtime events don't always work
+  if (!isHost) {
+    console.log('[leaveRoom] Triggering room update for non-host player leave');
+    await supabase
+      .from('rooms')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('code', code);
+  }
+  
+  // If this was the last player, delete the room
+  if (players.length <= 1) {
+    console.log('[leaveRoom] Last player, deleting room');
+    await supabase
+      .from('rooms')
+      .delete()
+      .eq('code', code);
+    
+    return null; // Room deleted
+  }
+  
+  console.log('[leaveRoom] Fetching updated room');
   return await getRoomWithPlayers(code);
 }

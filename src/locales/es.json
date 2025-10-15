@@ -58,7 +58,8 @@
   },
   "board": {
     "gridAria": "Tablero {cols} por {rows}",
-    "home": "Inicio"
+    "home": "Inicio",
+    "memorize": "Memoriza el camino"
   },
   "alerts": {
     "shareCopied": "¡Resultado copiado al portapapeles!",
