@@ -1147,14 +1147,33 @@ function onCellClick(r, c) {
         // Reset my live progress to 0 before restarting same path
         versusLastProgress.value = 0; // Reset local progress display
         try { if (versusCode.value) await setPlayerProgress(versusCode.value, me, 0).then(updated => { if (updated) versusRoom.value = updated; }); } catch (_) {}
-        // Decrement my life; if busted, room finishes with opponent winner
+        // Decrement my life
         const updated = await reportLifeLoss(versusCode.value, me, opponent);
         if (updated) { versusRoom.value = updated; }
+        
+        // Check if the room is finished (only one player left or all eliminated)
         if (updated && updated.status === 'finished') {
-          loseActive.value = true;
+          const winnerId = updated.winner_id;
+          if (winnerId === me) {
+            // I won by being the last player standing!
+            winActive.value = true;
+          } else {
+            // I lost (either eliminated or someone else won)
+            loseActive.value = true;
+          }
         } else {
-          // Continue same round by re-showing the same path after animation delay
-          setTimeout(() => { showPath(); }, 350);
+          // Check if I still have lives
+          const myPlayer = updated?.players?.find(p => p.id === me);
+          const myLives = myPlayer?.lives ?? 3;
+          
+          if (myLives <= 0) {
+            // Player is eliminated but game continues for others
+            // Show lose modal but keep them in spectator mode
+            loseActive.value = true;
+          } else {
+            // Continue same round by re-showing the same path after animation delay
+            setTimeout(() => { showPath(); }, 350);
+          }
         }
       } catch (_) {
         // On error, show lose modal to avoid dead-end

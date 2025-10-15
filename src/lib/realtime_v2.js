@@ -646,17 +646,34 @@ export async function reportLifeLoss(code, loserId, winnerIdIfBusted) {
     if (insErr) throw insErr;
   }
   
-  // Finish room if player is eliminated
-  if (newLives <= 0 && winnerIdIfBusted) {
+  // Check if there's only one player left with lives > 0
+  // If so, that player wins even if they just lost their last life
+  const room = await getRoomWithPlayers(code);
+  const playersWithLives = (room.players || []).filter(p => (p.lives ?? 0) > 0);
+  
+  if (playersWithLives.length === 1) {
+    // Only one player left with lives - they win!
+    const winner = playersWithLives[0];
     const { error: finishErr } = await supabase
       .from('rooms')
-      .update({ status: 'finished', winner_id: winnerIdIfBusted })
+      .update({ status: 'finished', winner_id: winner.id })
       .eq('code', code);
     
     if (finishErr) throw finishErr;
+    return await getRoomWithPlayers(code);
+  } else if (playersWithLives.length === 0) {
+    // All players are eliminated - it's a draw, finish the room
+    const { error: finishErr } = await supabase
+      .from('rooms')
+      .update({ status: 'finished', winner_id: null })
+      .eq('code', code);
+    
+    if (finishErr) throw finishErr;
+    return await getRoomWithPlayers(code);
   }
   
-  return await getRoomWithPlayers(code);
+  // Multiple players still have lives - game continues
+  return room;
 }
 
 /**
