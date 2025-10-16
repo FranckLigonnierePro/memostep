@@ -11,10 +11,10 @@
             <div
               v-for="(cell, idx) in cells"
               :key="idx"
-              class="cell"
+              :class="['cell', { 'no-interaction': !revealComplete }]"
               :data-r="cell.r"
               :data-c="cell.c"
-              @click="emit('cellClick', cell.r, cell.c)"
+              @click="revealComplete ? emit('cellClick', cell.r, cell.c) : null"
             >
               <div class="cell-inner" :class="{ flipping: flipActive, revealing: flipBackActive, facedown: faceDownActive, frozen: frozenGrid }" :style="cellStyle(cell.r, cell.c)">
                 <div class="cell-face front" :class="cellClass(cell.r, cell.c)" />
@@ -456,6 +456,11 @@ function bubbleTextColor(bg) {
   aspect-ratio: 1 / 1;
   cursor: pointer;
   position: relative;
+}
+
+.cell.no-interaction {
+  cursor: default;
+  pointer-events: none;
 }
 
 .cell:hover .cell-face.front { background: #1f2238; }

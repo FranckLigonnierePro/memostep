@@ -378,6 +378,7 @@ const versusError = ref('');
 let versusUnsub = null;
 const versusSeed = ref(null);
 const versusStartAtMs = ref(null);
+const versusCurrentRound = ref(0); // Track current round to avoid restart loops
 const playerId = ref(null);
 const versusRoom = ref(null); // latest room snapshot
 const versusLastProgress = ref(0); // Keep last progress to avoid bubble drop between rounds
@@ -1231,6 +1232,7 @@ async function handleVersusReplay() {
   versusLastProgress.value = 0;
   versusStartAtMs.value = null;
   versusSeed.value = null;
+  versusCurrentRound.value = 0;
   // Reset server-side room (hearts, scores, progress, round, seed) if available
   try {
     if (versusCode.value) {
@@ -1297,6 +1299,7 @@ function handleCloseVersusView() {
   versusCode.value = '';
   versusRoom.value = null;
   versusIsHost.value = false;
+  versusCurrentRound.value = 0;
   showVersusView.value = false;
   state.showHome = true;
 }
@@ -1354,7 +1357,7 @@ function subscribeToRoom(code) {
   // Shared handler to process any room snapshot (from realtime or initial fetch)
   async function handleRoomUpdate(room) {
     if (!room) return;
-    console.log('[App] Room update received:', room.status, room.players?.map(p => ({ id: p.id?.slice(0,4), progress: p.progress })));
+    console.log('[App] Room update received:', room.status, room.players?.map(p => ({ id: p.id?.slice(0,4), progress: p.progress, round: p.current_round })));
     versusRoom.value = room;
     updateFreezeState();
     // When playing, check if we need to start/restart based on our current_round
@@ -1363,24 +1366,19 @@ function subscribeToRoom(code) {
       const myPlayer = room.players?.find(p => p && p.id === me);
       const myRound = myPlayer?.current_round || 1;
       
-      // Calculer le seed pour mon round actuel
-      const myRoundSeed = room.seed + (myRound - 1) * 1000000;
+      // Ne redémarrer que si on a changé de round
+      // Comparer le round actuel avec le round précédent
+      const needsRestart = versusCurrentRound.value !== myRound;
       
-      // Ne redémarrer que si on n'a pas encore démarré ce round spécifique
-      // Vérifier le seed ET le mode versus pour éviter de redémarrer pendant le jeu
-      const alreadyStartedThisRound = (
-        state.mode === 'versus' && 
-        versusSeed.value === myRoundSeed
-      );
-      
-      if (!alreadyStartedThisRound) {
-        console.log('[App] Démarrage du round', myRound, 'pour le joueur', me, '(seed:', myRoundSeed, 'vs', versusSeed.value, ')');
+      if (needsRestart) {
+        console.log('[App] Démarrage du round', myRound, 'pour le joueur', me, '(précédent round:', versusCurrentRound.value, ')');
+        versusCurrentRound.value = myRound;
         beginVersus(room.seed, room.start_at_ms, myRound);
         // Do not toggle back to home; just hide the VersusView so BoardView shows
         showVersusView.value = false;
         state.showHome = false;
       } else {
-        console.log('[App] Round', myRound, 'déjà démarré, skip');
+        console.log('[App] Round', myRound, 'déjà en cours, skip');
       }
       return;
     }
@@ -1543,6 +1541,7 @@ async function goHome() {
     versusCode.value = '';
     versusRoom.value = null;
     versusIsHost.value = false;
+    versusCurrentRound.value = 0;
     stopProgressAutoPublish();
   }
   
