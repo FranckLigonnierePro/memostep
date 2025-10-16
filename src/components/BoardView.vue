@@ -163,14 +163,6 @@ watch(() => props.revealProgress, (progress, oldProgress) => {
       showMemorizePopup.value = false;
     }, 2000);
   }
-  // Hide popup when timer resets
-  // if (progress === 0 && oldProgress > 0) {
-  //   if (memorizeTimeout) {
-  //     clearTimeout(memorizeTimeout);
-  //     memorizeTimeout = null;
-  //   }
-  //   showMemorizePopup.value = false;
-  // }
 });
 
 function cellStyle(row, col) {
