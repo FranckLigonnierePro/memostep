@@ -71,5 +71,8 @@
     "yourTurn": "Your turn!",
     "miss": "Missed!",
     "bravo": "Bravo!"
+  },
+  "versus": {
+    "title": "Versus Mode"
   }
 }

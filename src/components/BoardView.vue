@@ -151,7 +151,9 @@ const emit = defineEmits(['cellClick', 'goHome']);
 // Watch for revealProgress to show memorize popup at the start of memorization timer
 watch(() => props.revealProgress, (progress, oldProgress) => {
   // Show popup when timer starts (progress goes from 0 to > 0)
-  if (progress > 0 && oldProgress === 0) {
+  console.log(progress, oldProgress);
+  if (progress > 0 && progress < 1 && oldProgress === 0 ) {
+    
     if (memorizeTimeout) {
       clearTimeout(memorizeTimeout);
       memorizeTimeout = null;
@@ -162,13 +164,13 @@ watch(() => props.revealProgress, (progress, oldProgress) => {
     }, 2000);
   }
   // Hide popup when timer resets
-  if (progress === 0 && oldProgress > 0) {
-    if (memorizeTimeout) {
-      clearTimeout(memorizeTimeout);
-      memorizeTimeout = null;
-    }
-    showMemorizePopup.value = false;
-  }
+  // if (progress === 0 && oldProgress > 0) {
+  //   if (memorizeTimeout) {
+  //     clearTimeout(memorizeTimeout);
+  //     memorizeTimeout = null;
+  //   }
+  //   showMemorizePopup.value = false;
+  // }
 });
 
 function cellStyle(row, col) {

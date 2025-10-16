@@ -71,5 +71,8 @@
     "yourTurn": "À vous de jouer !",
     "miss": "Raté !",
     "bravo": "Bravo !"
+  },
+  "versus": {
+    "title": "Mode Versus"
   }
 }

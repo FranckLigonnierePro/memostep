@@ -1,6 +1,7 @@
 <template>
   <div class="versus-view">
     <div v-if="!versusCode" class="flex flex-col mt-4 w-full grow justify-center">
+      <h2 class="versus-title">{{ $t('versus.title') }}</h2>
       <div class="input-with-btn" style="height:46px;">
         <button type="button" class="icon-input-btn" aria-label="Pseudo">
           <User :size="18" aria-hidden="true" />
@@ -310,6 +311,18 @@ onBeforeUnmount(() => {
   flex-grow: 1;
   flex-direction: column;
   align-items: center;
+}
+
+.versus-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .body { flex: 1; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; }

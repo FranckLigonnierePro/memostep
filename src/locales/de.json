@@ -71,5 +71,8 @@
     "yourTurn": "Du bist dran!",
     "miss": "Daneben!",
     "bravo": "Bravo!"
+  },
+  "versus": {
+    "title": "Versus-Modus"
   }
 }
