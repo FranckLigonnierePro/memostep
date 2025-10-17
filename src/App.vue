@@ -65,6 +65,20 @@
       @newGame="newGame"
     />
 
+    <!-- Flow HUD (visible uniquement en mode solo/daily avec Flow activé) -->
+    <FlowHUD
+      v-if="!state.showHome && !showVersusView && flowEnabled"
+      :combo="state.combo"
+      :score="flowScore"
+      :streak="state.streak"
+      :branch="state.branch"
+      :flowState="state.flowState"
+      :tempoBPM="state.tempoBPM"
+      :beatCount="flowBeatCount"
+      :errorsInPattern="state.errorsInPattern"
+      :showPerfectFX="state.showPerfectFX"
+      :showJackpotFX="state.showJackpotFX"
+    />
    
   </div>
     <!-- Hidden audio element for background music -->
@@ -239,6 +253,16 @@ import {
 } from './lib/storage.js';
 import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult, reportLifeLoss, setPlayerProgress, resetRoom, usePower, leaveRoom } from './lib/realtime_v2.js';
 
+// Flow System 6×6 - Imports
+import { createRandomEngine, createDailyEngine } from './lib/patternEngine.js';
+import { createFlowController } from './lib/flowController.js';
+import { createScoreManager } from './lib/scoreManager.js';
+import { createTempoManager } from './lib/tempoManager.js';
+import { createDailyManager } from './lib/dailyManager.js';
+import { createVisualFXManager, createAudioFXManager } from './lib/fxManager.js';
+import { createErrorHandler } from './lib/errorHandler.js';
+import FlowHUD from './components/FlowHUD.vue';
+
 // Get supabase instance for direct updates
 let supabase = null;
 function getSupabase() {
@@ -300,14 +324,26 @@ function fitRootScale() {
   rootScale.value = Math.min(sW, sH);
 }
 
-// Constantes
-const COLS = 4;
-const ROWS = 10;
+// Constantes - Grille 6×6 Flow Edition
+const COLS = 6;
+const ROWS = 6;
 const TARGET_CELL = 56;  // taille cible confortable
 const MIN_CELL = 48;     // taille minimale ergonomique
 const MAX_CELL = 72;     // taille max esthétique
 const REVEAL_MS = 8000;  // 8s d'exposition
 const REVEAL_TICK = 100; // rafraîchissement du timer (ms)
+
+// Constantes Flow System
+const MIN_PATTERN_LENGTH = 3;  // Motif minimum: 3 cases
+const MAX_PATTERN_LENGTH = 6;  // Motif maximum: 6 cases
+const ERROR_TOLERANCE = 2;     // Nombre d'erreurs tolérées par motif
+const COMBO_INCREMENT = 0.2;   // Incrément du combo par case correcte
+const PERFECT_BONUS = 50;      // Bonus pour motif parfait
+const JACKPOT_STREAK = 3;      // Jackpot tous les 3 perfects
+const JACKPOT_BONUS = 200;     // Bonus jackpot
+const BASE_TEMPO_BPM = 100;    // Tempo de base
+const MAX_TEMPO_BPM = 180;     // Tempo maximum
+const TEMPO_INCREMENT = 5;     // Augmentation du tempo par perfect
 
 // Refs DOM
 const appRef = ref(null);
@@ -343,6 +379,20 @@ const state = reactive({
   frozenClicksLeft: 0,  // how many clicks left to break ice (starts at 8)
   powerUsed: false,     // whether freeze power has been used this round
   showSnowstorm: false, // whether to show snowstorm animation
+  
+  // Flow System 6×6 - Nouvelles variables
+  flowState: 'OBSERVE',      // États: OBSERVE, INPUT, REWARD, TRANSITION
+  branch: 'FULL_PREVIEW',    // Branches: FULL_PREVIEW, QUICK_PREVIEW, FLOW_CHAIN
+  currentPattern: [],        // Motif actuel [{r,c}, ...]
+  patternIndex: 0,           // Index dans le motif actuel
+  errorsInPattern: 0,        // Nombre d'erreurs dans le motif actuel
+  combo: 1.0,                // Multiplicateur de combo (commence à 1.0)
+  streak: 0,                 // Nombre de motifs parfaits consécutifs
+  perfectCount: 0,           // Compteur pour le jackpot (reset tous les 3)
+  tempoBPM: BASE_TEMPO_BPM,  // Tempo actuel en BPM
+  patternStartTime: 0,       // Timestamp de début du motif (pour mesurer la vitesse)
+  showPerfectFX: false,      // Afficher l'effet "Perfect"
+  showJackpotFX: false,      // Afficher l'effet "Jackpot"
 });
 
 // Flip wave animation control (top -> bottom)
@@ -467,6 +517,20 @@ function resumeMainMusic() {
     tryPlay();
   }
 }
+
+// Flow System 6×6 - Gestionnaires
+let flowController = null;
+let scoreManager = null;
+let tempoManager = null;
+let dailyManager = null;
+let fxManager = null;
+let audioFXManager = null;
+let errorHandler = null;
+
+// Flow System - Variables réactives
+const flowEnabled = ref(false); // Active le système Flow
+const flowScore = computed(() => scoreManager?.totalScore || 0);
+const flowBeatCount = computed(() => tempoManager?.beatCount || 0);
 
 // Hearts state for lose modal
 const justLost = ref(false);
@@ -785,6 +849,156 @@ function dailySeed() {
   return key;
 }
 
+// Flow System 6×6 - Initialisation
+function initializeFlowSystem() {
+  console.log('[Flow] Initializing Flow System 6×6');
+  
+  // Nettoyer les gestionnaires existants
+  if (flowController) {
+    flowController.stop();
+    flowController.cleanup();
+  }
+  if (tempoManager) {
+    tempoManager.stop();
+  }
+  
+  // Pattern Engine
+  const patternEngine = state.mode === 'daily' 
+    ? createDailyEngine() 
+    : createRandomEngine();
+
+  // Score Manager
+  scoreManager = createScoreManager();
+
+  // Tempo Manager
+  tempoManager = createTempoManager(state.tempoBPM, {
+    onTempoChange: (data) => {
+      state.tempoBPM = data.target;
+    },
+    onBeat: (data) => {
+      // Synchroniser les animations au beat
+    },
+  });
+
+  // Error Handler
+  errorHandler = createErrorHandler({
+    onError: (data) => {
+      console.log('[Flow] Error:', data);
+    },
+    onErrorTolerated: (data) => {
+      console.log(`[Flow] Error tolerated: ${data.remaining} remaining`);
+    },
+    onErrorLimitReached: () => {
+      console.log('[Flow] Error limit reached - resetting pattern');
+    },
+  });
+
+  // FX Managers
+  fxManager = createVisualFXManager({
+    onGlow: (data) => {
+      // Effet glow sur cellule
+      const cellKey = `${data.cell.r}-${data.cell.c}`;
+      console.log('[Flow] Glow on cell:', cellKey);
+    },
+    onShake: (data) => {
+      // Effet shake sur erreur
+      const cellKey = `${data.cell.r}-${data.cell.c}`;
+      console.log('[Flow] Shake on cell:', cellKey);
+    },
+    onPerfectHalo: () => {
+      state.showPerfectFX = true;
+      setTimeout(() => { state.showPerfectFX = false; }, 2000);
+    },
+    onJackpotExplosion: () => {
+      state.showJackpotFX = true;
+      setTimeout(() => { state.showJackpotFX = false; }, 3000);
+    },
+  });
+
+  audioFXManager = createAudioFXManager();
+  audioFXManager.setMuted(audioMuted.value);
+
+  // Flow Controller
+  flowController = createFlowController(state, patternEngine, {
+    onStateChange: (newState) => {
+      console.log('[Flow] State:', newState);
+    },
+    onBranchChange: (newBranch) => {
+      console.log('[Flow] Branch:', newBranch);
+    },
+    onComboChange: (combo) => {
+      scoreManager.updateCombo(combo);
+    },
+    onScoreChange: (points) => {
+      scoreManager.addScore(points);
+    },
+    onPerfect: () => {
+      console.log('[Flow] Perfect!');
+      fxManager.triggerPerfectHalo();
+      audioFXManager.playPerfect();
+      tempoManager.increaseTempo();
+    },
+    onJackpot: () => {
+      console.log('[Flow] Jackpot!');
+      fxManager.triggerJackpotExplosion();
+      audioFXManager.playJackpot();
+      scoreManager.recordJackpot();
+    },
+    onError: (data) => {
+      const result = errorHandler.recordError(data, state.currentPattern[state.patternIndex]);
+      fxManager.triggerShake(data);
+      audioFXManager.playInputError();
+      
+      if (result === 'limit_reached') {
+        tempoManager.resetTempo();
+      }
+    },
+    onPatternComplete: (data) => {
+      scoreManager.recordPattern({
+        length: state.currentPattern.length,
+        isPerfect: data.isPerfect,
+        errors: state.errorsInPattern,
+        timeMs: data.timeMs,
+        score: data.score,
+        combo: state.combo,
+      });
+      
+      // Reset error handler pour le prochain motif
+      errorHandler.reset();
+    },
+  });
+
+  console.log('[Flow] Flow System initialized');
+}
+
+function startFlowGame() {
+  initializeFlowSystem();
+  
+  // Activer le Flow
+  flowEnabled.value = true;
+  
+  // Démarrer le tempo
+  tempoManager.start();
+  
+  // Démarrer le flow
+  flowController.start();
+  
+  console.log('[Flow] Flow game started');
+}
+
+function stopFlowGame() {
+  if (flowController) {
+    flowController.stop();
+  }
+  if (tempoManager) {
+    tempoManager.stop();
+  }
+  
+  flowEnabled.value = false;
+  
+  console.log('[Flow] Flow game stopped');
+}
+
 function startMode(mode) {
   state.mode = mode;
   state.showHome = false;
@@ -833,10 +1047,14 @@ function startMode(mode) {
     soloLivesUsed.value = 0;
     // reset solo level at the start of a solo session
     soloLevel.value = 0;
-    // starting solo from home should create a new path
-    state.soloPath = randomPath();
-    state.path = state.soloPath;
-    generateSoloDecoys();
+    
+    // FLOW SYSTEM 6×6 - Activer pour le mode solo
+    startFlowGame();
+    // Le Flow Controller va gérer les patterns, donc on ne génère pas de path classique
+    // state.soloPath = randomPath();
+    // state.path = state.soloPath;
+    // generateSoloDecoys();
+    return; // Le Flow Controller gère tout
   } else if (mode === 'versus' || mode === 'battle') {
     // Placeholder: start like solo for now
     state.path = randomPath();
@@ -914,6 +1132,13 @@ function hidePath() {
 }
 
 function onCellClick(r, c) {
+  // FLOW SYSTEM 6×6 - Déléguer au FlowController si activé
+  if (flowEnabled.value && flowController) {
+    flowController.onCellClick(r, c);
+    return;
+  }
+  
+  // Logique classique (pour modes non-Flow)
   if (!state.inPlay) return;
   const keyAlready = `${r}-${c}`;
   // Ignore repeated clicks on cells already validated as correct
@@ -1529,6 +1754,11 @@ function newGame() {
 }
 
 async function goHome() {
+  // FLOW SYSTEM 6×6 - Arrêter le Flow si activé
+  if (flowEnabled.value) {
+    stopFlowGame();
+  }
+  
   // Leave versus room if in one
   if (state.mode === 'versus' && versusCode.value) {
     try {
