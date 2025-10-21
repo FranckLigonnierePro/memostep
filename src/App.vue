@@ -60,6 +60,9 @@
       :frozenClicksLeft="state.frozenClicksLeft"
       :showSnowstorm="state.showSnowstorm"
       :powerAvailable="!state.powerUsed"
+      :path="state.path"
+      :revealed="state.revealed"
+      :shakeActive="shakeActive"
       @cellClick="onCellClick"
       @goHome="goHome"
       @newGame="newGame"
@@ -331,6 +334,7 @@ const state = reactive({
   timerId: null,
   intervalId: null,
   revealEndAt: 0,
+  revealDuration: REVEAL_MS, // Dynamic reveal duration based on path length
   nowMs: Date.now(),
   showHome: true,
   mode: 'solo',
@@ -352,6 +356,10 @@ const flipBackActive = ref(false);
 // Face-down colors control
 const faceDownActive = ref(false);
 const faceColors = ref({}); // { 'r-c': 'yellow' | 'green' | 'purple' | 'blue' }
+
+// Shake animation and click blocking on wrong cell
+const shakeActive = ref(false);
+const clickBlocked = ref(false);
 
 // Reveal bar should remain filled once the memorize phase completes
 const revealComplete = ref(false);
@@ -607,7 +615,7 @@ function startChrono() {
   if (chronoIntervalId) clearInterval(chronoIntervalId);
   // In versus, share a common chrono anchored to the agreed start time + reveal duration
   if (state.mode === 'versus' && typeof versusStartAtMs.value === 'number') {
-    const baseStart = versusStartAtMs.value + REVEAL_MS;
+    const baseStart = versusStartAtMs.value + state.revealDuration;
     chronoIntervalId = setInterval(() => {
       chronoMs.value = Math.max(0, Date.now() - baseStart);
     }, 250);
@@ -667,12 +675,12 @@ const revealMsLeft = computed(() => {
 
 const revealProgress = computed(() => {
   if (!state.revealed || !state.revealEndAt) return 0;
-  const elapsed = Math.min(REVEAL_MS, REVEAL_MS - revealMsLeft.value);
-  return Math.min(1, Math.max(0, elapsed / REVEAL_MS));
+  const elapsed = Math.min(state.revealDuration, state.revealDuration - revealMsLeft.value);
+  return Math.min(1, Math.max(0, elapsed / state.revealDuration));
 });
 
 const revealSecondsText = computed(() => {
-  if (!state.revealed) return (REVEAL_MS / 1000).toFixed(1) + ' s';
+  if (!state.revealed) return (state.revealDuration / 1000).toFixed(1) + ' s';
   const s = revealMsLeft.value / 1000;
   return s.toFixed(1) + ' s';
 });
@@ -863,10 +871,16 @@ function showPath() {
     stopChrono();
   }
   if (state.timerId) clearTimeout(state.timerId);
+  
+  // Calculate dynamic reveal time based on path length
+  // 200ms per cell + 500ms extra delay after last cell
+  const pathRevealTime = (state.path.length * 200) + 500;
+  state.revealDuration = Math.max(pathRevealTime, 2000); // Minimum 2 seconds
+  
   // programme la fin d'exposition et démarre le compteur visuel
-  state.revealEndAt = Date.now() + REVEAL_MS;
+  state.revealEndAt = Date.now() + state.revealDuration;
   startRevealTicker();
-  state.timerId = setTimeout(hidePath, REVEAL_MS);
+  state.timerId = setTimeout(hidePath, state.revealDuration);
   // while revealing, ensure face is up (no face-down colors)
   faceDownActive.value = false;
   // reset bar fill state at start
@@ -888,8 +902,6 @@ function hidePath() {
   // Assign random face-down colors first so they are visible during the flip
   faceColors.value = genFaceColors();
   faceDownActive.value = true;
-  // mark bar as fully filled
-  revealComplete.value = true;
   // In versus mode, resume chrono (don't reset)
   // In other modes, reset and start chrono
   if (state.mode !== 'versus') {
@@ -909,15 +921,20 @@ function hidePath() {
   const total = ROWS * FLIP_STEP + FLIP_DUR;
   flipActive.value = true;
   setTimeout(() => { flipActive.value = false; }, total);
-  // When the wave finishes, hide the path completely
-  setTimeout(() => { state.revealed = false; }, total);
+  // When the wave finishes, hide the path completely and allow clicks
+  setTimeout(() => { 
+    state.revealed = false;
+    revealComplete.value = true; // Allow clicks only after flip animation completes
+  }, total);
 }
 
 function onCellClick(r, c) {
   if (!state.inPlay) return;
+  if (clickBlocked.value) return; // Block clicks during shake animation
   const keyAlready = `${r}-${c}`;
-  // Ignore repeated clicks on cells already validated as correct
+  // Ignore repeated clicks on cells already validated as correct or marked as wrong
   if (state.correctSet.has(keyAlready)) return;
+  if (state.wrongSet.has(keyAlready)) return;
   
   // Check if grid is frozen (versus mode) - any click breaks ice progressively
   if (state.mode === 'versus' && state.frozenGrid && state.frozenClicksLeft > 0) {
@@ -1079,124 +1096,124 @@ function onCellClick(r, c) {
       }, backTotal);
     }
   } else {
+    // Wrong cell clicked - mark it with X and lose a heart, but continue playing
+    const key = `${r}-${c}`;
+    
     // Solo decoy handling: clicking a decoy does not cost a life but penalizes progress (-3 steps)
-    if (state.mode === 'solo') {
-      const key = `${r}-${c}`;
-      if (state.decoys.has(key)) {
-        // Move back 3 steps
-        const prevIndex = state.nextIndex;
-        const newIndex = Math.max(0, prevIndex - 3);
-        // Remove last correct marks accordingly
-        for (let i = prevIndex - 1; i >= newIndex; i--) {
-          const p = state.path[i];
-          if (!p) break;
-          state.correctSet.delete(`${p.r}-${p.c}`);
-        }
-        state.nextIndex = newIndex;
-        state.statusText = t('status.miss');
-        return; // do not trigger loss flow
+    if (state.mode === 'solo' && state.decoys.has(key)) {
+      // Move back 3 steps
+      const prevIndex = state.nextIndex;
+      const newIndex = Math.max(0, prevIndex - 3);
+      // Remove last correct marks accordingly
+      for (let i = prevIndex - 1; i >= newIndex; i--) {
+        const p = state.path[i];
+        if (!p) break;
+        state.correctSet.delete(`${p.r}-${p.c}`);
       }
+      state.nextIndex = newIndex;
+      state.statusText = t('status.miss');
+      return; // do not trigger loss flow
     }
-    state.wrongSet.add(`${r}-${c}`);
+    
+    // Mark the wrong cell with X
+    state.wrongSet.add(key);
     state.statusText = t('status.miss');
-    state.inPlay = false;
-    // Stop chrono immediately on mistake
-    stopChrono();
-    // Reveal the path now so it's visible during reverse flip (bottom-left -> top-right wave)
-    // During reverse flip, show front faces at the end
-    state.revealed = true;
-    const FLIP_BACK_STEP = 70;  // must match BoardView
-    const FLIP_BACK_DUR = 420;  // must match BoardView
-    const backTotal = ROWS * FLIP_BACK_STEP + FLIP_BACK_DUR;
-  flipBackActive.value = true;
-  // Ensure facedown stays during animation, then reveal faces up
-  setTimeout(async () => {
-    flipBackActive.value = false;
-    faceDownActive.value = false; // keep faces up revealing the path
-    // Record a failed attempt for daily mode
-    if (state.mode === 'daily') {
-      try {
-        const attempts = markDailyAttempt();
-        dailyAttempts.value = attempts;
-      } catch (_) {}
-    } else if (state.mode === 'solo') {
-      // increase solo lives used on each loss
-      soloLivesUsed.value = Math.min(3, (soloLivesUsed.value || 0) + 1);
-    }
-    // Trigger heart extinguish animation only on actual new loss
+    
+    // Trigger shake animation and block clicks for 1.5 seconds
+    shakeActive.value = true;
+    clickBlocked.value = true;
+    setTimeout(() => { shakeActive.value = false; }, 500); // Shake for 500ms
+    setTimeout(() => { clickBlocked.value = false; }, 500); // Block for 1.5s
+    
+    // Trigger heart extinguish animation
     justLost.value = true;
     setTimeout(() => { justLost.value = false; }, 900);
-    // Only show lose modal when out of hearts; otherwise auto-restart (daily/solo). Versus: finish room marking opponent winner.
+    
+    // Handle versus mode separately
     if (state.mode === 'versus') {
-      try {
-        // Fetch latest snapshot to identify opponent id if needed
-        const snapshot = await getRoom(versusCode.value).catch(() => versusRoom.value);
-        const room = snapshot || versusRoom.value;
-        const me = playerId.value || ensurePlayerId();
-        let opponent = null;
-        if (room) {
-          // Prefer roster players list to find someone not me
-          const roster = Array.isArray(room.players) ? room.players : [];
-          const other = roster.find(p => p && p.id && p.id !== me);
-          opponent = other?.id || null;
-          // Fallback to legacy host/guest ids
-          if (!opponent) {
-            if (room.host_id && room.host_id !== me) opponent = room.host_id;
-            else if (room.guest_id && room.guest_id !== me) opponent = room.guest_id;
+      // Versus mode: report life loss to server
+      (async () => {
+        try {
+          const snapshot = await getRoom(versusCode.value).catch(() => versusRoom.value);
+          const room = snapshot || versusRoom.value;
+          const me = playerId.value || ensurePlayerId();
+          let opponent = null;
+          if (room) {
+            const roster = Array.isArray(room.players) ? room.players : [];
+            const other = roster.find(p => p && p.id && p.id !== me);
+            opponent = other?.id || null;
+            if (!opponent) {
+              if (room.host_id && room.host_id !== me) opponent = room.host_id;
+              else if (room.guest_id && room.guest_id !== me) opponent = room.guest_id;
+            }
           }
-        }
-        // Reset my live progress to 0 before restarting same path
-        versusLastProgress.value = 0; // Reset local progress display
-        try { if (versusCode.value) await setPlayerProgress(versusCode.value, me, 0).then(updated => { if (updated) versusRoom.value = updated; }); } catch (_) {}
-        // Decrement my life
-        const updated = await reportLifeLoss(versusCode.value, me, opponent);
-        if (updated) { versusRoom.value = updated; }
-        
-        // Check if the room is finished (only one player left or all eliminated)
-        if (updated && updated.status === 'finished') {
-          const winnerId = updated.winner_id;
-          if (winnerId === me) {
-            // I won by being the last player standing!
-            winActive.value = true;
-          } else {
-            // I lost (either eliminated or someone else won)
-            loseActive.value = true;
-          }
-        } else {
-          // Check if I still have lives
-          const myPlayer = updated?.players?.find(p => p.id === me);
-          const myLives = myPlayer?.lives ?? 3;
           
-          if (myLives <= 0) {
-            // Player is eliminated but game continues for others
-            // Show lose modal but keep them in spectator mode
-            loseActive.value = true;
+          const updated = await reportLifeLoss(versusCode.value, me, opponent);
+          if (updated) { versusRoom.value = updated; }
+          
+          // Check if the room is finished
+          if (updated && updated.status === 'finished') {
+            state.inPlay = false;
+            stopChrono();
+            const winnerId = updated.winner_id;
+            if (winnerId === me) {
+              winActive.value = true;
+            } else {
+              loseActive.value = true;
+            }
           } else {
-            // Continue same round by re-showing the same path after animation delay
-            setTimeout(() => { showPath(); }, 350);
+            // Check if I still have lives
+            const myPlayer = updated?.players?.find(p => p.id === me);
+            const myLives = myPlayer?.lives ?? 3;
+            
+            if (myLives <= 0) {
+              // Player is eliminated
+              state.inPlay = false;
+              stopChrono();
+              loseActive.value = true;
+            }
+            // Otherwise, continue playing with the wrong cell marked
           }
+        } catch (_) {
+          // On error, just continue playing
         }
-      } catch (_) {
-        // On error, show lose modal to avoid dead-end
-        loseActive.value = true;
-      }
-    } else if (state.mode === 'daily') {
-      if ((dailyAttempts.value || 0) >= 3) {
-        loseActive.value = true;
-      } else {
-        setTimeout(() => { newGame(); }, 350);
-      }
-    } else if (state.mode === 'solo') {
-      if ((soloLivesUsed.value || 0) >= 3) {
-        loseActive.value = true;
-      } else {
-        setTimeout(() => { newGame(); }, 350);
-      }
+      })();
     } else {
-      // For other modes, keep previous behavior
-      loseActive.value = true;
+      // Daily/Solo modes: lose a heart
+      if (state.mode === 'daily') {
+        try {
+          const attempts = markDailyAttempt();
+          dailyAttempts.value = attempts;
+        } catch (_) {}
+      } else if (state.mode === 'solo') {
+        soloLivesUsed.value = Math.min(3, (soloLivesUsed.value || 0) + 1);
+      }
+      
+      // Check if out of hearts - if so, end game
+      let outOfHearts = false;
+      if (state.mode === 'daily' && (dailyAttempts.value || 0) >= 3) {
+        outOfHearts = true;
+      } else if (state.mode === 'solo' && (soloLivesUsed.value || 0) >= 3) {
+        outOfHearts = true;
+      }
+      
+      if (outOfHearts) {
+        // Game over - stop playing and show lose modal
+        state.inPlay = false;
+        stopChrono();
+        state.revealed = true;
+        const FLIP_BACK_STEP = 70;
+        const FLIP_BACK_DUR = 420;
+        const backTotal = ROWS * FLIP_BACK_STEP + FLIP_BACK_DUR;
+        flipBackActive.value = true;
+        setTimeout(() => {
+          flipBackActive.value = false;
+          faceDownActive.value = false;
+          loseActive.value = true;
+        }, backTotal);
+      }
+      // Otherwise, continue playing with the wrong cell marked
     }
-  }, backTotal);
   }
 }
 

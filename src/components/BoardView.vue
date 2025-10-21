@@ -6,8 +6,8 @@
     </div>
     <div class="flex w-full h-full" style="justify-content: center;">
       <div class="w-2/3 flex-col h-full">
-        <div class="panel">
-          <div id="board" class="board" :aria-label="$t('board.gridAria', { cols: colsCount, rows: rowsCount })" role="grid" :style="boardStyle">
+        <div class="panel" :style="{ backgroundImage: `url(${bgFirst})` }">
+          <div id="board" :class="['board', { shake: shakeActive }]" :aria-label="$t('board.gridAria', { cols: colsCount, rows: rowsCount })" role="grid" :style="boardStyle">
             <div
               v-for="(cell, idx) in cells"
               :key="idx"
@@ -16,9 +16,16 @@
               :data-c="cell.c"
               @click="revealComplete ? emit('cellClick', cell.r, cell.c) : null"
             >
-              <div class="cell-inner" :class="{ flipping: flipActive, revealing: flipBackActive, facedown: faceDownActive, frozen: frozenGrid }" :style="cellStyle(cell.r, cell.c)">
-                <div class="cell-face front" :class="cellClass(cell.r, cell.c)" />
-                <div class="cell-face back" :class="[ faceDownActive ? faceColorClass(cell.r, cell.c) : null, cellClass(cell.r, cell.c) ]" />
+              <div class="cell-inner" :class="{ frozen: frozenGrid }" :style="pathRevealStyle(cell.r, cell.c)">
+                <div class="cell-face front" :class="cellClass(cell.r, cell.c)">
+                  <!-- Broken cell overlay for wrong cells -->
+                  <div v-if="isCellWrong(cell.r, cell.c)" class="broken-overlay">
+                    <div class="broken-cracks">
+                      <div v-for="n in 6" :key="n" class="broken-crack" :style="brokenCrackStyle(n)"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="cell-face back" :class="cellClass(cell.r, cell.c)" />
                 <!-- Ice overlay for frozen grid -->
                 <div v-if="frozenGrid" class="ice-overlay" :class="{ cracking: frozenClicksLeft <= 4 }">
                   <div class="ice-cracks" v-if="frozenClicksLeft <= 4">
@@ -33,36 +40,21 @@
             <Snowflake :size="32" />
             <div class="frozen-text">{{ frozenClicksLeft }}</div>
           </div>
-          <!-- Memorize popup (shown for 2 seconds at start) -->
-          <div v-if="showMemorizePopup" class="memorize-popup">
-            <div class="memorize-text">{{ $t('board.memorize') }}</div>
-          </div>
         </div>
       </div>
-      <div class="reveal-bar" aria-hidden="true">
-        <div class="reveal-fill" :style="{ transform: `scaleY(${revealComplete ? 1 : revealProgress})` }"></div>
-      </div>
-      <!-- Versus wins bar (5 segments) -->
-      <div v-if="mode === 'versus'" class="wins-bar" :title="`Victoires: ${Number(versusWins)}/5 – Parcours en cours: ${(Number(versusProgress)*100).toFixed(0)}%`">
-        <div v-for="i in 5" :key="i" class="wins-segment">
-          <div
-            v-for="p in (versusPlayers || [])"
-            :key="p.id || p.name"
-            class="wins-fill"
-            :style="{ transform: `scaleY(${playerSegmentFill(p, i)})`, background: p.color || '#12b886' }"
-          ></div>
-        </div>
-        <!-- Player bubbles -->
-        <div class="wins-bubbles">
-          <div
-            v-for="p in (versusPlayers || [])"
-            :key="p.id || p.name"
-            class="wins-bubble"
-            :style="{ bottom: bubbleBottom(p), background: p.color || '#ffffff', color: bubbleTextColor(p.color) }"
-            :title="p.name"
-          >
+      <!-- Versus player bubbles positioned on the board -->
+      <div v-if="mode === 'versus'" class="versus-players-overlay">
+        <div
+          v-for="p in (versusPlayers || [])"
+          :key="p.id || p.name"
+          class="player-bubble"
+          :style="playerBubblePosition(p)"
+          :title="`${p.name} - ${p.wins || 0}/5 victoires`"
+        >
+          <div class="bubble-content" :style="{ background: p.color || '#12b886', color: bubbleTextColor(p.color) }">
             {{ initial(p.name) }}
           </div>
+          <div class="bubble-score">{{ p.wins || 0 }}/5</div>
         </div>
       </div>
       <div class="flex flex-col items-center">
@@ -113,11 +105,8 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
 import { Home, RotateCcw, Heart, Snowflake } from 'lucide-vue-next';
-
-const showMemorizePopup = ref(false);
-let memorizeTimeout = null;
+import bgFirst from '../assets/bg-first.png';
 
 const props = defineProps({
   cells: { type: Array, required: true },
@@ -145,25 +134,11 @@ const props = defineProps({
   frozenClicksLeft: { type: Number, default: 0 },
   powerAvailable: { type: Boolean, default: true },
   showSnowstorm: { type: Boolean, default: false },
+  path: { type: Array, default: () => [] },
+  revealed: { type: Boolean, default: false },
+  shakeActive: { type: Boolean, default: false },
 });
 const emit = defineEmits(['cellClick', 'goHome']);
-
-// Watch for revealProgress to show memorize popup at the start of memorization timer
-watch(() => props.revealProgress, (progress, oldProgress) => {
-  // Show popup when timer starts (progress goes from 0 to > 0)
-  console.log(progress, oldProgress);
-  if (progress > 0 && progress < 1 && oldProgress === 0 ) {
-    
-    if (memorizeTimeout) {
-      clearTimeout(memorizeTimeout);
-      memorizeTimeout = null;
-    }
-    showMemorizePopup.value = true;
-    memorizeTimeout = setTimeout(() => {
-      showMemorizePopup.value = false;
-    }, 2000);
-  }
-});
 
 function cellStyle(row, col) {
   const STEP = 70; // ms per diagonal delay
@@ -210,29 +185,55 @@ function crackStyle(crackIndex) {
   return patterns[(crackIndex - 1) % patterns.length];
 }
 
-// Each segment fill per player
-function playerSegmentFill(player, segmentIndex) {
-  const wins = Math.max(0, Math.min(5, Number(player.wins) || 0));
-  const prog = Math.max(0, Math.min(1, Number(player.progress) || 0));
-  if (segmentIndex <= wins) return 1;
-  if (segmentIndex === wins + 1) return prog;
-  return 0;
-}
-
 function initial(name) {
   const s = String(name || '').trim();
   return s ? s[0].toUpperCase() : '?';
 }
 
-function bubbleBottom(p) {
-  const wins = Math.max(0, Math.min(5, Number(p && p.wins || 0)));
-  const prog = Math.max(0, Math.min(1, Number(p && p.progress || 0)));
-  // Position bubble at the start of current segment + progress within that segment
-  // Each segment = 20% of total height (100% / 5)
-  const segmentBase = (wins / 5) * 100; // Start of current segment
-  const segmentProgress = (prog / 5) * 100; // Progress within current segment
-  const pct = segmentBase + segmentProgress;
-  return `calc(${pct}%)`;
+// Position player bubble vertically based on progress through the path
+function playerBubblePosition(player) {
+  const prog = Math.max(0, Math.min(1, Number(player.progress) || 0));
+  const pathLength = props.path.length || 1;
+  
+  // Calculate which cell index the player is at
+  const cellIndex = Math.floor(prog * pathLength);
+  const actualIndex = Math.min(cellIndex, pathLength - 1);
+  
+  // Get the cell position from the path
+  if (actualIndex >= 0 && actualIndex < props.path.length) {
+    const cell = props.path[actualIndex];
+    if (cell) {
+      // Calculate vertical position based on row
+      const rowPercent = ((cell.r + 0.5) / props.rowsCount) * 100;
+      
+      // Check how many players are at the same cell index
+      const playersAtSameLevel = (props.versusPlayers || []).filter(p => {
+        const pProg = Math.max(0, Math.min(1, Number(p.progress) || 0));
+        const pCellIndex = Math.floor(pProg * pathLength);
+        return pCellIndex === cellIndex;
+      });
+      
+      // Find this player's index among players at the same level
+      const playerIndex = playersAtSameLevel.findIndex(p => 
+        (p.id || p.name) === (player.id || player.name)
+      );
+      
+      // Calculate horizontal offset based on player index
+      // Space players horizontally: -40px, 0px, 40px, etc.
+      const horizontalOffset = playerIndex * 45;
+      
+      return {
+        top: `${rowPercent}%`,
+        left: `${horizontalOffset}px`,
+      };
+    }
+  }
+  
+  // Default to top if no valid position
+  return {
+    top: '5%',
+    left: '0px',
+  };
 }
 
 function bubbleTextColor(bg) {
@@ -246,6 +247,39 @@ function bubbleTextColor(bg) {
   }
   return '#0f1020';
 }
+
+// Style for progressive path reveal during memorization
+function pathRevealStyle(r, c) {
+  if (!props.revealed || props.revealComplete) return {};
+  
+  const pathIndex = props.path.findIndex(p => p.r === r && p.c === c);
+  if (pathIndex === -1) return {};
+  
+  // Delay each path cell by 200ms
+  const delay = pathIndex * 200;
+  return {
+    '--path-delay': `${delay}ms`,
+  };
+}
+
+// Check if a cell is marked as wrong
+function isCellWrong(r, c) {
+  const classes = props.cellClass(r, c);
+  return classes.includes('wrong');
+}
+
+// Generate broken crack patterns
+function brokenCrackStyle(crackIndex) {
+  const patterns = [
+    { top: '15%', left: '5%', width: '90%', height: '2px', transform: 'rotate(25deg)' },
+    { top: '40%', left: '10%', width: '80%', height: '2px', transform: 'rotate(-35deg)' },
+    { top: '65%', left: '8%', width: '85%', height: '2px', transform: 'rotate(45deg)' },
+    { top: '30%', left: '20%', width: '60%', height: '2px', transform: 'rotate(-60deg)' },
+    { top: '55%', left: '15%', width: '70%', height: '2px', transform: 'rotate(15deg)' },
+    { top: '80%', left: '12%', width: '75%', height: '2px', transform: 'rotate(-25deg)' },
+  ];
+  return patterns[(crackIndex - 1) % patterns.length];
+}
 </script>
 
 <style scoped>
@@ -258,6 +292,9 @@ function bubbleTextColor(bg) {
 
 .panel {
   background: var(--panel);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   border: 1px solid #2a2e52;
   border-radius: 16px;
   box-shadow: 0 2px 0 #1a1c30;
@@ -271,90 +308,71 @@ function bubbleTextColor(bg) {
   overflow: hidden;
 }
 
-/* Vertical reveal progress bar on the side of panel */
-.reveal-bar {
-  position: relative;
-  margin: 12px 0px;
-  margin-right: 8px;
-  width: 8px;
-  border-bottom-right-radius: 999px;
-  border-top-right-radius: 999px;
-  background: #1b1e34;
-  border: 1px solid #2a2e52;
-  border-left: none;
-  overflow: hidden;
+/* Versus player bubbles overlay */
+.versus-players-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -60px;
+  width: 200px;
   pointer-events: none;
-}
-.reveal-fill {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 100%;
-  background: linear-gradient(180deg, var(--accent), #7b2cff);
-  transform-origin: bottom center;
-  will-change: transform;
-  transition: transform 100ms linear;
+  z-index: 10;
 }
 
-/* Wins bar next to reveal bar */
-.wins-bar {
+.player-bubble {
+  position: absolute;
   display: flex;
-  flex-direction: column-reverse;
-  gap: 4px;
-  margin-right: 8px;
-  align-self: center; /* take full available height in the flex row */
-  height: 95%;
-  position: relative; /* for bubbles absolute positioning */
-}
-.wins-segment {
-  width: 10px;
-  /* Distribute segments to fill the full height */
-  flex: 1 1 0;
-  border-radius: 4px;
-  background: #1b1e34;
-  border: 1px solid #2a2e52;
-  overflow: hidden;
-  position: relative; /* for absolute positioned fills */
-}
-.wins-fill {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 100%;
-  background: #12b886; /* ok green */
-  transform-origin: bottom center;
-  transform: scaleY(0);
-  transition: transform 100ms linear;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  transform: translateY(-50%);
+  transition: all 0.3s ease-out;
+  pointer-events: none;
+  animation: bubbleBounce 0.5s ease-out;
 }
 
-.wins-bubbles {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  top: 0;
-  bottom: 0;
-  width: 0; /* collapse width so bubbles center over bar */
-  pointer-events: none; /* bubbles non-interactives */
-}
-.wins-bubble {
-  position: absolute;
-  left: 50%;
-  transform: translate(-50%, 50%);
-  width: 20px;
-  height: 20px;
+.bubble-content {
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
-  background: #ffffff;
-  color: #0f1020;
-  font-size: 10px;
+  background: #12b886;
+  color: #ffffff;
+  font-size: 14px;
   font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid rgba(0,0,0,0.2);
-  box-shadow: 0 1px 0 #1a1c30;
-  pointer-events: none;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    0 0 0 2px rgba(0, 0, 0, 0.2),
+    inset 0 2px 4px rgba(255, 255, 255, 0.3);
+}
+
+.bubble-score {
+  background: rgba(15, 16, 32, 0.9);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+}
+
+@keyframes bubbleBounce {
+  0% {
+    transform: translateY(-50%) scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(-50%) scale(1.1);
+  }
+  100% {
+    transform: translateY(-50%) scale(1);
+    opacity: 1;
+  }
 }
 
 .side-actions {
@@ -450,6 +468,16 @@ function bubbleTextColor(bg) {
   perspective: 800px; /* enable 3D flip effect */
 }
 
+.board.shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+  20%, 40%, 60%, 80% { transform: translateX(8px); }
+}
+
 .cell {
   width: 100%;
   height: auto;
@@ -463,8 +491,12 @@ function bubbleTextColor(bg) {
   pointer-events: none;
 }
 
-.cell:hover .cell-face.front { background: #1f2238; }
-.cell:active .cell-face.front { transform: scale(0.98); }
+.cell:hover .cell-face.front { 
+  filter: brightness(1.1);
+}
+.cell:active .cell-face.front { 
+  transform: translateY(2px);
+}
 
 /* 3D container */
 .cell-inner {
@@ -479,34 +511,143 @@ function bubbleTextColor(bg) {
   position: absolute;
   inset: 0;
   border-radius: 10px;
-  border: 2px solid #2a2e52;
+  border: none;
   backface-visibility: hidden;
-  transition: background .12s ease, border-color .12s ease, transform .06s ease;
-  will-change: transform, background, border-color;
+  transition: all .12s ease;
+  will-change: transform, background, border-color, box-shadow;
+  box-shadow: 
+    0 4px 0 #0f1020,
+    0 6px 10px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
 }
 
 /* Front visuals (path/start/end/correct/wrong) */
-.cell-face.front { background: #1a1c30; }
-.cell-face.front.path { background: #2a2e52; border-color: #3a3f6b; }
-.cell-face.front.start { background: #1a3d2e; border-color: #2a5d4e; }
-.cell-face.front.end { background: #3d1a2e; border-color: #5d2a4e; }
-.cell-face.front.correct { background: #1a3d2e; border-color: var(--ok); }
-.cell-face.front.wrong { background: #3a1c2e; border-color: var(--bad); }
-
-/* Outline the path on the back face during reverse flip (keep background as random color) */
-.cell-face.back.path  { border-color: #3a3f6b; }
-.cell-face.back.start { border-color: #2a5d4e; }
-.cell-face.back.end   { border-color: #5d2a4e; }
-
-/* Flip wave animation applies to inner wrapper */
-.cell-inner.flipping {
-  animation: cellFlip 420ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-  animation-delay: var(--delay, 0ms);
+.cell-face.front { 
+  background: linear-gradient(145deg, #1f2340, #15172a);
+}
+.cell-face.front.path { 
+  background: linear-gradient(145deg, #353a62, #252948);
+  box-shadow: 
+    0 4px 0 #1a1d35,
+    0 6px 10px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  animation: pathReveal 0.4s ease-out forwards;
+  animation-delay: var(--path-delay, 0ms);
+  opacity: 0;
+  transform: scale(0.8);
 }
 
-/* Reverse flip (face-down -> face-up) */
-.cell-inner.revealing {
-  animation: cellFlipBack 420ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+@keyframes pathReveal {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.cell-face.front.start { 
+  background: linear-gradient(145deg, #1f4d3e, #15372e);
+  box-shadow: 
+    0 4px 0 #0d2520,
+    0 6px 10px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
+.cell-face.front.end { 
+  background: linear-gradient(145deg, #4d1f3e, #37152e);
+  box-shadow: 
+    0 4px 0 #250d20,
+    0 6px 10px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
+.cell-face.front.correct { 
+  background: linear-gradient(145deg, #2ecc71, #27ae60);
+  box-shadow: 
+    0 4px 0 var(--ok),
+    0 6px 20px rgba(18, 184, 134, 0.8),
+    0 0 30px rgba(18, 184, 134, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  filter: brightness(1.3);
+  animation: correctPulse 0.6s ease-out;
+}
+.cell-face.front.wrong { 
+  background: linear-gradient(145deg, #e74c3c, #c0392b);
+  box-shadow: 
+    0 4px 0 var(--bad),
+    0 6px 20px rgba(239, 68, 68, 0.8),
+    0 0 30px rgba(239, 68, 68, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  filter: brightness(1.3);
+  animation: wrongPulse 0.6s ease-out;
+}
+
+/* Outline the path on the back face */
+.cell-face.back.path  { 
+  background: linear-gradient(145deg, #353a62, #252948);
+}
+.cell-face.back.start { 
+  background: linear-gradient(145deg, #1f4d3e, #15372e);
+}
+.cell-face.back.end   { 
+  background: linear-gradient(145deg, #4d1f3e, #37152e);
+}
+
+/* Broken cell overlay for wrong cells */
+.broken-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(145deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6));
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 5;
+  animation: brokenAppear 0.3s ease-out;
+}
+
+.broken-cracks {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.broken-crack {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: 
+    0 0 3px rgba(0, 0, 0, 0.8),
+    inset 0 0 2px rgba(255, 255, 255, 0.5);
+  transform-origin: center;
+  animation: crackGrow 0.3s ease-out;
+}
+
+@keyframes brokenAppear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes crackGrow {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Heart blink animation for power card */
@@ -560,31 +701,94 @@ function bubbleTextColor(bg) {
   100% { transform: scale(1); }
 }
 
-@keyframes cellFlip {
-  0% { transform: rotateX(0deg); }
-  100% { transform: rotateX(180deg); }
+@keyframes correctPulse {
+  0% {
+    box-shadow: 
+      0 4px 0 var(--ok),
+      0 6px 20px rgba(18, 184, 134, 0.8),
+      0 0 30px rgba(18, 184, 134, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+    filter: brightness(1.3);
+  }
+  50% {
+    box-shadow: 
+      0 4px 0 var(--ok),
+      0 6px 30px rgba(18, 184, 134, 1),
+      0 0 50px rgba(18, 184, 134, 0.9),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+    filter: brightness(1.5);
+  }
+  100% {
+    box-shadow: 
+      0 4px 0 var(--ok),
+      0 6px 20px rgba(18, 184, 134, 0.8),
+      0 0 30px rgba(18, 184, 134, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+    filter: brightness(1.3);
+  }
 }
 
-@keyframes cellFlipBack {
-  0% { transform: rotateX(180deg); }
-  100% { transform: rotateX(0deg); }
+@keyframes wrongPulse {
+  0% {
+    box-shadow: 
+      0 4px 0 var(--bad),
+      0 6px 20px rgba(239, 68, 68, 0.8),
+      0 0 30px rgba(239, 68, 68, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+    filter: brightness(1.3);
+  }
+  50% {
+    box-shadow: 
+      0 4px 0 var(--bad),
+      0 6px 30px rgb(249, 35, 35),
+      0 0 50px rgba(239, 68, 68, 0.9),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+    filter: brightness(1.5);
+  }
+  100% {
+    box-shadow: 
+      0 4px 0 var(--bad),
+      0 6px 20px rgba(239, 68, 68, 0.8),
+      0 0 30px rgba(239, 68, 68, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+    filter: brightness(1.3);
+  }
 }
 
-/* Back face and facedown state */
+
+/* Back face */
 .cell-face.back { transform: rotateX(180deg); }
-/* Keep back colors visible until each cell's animation starts; the keyframe animation
-   will override this transform once it begins (even during 'revealing' with delay). */
-.cell-inner.facedown:not(.flipping) { transform: rotateX(180deg); }
 
-/* Face colors for hidden side — harmonized with theme (muted/dark tones) */
-.cell-face.back.face-yellow { background: #3a2d14; border-color: #6a5a1a; }
-.cell-face.back.face-green  { background: #1a3d2e; border-color: #2a5d4e; }
-.cell-face.back.face-purple { background: #2a1f4d; border-color: #4a2f8a; }
-.cell-face.back.face-blue   { background: #2a2e52; border-color: #3a3f6b; }
 
-/* Override random color when the cell is marked correct/wrong during play */
-.cell-face.back.correct { background: #1a3d2e; border-color: var(--ok); }
-.cell-face.back.wrong   { background: #3a1c2e; border-color: var(--bad); }
+/* Override when the cell is marked correct/wrong during play */
+.cell-face.back.correct { 
+  background: linear-gradient(145deg, #2ecc71, #27ae60);
+  box-shadow: 
+    0 4px 0 var(--ok),
+    0 6px 20px rgba(18, 184, 134, 0.8),
+    0 0 30px rgba(18, 184, 134, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  filter: brightness(1.3);
+  animation: correctPulse 0.6s ease-out;
+}
+.cell-face.back.wrong { 
+  background: linear-gradient(145deg, #e74c3c, #c0392b);
+  box-shadow: 
+    0 4px 0 var(--bad),
+    0 6px 20px rgba(239, 68, 68, 0.8),
+    0 0 30px rgba(239, 68, 68, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  filter: brightness(1.3);
+  animation: wrongPulse 0.6s ease-out;
+}
 
 /* Ice overlay for frozen grid */
 .ice-overlay {
@@ -664,40 +868,6 @@ function bubbleTextColor(bg) {
 @keyframes pulse {
   0%, 100% { transform: translate(-50%, -50%) scale(1); }
   50% { transform: translate(-50%, -50%) scale(1.1); }
-}
-
-/* Memorize popup overlay */
-.memorize-popup {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 30;
-  pointer-events: none;
-  animation: memorizeAppear 0.4s ease-out;
-}
-
-.memorize-text {
-  background: linear-gradient(135deg, #6F08EF 0%, #8B2FFF 100%);
-  color: white;
-  padding: 20px 40px;
-  border-radius: 16px;
-  font-size: 24px;
-  font-weight: 700;
-  box-shadow: 0 8px 32px rgba(111, 8, 239, 0.4), 0 0 0 2px rgba(255, 255, 255, 0.1);
-  text-align: center;
-  letter-spacing: 0.5px;
-}
-
-@keyframes memorizeAppear {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.8);
-  }
-  100% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
 }
 
 /* Snowstorm overlay */
