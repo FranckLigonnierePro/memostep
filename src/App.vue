@@ -63,6 +63,7 @@
       :path="state.path"
       :revealed="state.revealed"
       :shakeActive="shakeActive"
+      :wrongCrackTexture="crackTexture"
       @cellClick="onCellClick"
       @goHome="goHome"
       @newGame="newGame"
@@ -230,6 +231,7 @@ import enFlag from './assets/en.png';
 import esFlag from './assets/es.png';
 import deFlag from './assets/de.png';
 import themeUrl from './assets/memosteptheme.mp3';
+import crackTexture from './assets/crack.png';
 import {
   ensurePlayerId,
   setCurrentDay,

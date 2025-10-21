@@ -20,7 +20,8 @@
                 <div class="cell-face front" :class="cellClass(cell.r, cell.c)">
                   <!-- Broken cell overlay for wrong cells -->
                   <div v-if="isCellWrong(cell.r, cell.c)" class="broken-overlay">
-                    <div class="broken-cracks">
+                    <div v-if="wrongCrackTexture" class="broken-image" :style="{ backgroundImage: `url(${wrongCrackTexture})` }"></div>
+                    <div v-else class="broken-cracks">
                       <div v-for="n in 6" :key="n" class="broken-crack" :style="brokenCrackStyle(n)"></div>
                     </div>
                   </div>
@@ -137,6 +138,7 @@ const props = defineProps({
   path: { type: Array, default: () => [] },
   revealed: { type: Boolean, default: false },
   shakeActive: { type: Boolean, default: false },
+  wrongCrackTexture: { type: String, default: '' },
 });
 const emit = defineEmits(['cellClick', 'goHome']);
 
@@ -611,6 +613,17 @@ function brokenCrackStyle(crackIndex) {
   pointer-events: none;
   z-index: 5;
   animation: brokenAppear 0.3s ease-out;
+}
+
+.broken-image {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 6px rgba(0,0,0,0.4));
 }
 
 .broken-cracks {
