@@ -74,7 +74,7 @@ const cards = [
 
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   /* Make the grid scrollable within the available space */
   max-height: 60vh;
