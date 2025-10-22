@@ -159,37 +159,8 @@ onMounted(async () => {
 
 <template>
 <section>
-<h2 class="text-xl font-bold tracking-tight">Nos derniers donateurs</h2>
 
-<!-- Loading state -->
-<div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-<div v-for="n in 6" :key="n" class="animate-pulse rounded-2xl p-4 border border-white/10 bg-white/5 dark:bg-white/5">
-<div class="flex items-center gap-3">
-<div class="w-12 h-12 rounded-full bg-white/20" />
-<div class="flex-1 space-y-2">
-<div class="h-3 w-1/3 bg-white/20 rounded" />
-<div class="h-3 w-1/4 bg-white/20 rounded" />
-</div>
-</div>
-<div class="h-3 w-2/3 bg-white/20 rounded mt-4" />
-</div>
-</div>
-
-
-<!-- Error state -->
-<div v-else-if="error" class="p-4 rounded-xl border border-red-300/50 bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200">
-Une erreur est survenue : {{ error }}
-</div>
-
-
-<!-- Empty state -->
-<div v-else-if="!donors.length" class="p-6 rounded-xl border border-white/10 bg-white/5 text-sm opacity-80">
-Aucun don pour le moment. Sois le premier à soutenir 💜
-</div>
-
-
-<!-- Donors grid -->
-<ul v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+<ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 <li v-for="(d, i) in donors" :key="d.id || i" class="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-4 shadow-sm hover:shadow-md transition">
 <div class="flex items-center gap-3">
 <div class="shrink-0 w-12 h-12 rounded-full overflow-hidden border" :style="{ borderColor: color }">

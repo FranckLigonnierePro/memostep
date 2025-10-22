@@ -4,7 +4,7 @@
     <div v-if="showSnowstorm" class="snowstorm-overlay">
       <div v-for="i in 50" :key="i" class="snowflake" :style="snowflakeStyle(i)"></div>
     </div>
-    <div class="flex w-full h-full" style="justify-content: center;">
+    <div class="flex w-full h-full" style="justify-content: space-evenly;">
       <div class="w-2/3 flex-col h-full">
         <div class="panel" :style="{ backgroundImage: `url(${bgFirst})` }">
           <div id="board" :class="['board', { shake: shakeActive }]" :aria-label="$t('board.gridAria', { cols: colsCount, rows: rowsCount })" role="grid" :style="boardStyle">
@@ -24,6 +24,10 @@
                     <div v-else class="broken-cracks">
                       <div v-for="n in 6" :key="n" class="broken-crack" :style="brokenCrackStyle(n)"></div>
                     </div>
+                  </div>
+                  <!-- Heart drop (solo reward) -->
+                  <div v-if="showHeart(cell.r, cell.c)" class="heart-drop" title="+1 vie">
+                    <Heart />
                   </div>
                 </div>
                 <div class="cell-face back" :class="cellClass(cell.r, cell.c)" />
@@ -147,6 +151,7 @@ const props = defineProps({
   shakeActive: { type: Boolean, default: false },
   wrongCrackTexture: { type: String, default: '' },
   selfId: { type: [String, Object], default: '' },
+  heartCell: { type: Object, default: null }, // { r, c } when a heart is present on this path
 });
 const emit = defineEmits(['cellClick', 'goHome']);
 
@@ -369,6 +374,13 @@ function pathRevealStyle(r, c) {
 function isCellWrong(r, c) {
   const classes = props.cellClass(r, c);
   return classes.includes('wrong');
+}
+
+// Show heart only during input phase (revealComplete true and not revealed), on the exact cell
+function showHeart(r, c) {
+  if (!props.heartCell) return false;
+  if (!props.revealComplete || props.revealed) return false;
+  return props.heartCell.r === r && props.heartCell.c === c;
 }
 
 // Generate broken crack patterns
@@ -742,6 +754,27 @@ function brokenCrackStyle(crackIndex) {
     inset 0 -1px 0 rgba(0, 0, 0, 0.2);
   filter: brightness(1.3);
   animation: wrongPulse 0.6s ease-out;
+}
+
+/* Heart drop overlay */
+.heart-drop {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff5577;
+  filter: drop-shadow(0 0 6px rgba(255, 85, 119, 0.5));
+  z-index: 6;
+  animation: heartFloat 1.4s ease-in-out infinite;
+}
+
+@keyframes heartFloat {
+  0%, 100% { transform: translateY(0); opacity: 0.95; }
+  50% { transform: translateY(-2px); opacity: 1; }
 }
 
 /* Outline the path on the back face */

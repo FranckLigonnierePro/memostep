@@ -1,9 +1,9 @@
 <template>
-
-      <!-- <div class="left-view">
-        <KoFiDonors src="/api/Supporters_638967188676245800.csv" />
-      </div> -->
-  <div class="content" :style="{ transform: `scale(${rootScale})`}">
+  <div class="app-frame">
+    <div class="left-view">
+      <KoFiDonors src="/api/Supporters_638967188676245800.csv" />
+    </div>
+    <div class="content" :style="{ transform: `scale(${rootScale})`}">
     <div :class="'header' + (!state.showHome ? ' small' : '')">
       <div class="logo-container">
         <img :src="logoSrc" alt="Logo" class="logo" :width="state.showHome ? 200 : 125" :height="state.showHome ? 200 : 100">
@@ -66,6 +66,7 @@
       :powerAvailable="!state.powerUsed"
       :path="state.path"
       :revealed="state.revealed"
+      :heartCell="state.heartCell"
       :shakeActive="shakeActive"
       :wrongCrackTexture="crackTexture"
       :selfId="playerId"
@@ -75,6 +76,7 @@
     />
 
    
+    </div>
   </div>
     <!-- Hidden audio element for background music -->
     <audio ref="audioRef" :src="themeUrl" preload="auto" style="display:none"></audio>
@@ -348,6 +350,9 @@ const state = reactive({
   mode: 'solo',
   // Persist current solo path across retries until success
   soloPath: [],
+  // Heart placement: prepared for the NEXT solo path (after a win), and active for the current round
+  preparedHeart: null,   // { r, c } or null, assigned when preparing the next solo path
+  heartCell: null,       // { r, c } or null, active heart on current path
   // Solo decoy cells (adjacent to path), active from level >= 5
   decoys: new Set(), // 'r-c'
   // Freeze power state (versus mode)
@@ -766,6 +771,23 @@ function randomPathWithRng(rng) {
   return arr;
 }
 
+// Pick a random heart cell on a given path, avoiding start/end when possible
+function pickHeartForPath(pathArr) {
+  try {
+    if (!Array.isArray(pathArr) || pathArr.length === 0) return null;
+    const n = pathArr.length;
+    // Prefer indices [1, n-2] to avoid start/end; if too small, allow any index
+    const start = n >= 3 ? 1 : 0;
+    const end = n >= 3 ? (n - 2) : (n - 1);
+    const idx = start + Math.floor(Math.random() * (end - start + 1));
+    const p = pathArr[idx];
+    if (!p || typeof p.r !== 'number' || typeof p.c !== 'number') return null;
+    return { r: p.r, c: p.c };
+  } catch (_) {
+    return null;
+  }
+}
+
 // Generate up to 2 decoy cells adjacent (orthogonal) to the path, not overlapping path cells
 function generateSoloDecoys() {
   state.decoys.clear();
@@ -854,6 +876,9 @@ function startMode(mode) {
     // starting solo from home should create a new path
     state.soloPath = randomPath();
     state.path = state.soloPath;
+    // First level: no heart yet; future heart will be prepared after this level is passed
+    state.heartCell = null;
+    state.preparedHeart = null;
     generateSoloDecoys();
   } else if (mode === 'versus' || mode === 'battle') {
     // Placeholder: start like solo for now
@@ -975,6 +1000,12 @@ function onCellClick(r, c) {
   if (expect && expect.r === r && expect.c === c) {
     state.correctSet.add(`${r}-${c}`);
     state.nextIndex++;
+    // Heart pickup on correct click (solo mode only)
+    if (state.mode === 'solo' && state.heartCell && state.heartCell.r === r && state.heartCell.c === c) {
+      // Grant back one life (down to a minimum of 0 used)
+      soloLivesUsed.value = Math.max(0, (soloLivesUsed.value || 0) - 1);
+      state.heartCell = null; // consume the heart
+    }
     // Versus: publish progress after each correct step
     if (state.mode === 'versus') {
       try {
@@ -1011,7 +1042,10 @@ function onCellClick(r, c) {
         } else if (state.mode === 'solo') {
           // Solo: increment level, prepare next path, auto-advance without win modal
           soloLevel.value = (soloLevel.value || 0) + 1;
-          state.soloPath = randomPath();
+          // Prepare next solo path and place a heart on it only if not at full lives
+          const nextPath = randomPath();
+          state.soloPath = nextPath;
+          state.preparedHeart = (soloLivesUsed.value > 0) ? pickHeartForPath(nextPath) : null;
           // Immediately start next game
           newGame();
           return;
@@ -1538,6 +1572,9 @@ function newGame() {
   } else if (state.mode === 'solo') {
     // In solo: keep the same path after a loss; use the prepared next path after a win
     state.path = (state.soloPath && state.soloPath.length) ? state.soloPath : randomPath();
+    // Activate prepared heart for this new path (if any), then clear preparation
+    state.heartCell = state.preparedHeart || null;
+    state.preparedHeart = null;
     generateSoloDecoys();
   } else if (state.mode === 'versus' || state.mode === 'battle') {
     // Placeholder: same as solo for now
@@ -1780,6 +1817,33 @@ html, body, #app {
   display: flex;
   flex-direction: column;
   padding: .5rem;
+}
+
+/* Frame that keeps the main content perfectly centered */
+.app-frame {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Left donors sidebar that doesn't affect centering */
+.left-view {
+  position: fixed;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  max-height: 90vh;
+  overflow: auto;
+  z-index: 5;
+}
+
+/* Hide donors sidebar on narrow screens to preserve space */
+@media (max-width: 900px) {
+  .left-view { display: none; }
 }
 
 /* Modal */
