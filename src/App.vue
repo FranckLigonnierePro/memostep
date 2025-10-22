@@ -1,17 +1,26 @@
 <template>
   <div class="app-frame">
-    <div class="left-view">
+    <!-- <div class="left-view">
       <KoFiDonors src="/api/Supporters_638967188676245800.csv" />
-    </div>
+    </div> -->
     <div class="content" :style="{ transform: `scale(${rootScale})`}">
     <div :class="'header' + (!state.showHome ? ' small' : '')">
       <div class="logo-container">
         <img :src="logoSrc" alt="Logo" class="logo" :width="state.showHome ? 200 : 125" :height="state.showHome ? 200 : 100">
       </div>
+      <button
+        class="menu-btn w-11 h-11"
+        :style="(selectedAvatar && selectedAvatar.img)
+          ? { backgroundImage: `url(${selectedAvatar.img})`, backgroundSize: '180%', backgroundPosition: '45% 20%', backgroundRepeat: 'no-repeat' }
+          : {}"
+        @click="openProfile"
+      >
+        <span v-if="!selectedAvatar || !selectedAvatar.img">Profil</span>
+      </button>
     </div>
     
     <HomeView
-      v-if="state.showHome"
+      v-if="state.showHome && !showProfileView"
       :logoSrc="logoSrc"
       :dailyDone="dailyDone"
       :currentFlag="currentFlag"
@@ -26,6 +35,12 @@
       @stats="openStats"
       @openLang="openLang"
       @toggleAudio="toggleAudio"
+    />
+
+    <ProfileView
+      v-else-if="showProfileView"
+      @close="handleCloseProfileView"
+      @select="handleProfileSelect"
     />
 
     <VersusView
@@ -78,6 +93,7 @@
    
     </div>
   </div>
+
     <!-- Hidden audio element for background music -->
     <audio ref="audioRef" :src="themeUrl" preload="auto" style="display:none"></audio>
     <!-- Loses modal -->
@@ -233,6 +249,7 @@ import BoardView from './components/BoardView.vue';
 import KoFiDonors from './components/KoFiDonors.vue';
 import VersusView from './components/VersusView.vue';
 import PowerWheel from './components/PowerWheel.vue';
+import ProfileView from './components/ProfileView.vue';
 // Import flag assets so Vite resolves URLs correctly
 import frFlag from './assets/fr.png';
 import enFlag from './assets/en.png';
@@ -386,6 +403,9 @@ const showHelp = ref(false);
 const showSettings = ref(false);
 const showStats = ref(false);
 const showLang = ref(false);
+// Profile view (takes the place of Home)
+const showProfileView = ref(false);
+const selectedAvatar = ref(null); // { id, name, emoji } or similar
 // Versus UI state
 const showVersus = ref(false); // legacy modal (unused now)
 const showVersusView = ref(false); // new dedicated screen
@@ -1319,6 +1339,19 @@ function openHelp() {
 function openSettings() {
   showSettings.value = true;
 }
+function openProfile() {
+  showProfileView.value = true;
+  state.showHome = false;
+}
+function handleCloseProfileView() {
+  showProfileView.value = false;
+  state.showHome = true;
+}
+function handleProfileSelect(card) {
+  selectedAvatar.value = card;
+  try { localStorage.setItem('selectedAvatar', JSON.stringify(card)); } catch(_){}
+  handleCloseProfileView();
+}
 function openLang() {
   showLang.value = true;
 }
@@ -1751,6 +1784,14 @@ onMounted(() => {
   }
   window.addEventListener('pointerdown', onFirstInteract, { capture: true, once: true });
   window.addEventListener('keydown', onFirstInteract, { capture: true, once: true });
+
+  // Load selected avatar if previously chosen
+  try {
+    const savedAvatar = localStorage.getItem('selectedAvatar');
+    if (savedAvatar) {
+      selectedAvatar.value = JSON.parse(savedAvatar);
+    }
+  } catch (_) {}
 });
 
 onBeforeUnmount(() => {
@@ -1959,4 +2000,35 @@ html, body, #app {
     align-items: flex-end;
     justify-content: center;
 }
+.menu-btn {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #2a2e52;
+  margin-top: .75rem;
+  background: #1a1c30;
+  color: var(--text);
+  box-shadow: 0 2px 0 #1a1c30;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+}
+
+.menu-btn:hover { background: #1f2238; }
+.menu-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #1a1c30; }
+
+/* Center icons in small square buttons (help, settings, flag) */
+.menu-btn.w-11.h-11 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;        /* remove extra padding for perfect centering */
+  line-height: 1;    /* avoid vertical offset from line height */
+}
+
+/* Define the size for the w-11/h-11 utility classes if not provided elsewhere */
+.menu-btn.w-11 { width: 50px; }
+.menu-btn.h-11 { height: 44px; }
+
+/* Normalize icon rendering */
+.menu-btn.w-11.h-11 svg { display: block; }
 </style>
