@@ -529,12 +529,13 @@ function brokenCrackStyle(crackIndex) {
   background: linear-gradient(145deg, #1f2340, #15172a);
 }
 .cell-face.front.path { 
-  background: linear-gradient(145deg, #353a62, #252948);
+  background: linear-gradient(145deg, #1e90ff, #0b61d0);
   box-shadow: 
-    0 4px 0 #1a1d35,
-    0 6px 10px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+    0 4px 0 #0b3a7a,
+    0 0 18px rgba(30, 144, 255, 0.9),
+    0 0 36px rgba(30, 144, 255, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35);
   animation: pathReveal 0.4s ease-out forwards;
   animation-delay: var(--path-delay, 0ms);
   opacity: 0;
@@ -555,20 +556,22 @@ function brokenCrackStyle(crackIndex) {
   }
 }
 .cell-face.front.start { 
-  background: linear-gradient(145deg, #1f4d3e, #15372e);
+  background: linear-gradient(145deg, #1e90ff, #0b61d0);
   box-shadow: 
-    0 4px 0 #0d2520,
-    0 6px 10px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+    0 4px 0 #0b3a7a,
+    0 0 18px rgba(30, 144, 255, 0.9),
+    0 0 36px rgba(30, 144, 255, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35);
 }
 .cell-face.front.end { 
-  background: linear-gradient(145deg, #4d1f3e, #37152e);
+  background: linear-gradient(145deg, #1e90ff, #0b61d0);
   box-shadow: 
-    0 4px 0 #250d20,
-    0 6px 10px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+    0 4px 0 #0b3a7a,
+    0 0 18px rgba(30, 144, 255, 0.9),
+    0 0 36px rgba(30, 144, 255, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35);
 }
 .cell-face.front.correct { 
   background: linear-gradient(145deg, #2ecc71, #27ae60);
@@ -595,13 +598,13 @@ function brokenCrackStyle(crackIndex) {
 
 /* Outline the path on the back face */
 .cell-face.back.path  { 
-  background: linear-gradient(145deg, #353a62, #252948);
+  background: linear-gradient(145deg, #1e90ff, #0b61d0);
 }
 .cell-face.back.start { 
-  background: linear-gradient(145deg, #1f4d3e, #15372e);
+  background: linear-gradient(145deg, #1e90ff, #0b61d0);
 }
 .cell-face.back.end   { 
-  background: linear-gradient(145deg, #4d1f3e, #37152e);
+  background: linear-gradient(145deg, #1e90ff, #0b61d0);
 }
 
 /* Broken cell overlay for wrong cells */

@@ -1,8 +1,8 @@
 <template>
 
-      <div class="left-view">
+      <!-- <div class="left-view">
         <KoFiDonors src="/api/Supporters_638967188676245800.csv" />
-      </div>
+      </div> -->
   <div class="content" :style="{ transform: `scale(${rootScale})`}">
     <div :class="'header' + (!state.showHome ? ' small' : '')">
       <div class="logo-container">
