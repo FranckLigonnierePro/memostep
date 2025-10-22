@@ -68,6 +68,7 @@
       :revealed="state.revealed"
       :shakeActive="shakeActive"
       :wrongCrackTexture="crackTexture"
+      :selfId="playerId"
       @cellClick="onCellClick"
       @goHome="goHome"
       @newGame="newGame"
@@ -530,8 +531,10 @@ const versusPlayers = computed(() => {
     const progress = (p && p.id === me) ? (Number(versusProgress.value) || 0) : storedProg;
     const name = (p && p.name) ? String(p.name) : 'Player';
     const color = (p && p.color) ? String(p.color) : '#ffffff';
-    console.log('[versusPlayers] Player:', { id: p?.id?.slice(0,6), name, progress, storedProg, isMe: p?.id === me });
-    return { id: p.id, name, wins, progress, color };
+    const frozenClicks = Number(p && p.frozen_clicks != null ? p.frozen_clicks : 0);
+    const isFrozen = frozenClicks > 0;
+    console.log('[versusPlayers] Player:', { id: p?.id?.slice(0,6), name, progress, storedProg, isMe: p?.id === me, frozenClicks, isFrozen });
+    return { id: p.id, name, wins, progress, color, frozenClicks, isFrozen };
   });
 });
 
@@ -1714,11 +1717,14 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  cleanupSub();
+  stopWaitingMusic();
   window.removeEventListener('resize', fitBoard);
   window.removeEventListener('orientationchange', fitBoard);
   window.removeEventListener('resize', fitRootScale);
   window.removeEventListener('orientationchange', fitRootScale);
   window.removeEventListener('keydown', handleKeyDown);
+  window.removeEventListener('keydown', handleGlobalKeydown);
   if (state.timerId) clearTimeout(state.timerId);
   stopRevealTicker();
 });

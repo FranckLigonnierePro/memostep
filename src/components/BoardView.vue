@@ -48,12 +48,12 @@
         <div
           v-for="p in (versusPlayers || [])"
           :key="p.id || p.name"
-          class="player-bubble"
+          :class="['player-bubble', { frozen: playerIsFrozen(p), 'just-frozen': isJustFrozen(p) }]"
           :style="playerBubblePosition(p)"
           :title="`${p.name} - ${p.wins || 0}/5 victoires`"
         >
-          <div class="bubble-content" :style="{ background: p.color || '#12b886', color: bubbleTextColor(p.color) }">
-            {{ initial(p.name) }}
+          <div class="bubble-content">
+            <img class="bubble-avatar" :src="getAvatar(p)" :alt="p.name" />
           </div>
           <div class="bubble-score">{{ p.wins || 0 }}/5</div>
         </div>
@@ -106,8 +106,15 @@
 </template>
 
 <script setup>
+import { computed, ref, watch } from 'vue';
 import { Home, RotateCcw, Heart, Snowflake } from 'lucide-vue-next';
 import bgFirst from '../assets/bg-first.png';
+import mageAvatar from '../assets/mage/content.png';
+import warriorAvatar from '../assets/guerriere/fcontent.png';
+import mageFrost from '../assets/mage/givré.png';
+import warriorFrost from '../assets/guerriere/fgivré.png';
+import genAvatar1 from '../assets/Generated Image October 22, 2025 - 12_20AM.png';
+import genAvatar2 from '../assets/Generated Image October 22, 2025 - 12_25AM.png';
 
 const props = defineProps({
   cells: { type: Array, required: true },
@@ -139,8 +146,75 @@ const props = defineProps({
   revealed: { type: Boolean, default: false },
   shakeActive: { type: Boolean, default: false },
   wrongCrackTexture: { type: String, default: '' },
+  selfId: { type: [String, Object], default: '' },
 });
 const emit = defineEmits(['cellClick', 'goHome']);
+
+const AVATARS = [mageAvatar, warriorAvatar, genAvatar1, genAvatar2];
+
+function playerKey(player) {
+  return String(player?.id || player?.name || '');
+}
+
+// Determines if the given player is currently frozen (includes local self freeze)
+function playerIsFrozen(player) {
+  const isSelf = !!(player && props && String(player.id || '') === String(props.selfId || ''));
+  const localFrozen = !!(isSelf && props && props.frozenGrid);
+  return !!(player && (player.isFrozen || (player.frozenClicks || player.frozen_clicks || 0) > 0 || localFrozen));
+}
+
+// Track players who just transitioned to frozen to trigger one-time animation
+const justFrozen = ref(new Set());
+const prevFrozenById = ref(new Map());
+
+watch(
+  () => (props.versusPlayers || []).map(p => ({ id: p?.id || p?.name || '', frozen: playerIsFrozen(p) })),
+  (now) => {
+    const prev = prevFrozenById.value;
+    const nextMap = new Map();
+    for (const entry of now) {
+      const was = prev.get(entry.id) || false;
+      nextMap.set(entry.id, entry.frozen);
+      if (entry.frozen && !was) {
+        // mark just-frozen and clear after short delay
+        justFrozen.value.add(entry.id);
+        setTimeout(() => {
+          const set = justFrozen.value; set.delete(entry.id);
+        }, 700);
+      }
+    }
+    prevFrozenById.value = nextMap;
+  },
+  { immediate: true, deep: false }
+);
+
+function isJustFrozen(player) {
+  const id = String(player?.id || player?.name || '');
+  return justFrozen.value.has(id);
+}
+
+function hashString(s) {
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    hash = ((hash << 5) - hash) + s.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
+}
+
+// Build a stable avatar assignment without duplicates among current players
+const avatarByKey = computed(() => {
+  const players = (props.versusPlayers || []);
+  const keys = players.map(p => playerKey(p)).filter(Boolean);
+  const uniqueKeys = [...new Set(keys)];
+  const seed = uniqueKeys.join('|');
+  const base = Math.abs(hashString(seed)) % AVATARS.length;
+  const mapping = {};
+  uniqueKeys.forEach((k, i) => {
+    mapping[k] = AVATARS[(base + i) % AVATARS.length];
+  });
+  return mapping;
+});
 
 function cellStyle(row, col) {
   const STEP = 70; // ms per diagonal delay
@@ -250,6 +324,33 @@ function bubbleTextColor(bg) {
   return '#0f1020';
 }
 
+// Get avatar for a player from current no-duplicate mapping, with stable fallback
+function getAvatar(player) {
+  const key = playerKey(player);
+  if (!key) return AVATARS[0];
+  const mapped = avatarByKey.value[key];
+  // If player is frozen, switch to frost variant based on their base avatar
+  const isSelf = !!(player && props && String(player.id || '') === String(props.selfId || ''));
+  const localFrozen = !!(isSelf && props && props.frozenGrid);
+  const isFrozen = !!(player && (player.isFrozen || (player.frozenClicks || player.frozen_clicks || 0) > 0 || localFrozen));
+  if (isFrozen && mapped) {
+    if (mapped === warriorAvatar) return warriorFrost;
+    if (mapped === mageAvatar) return mageFrost;
+    // For generated avatars, default to mage frost
+    return mageFrost;
+  }
+  if (mapped) return mapped;
+  // Fallback: hash-based pick (should rarely be used)
+  const idx = Math.abs(hashString(key)) % AVATARS.length;
+  const base = AVATARS[idx];
+  if (isFrozen) {
+    if (base === warriorAvatar) return warriorFrost;
+    if (base === mageAvatar) return mageFrost;
+    return mageFrost;
+  }
+  return base;
+}
+
 // Style for progressive path reveal during memorization
 function pathRevealStyle(r, c) {
   if (!props.revealed || props.revealComplete) return {};
@@ -333,22 +434,69 @@ function brokenCrackStyle(crackIndex) {
   animation: bubbleBounce 0.5s ease-out;
 }
 
+/* When frozen: keep a subtle scale up and blue glow */
+.player-bubble.frozen .bubble-content {
+  transform: scale(1.12);
+  box-shadow:
+    0 0 14px rgba(58, 141, 204, 0.7),
+    0 0 0 2px rgba(58, 141, 204, 0.5),
+    inset 0 2px 4px rgba(255, 255, 255, 0.35);
+  border-color: rgba(170, 221, 255, 0.6);
+  animation: frozenWiggle 1.2s ease-in-out infinite;
+}
+
+/* On freeze transition: quick pop + shake without breaking vertical centering */
+.player-bubble.just-frozen {
+  animation: frozenShake 0.6s ease-in-out;
+}
+
+@keyframes frozenShake {
+  0%   { transform: translateY(-50%) translateX(0) scale(1); }
+  20%  { transform: translateY(-50%) translateX(-6px) scale(1.18); }
+  40%  { transform: translateY(-50%) translateX(6px)  scale(1.18); }
+  60%  { transform: translateY(-50%) translateX(-3px) scale(1.1); }
+  80%  { transform: translateY(-50%) translateX(3px)  scale(1.05); }
+  100% { transform: translateY(-50%) translateX(0)  scale(1); }
+}
+
+/* Subtle continuous wiggle for frozen bubble content (keeps base scale) */
+@keyframes frozenWiggle {
+  0%   { transform: scale(1.12) rotate(0deg) translateX(0); }
+  25%  { transform: scale(1.12) rotate(2deg) translateX(1px); }
+  50%  { transform: scale(1.12) rotate(0deg) translateX(0); }
+  75%  { transform: scale(1.12) rotate(-2deg) translateX(-1px); }
+  100% { transform: scale(1.12) rotate(0deg) translateX(0); }
+}
+
 .bubble-content {
   width: 32px;
   height: 32px;
   border-radius: 999px;
-  background: #12b886;
+  background: #0e1328;
   color: #ffffff;
   font-size: 14px;
   font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 3px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.3);
   box-shadow: 
     0 4px 12px rgba(0, 0, 0, 0.4),
     0 0 0 2px rgba(0, 0, 0, 0.2),
     inset 0 2px 4px rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.bubble-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  object-fit: cover;
+  display: block;
+  transform: scale(2) translateY(-2px) translateX(1.3px);
+  transform-origin: top center;
+  will-change: transform;
 }
 
 .bubble-score {

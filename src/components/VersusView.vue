@@ -24,6 +24,7 @@
         <div class="slots">
           <div v-for="i in 8" :key="i" class="slot">
             <div class="badge" :style="{ background: slotColor(i-1), borderColor: slotColor(i-1) }">{{ i }}</div>
+            <img v-if="slots[i-1]" class="slot-avatar" :src="getAvatar(slots[i-1])" :alt="slotName(i-1)" />
             <div class="name">
               {{ slotName(i-1) }}
             </div>
@@ -47,6 +48,10 @@ import { ensurePlayerId } from '../lib/storage.js';
 import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, getRoom, leaveRoom } from '../lib/realtime_v2.js';
 import { User, Crown } from 'lucide-vue-next';
 import waitingRoomUrl from '../assets/waitingRoom.mp3';
+import mageAvatar from '../assets/mage/content.png';
+import warriorAvatar from '../assets/guerriere/fcontent.png';
+import genAvatar1 from '../assets/Generated Image October 22, 2025 - 12_20AM.png';
+import genAvatar2 from '../assets/Generated Image October 22, 2025 - 12_25AM.png';
 
 const emit = defineEmits(['close', 'begin']);
 
@@ -131,6 +136,24 @@ const slots = computed(() => {
   for (let i = 0; i < Math.min(8, list.length); i++) arr[i] = list[i];
   return arr;
 });
+
+const AVATARS = [mageAvatar, warriorAvatar, genAvatar1, genAvatar2];
+function playerKey(p) { return String(p && (p.id || p.name) || ''); }
+function hashString(s) { let h = 0; for (let i=0;i<s.length;i++){ h=((h<<5)-h)+s.charCodeAt(i); h|=0; } return h; }
+const avatarByKey = computed(() => {
+  const list = (versusRoom.value && Array.isArray(versusRoom.value.players)) ? versusRoom.value.players : defaultPlayers.value;
+  const keys = [...new Set(list.map(playerKey).filter(Boolean))];
+  const seed = keys.join('|');
+  const base = Math.abs(hashString(seed)) % AVATARS.length;
+  const map = {};
+  keys.forEach((k, i) => { map[k] = AVATARS[(base + i) % AVATARS.length]; });
+  return map;
+});
+function getAvatar(p) {
+  const k = playerKey(p);
+  if (!k) return AVATARS[0];
+  return avatarByKey.value[k] || AVATARS[Math.abs(hashString(k)) % AVATARS.length];
+}
 
 function slotName(idx) {
   const s = slots.value[idx];
@@ -344,6 +367,7 @@ onBeforeUnmount(() => {
 }
 .slots { display:flex; flex-direction: column; flex-wrap:wrap; gap:4px; }
 .slot { display:flex; align-items:center; gap:8px; padding:4px; border:1px solid #2a2e52; border-radius:10px; background:#0f1020; min-width:0; }
+.slot-avatar { width: 22px; height: 22px; border-radius: 999px; object-fit: cover; flex: 0 0 auto; transform: scale(1.15); transform-origin: center center; }
 .slot .badge { width:22px; height:22px; border-radius:999px; background:#1a1c30; border:1px solid #2a2e52; display:flex; align-items:center; justify-content:center; font-size:12px; color:#fff; }
 .slot .name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#fff; font-weight:700; }
 .error { color:#ff5a8a; font-size:12px; margin-top:6px; }
