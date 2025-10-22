@@ -81,12 +81,7 @@ const cards = [
   overflow: auto;
   padding-right: 4px; /* room for scrollbar */
 }
-@media (min-width: 420px) {
-  .cards-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (min-width: 640px) {
-  .cards-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
+
 .char-card {
   position: relative;
   display: block;
