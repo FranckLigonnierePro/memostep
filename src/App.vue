@@ -1,4 +1,8 @@
 <template>
+
+      <div class="left-view">
+        <KoFiDonors src="/api/Supporters_638967188676245800.csv" />
+      </div>
   <div class="content" :style="{ transform: `scale(${rootScale})`}">
     <div :class="'header' + (!state.showHome ? ' small' : '')">
       <div class="logo-container">
@@ -223,6 +227,7 @@ import { onMounted, onBeforeUnmount, reactive, ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import HomeView from './components/HomeView.vue';
 import BoardView from './components/BoardView.vue';
+import KoFiDonors from './components/KoFiDonors.vue';
 import VersusView from './components/VersusView.vue';
 import PowerWheel from './components/PowerWheel.vue';
 // Import flag assets so Vite resolves URLs correctly
@@ -1874,5 +1879,14 @@ html, body, #app {
   60%  { transform: scale(1.04); opacity: 1; }
   80%  { transform: scale(0.98); }
   100% { transform: scale(1); }
+}
+
+.left-view {
+    display: flex;
+    height: 100%;
+    flex: 1 1 0%;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
 }
 </style>
