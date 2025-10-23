@@ -54,14 +54,14 @@ const cards = [
   { id: 'frozen', name: 'Frozen', img: imgFrozen, color: '#60a5fa', glow: 'rgba(96,165,250,0.45)' },
   { id: 'forest', name: 'Forest', img: imgForest, color: '#34d399', glow: 'rgba(52,211,153,0.45)' },
   { id: 'pixel', name: 'Pixel', img: imgPixel, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
-  { id: 'danseur', name: 'Danseur', img: imgDanseur, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
-  { id: 'inventeur', name: 'Inventeur', img: imgInventeur, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
-  { id: 'shadow', name: 'Shadow', img: imgShadow, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
-  { id: 'astre', name: 'Astre', img: imgAstre, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
-  { id: 'colosse', name: 'Colosse', img: imgColosse, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
-  { id: 'chrono', name: 'Chrono', img: imgChrono, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
-  { id: 'hack', name: 'Hack', img: imgHack, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
-  { id: 'archie', name: 'Archie', img: imgArchie, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
+  { id: 'danseur', name: 'Danseur', img: imgDanseur, color: '#f43f5e', glow: 'rgba(244,63,94,0.45)' },
+  { id: 'inventeur', name: 'Inventeur', img: imgInventeur, color: '#14b8a6', glow: 'rgba(20,184,166,0.45)' },
+  { id: 'shadow', name: 'Shadow', img: imgShadow, color: '#0ea5e9', glow: 'rgba(14,165,233,0.45)' },
+  { id: 'astre', name: 'Astre', img: imgAstre, color: '#a3e635', glow: 'rgba(163,230,53,0.45)' },
+  { id: 'colosse', name: 'Colosse', img: imgColosse, color: '#ef4444', glow: 'rgba(239,68,68,0.45)' },
+  { id: 'chrono', name: 'Chrono', img: imgChrono, color: '#06b6d4', glow: 'rgba(6,182,212,0.45)' },
+  { id: 'hack', name: 'Hack', img: imgHack, color: '#6366f1', glow: 'rgba(99,102,241,0.45)' },
+  { id: 'archie', name: 'Archie', img: imgArchie, color: '#f59e0b', glow: 'rgba(245,158,11,0.45)' },
 ];
 </script>
 
