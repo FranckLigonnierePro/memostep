@@ -1,6 +1,6 @@
 <template>
   <div class="profile-view">
-    <div class="flex flex-col mt-4 w-full grow justify-center" style="height: 100%;">
+    <div class="profile-body mt-4" style="height: 100%;">
       <p class="profile-title">Choisis ton personnage</p>
       <div class="cards-grid">
         <button
@@ -74,6 +74,17 @@ const cards = [
   flex-direction: column;
   align-items: center;
   height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.profile-body {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1;
+  min-height: 0; /* allow children to shrink for scrolling */
+  justify-content: center;
 }
 
 .profile-title {
@@ -90,13 +101,16 @@ const cards = [
 
 .cards-grid {
   display: grid;
-  align-items: center;
-  height: 420px;
+  align-items: stretch;
+  align-content: start;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 5px;
   /* Make the grid scrollable within the available space */
-  max-height: 60vh;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
+  padding: 2px 25px; /* tighter sides, keep vertical space for shadows */
+  box-sizing: border-box;
 }
 
 .char-card {
@@ -115,7 +129,7 @@ const cards = [
   aspect-ratio: 2 / 3;
   overflow: hidden;
 }
-.char-card:hover { background: #1f2238; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset, 0 0 12px var(--glow), 0 0 28px var(--glow); }
+.char-card:hover { background: #1f2238; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset, 0 0 12px var(--glow), 0 0 18px var(--glow); }
 .char-card:active { transform: translateY(1px); box-shadow: 0 1px 0 #1a1c30; }
 .card-media { position: absolute; inset: 0; }
 .char-img { width: 100%; height: 100%; object-fit: cover; display: block; }
