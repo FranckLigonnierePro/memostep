@@ -39,6 +39,18 @@
                 </div>
               </div>
             </div>
+            <!-- Player avatar overlay for solo/daily modes -->
+            <div v-if="(mode === 'solo' || mode === 'daily') && selectedAvatar" class="solo-player-overlay">
+              <div
+                class="player-bubble solo-avatar"
+                :style="soloPlayerPosition()"
+                :title="selectedAvatar.name || 'Joueur'"
+              >
+                <div class="bubble-content">
+                  <img class="bubble-avatar" :src="selectedAvatar.img" :alt="selectedAvatar.name" />
+                </div>
+              </div>
+            </div>
             <!-- Versus player bubbles positioned over the grid (inside board for perfect alignment) -->
             <div v-if="mode === 'versus'" class="versus-players-overlay">
               <div
@@ -153,6 +165,8 @@ const props = defineProps({
   wrongCrackTexture: { type: String, default: '' },
   selfId: { type: [String, Object], default: '' },
   heartCell: { type: Object, default: null }, // { r, c } when a heart is present on this path
+  selectedAvatar: { type: Object, default: null }, // Avatar selected by player
+  playerProgress: { type: Number, default: 0 }, // Current nextIndex for solo/daily player position
 });
 const emit = defineEmits(['cellClick', 'goHome']);
 
@@ -272,18 +286,56 @@ function initial(name) {
   return s ? s[0].toUpperCase() : '?';
 }
 
-// Position player bubble vertically based on progress through the path
+// Position solo/daily player avatar on the last validated cell
+function soloPlayerPosition() {
+  const pathLength = (props.path || []).length || 1;
+  const progress = Number(props.playerProgress) || 0;
+  
+  // Position on the last validated cell: nextIndex-1
+  // If nextIndex is 0, position on first cell (start)
+  const lastIndex = Math.max(0, progress - 1);
+  const actualIndex = Math.max(0, Math.min(lastIndex, pathLength - 1));
+  
+  if (actualIndex >= 0 && actualIndex < props.path.length) {
+    const cell = props.path[actualIndex];
+    if (cell) {
+      return {
+        gridRow: String((cell.r + 1)),
+        gridColumn: String((cell.c + 1)),
+        justifySelf: 'center',
+        alignSelf: 'center',
+      };
+    }
+  }
+  // Default to first cell if no valid position
+  if (props.path.length > 0) {
+    const firstCell = props.path[0];
+    return {
+      gridRow: String((firstCell.r + 1)),
+      gridColumn: String((firstCell.c + 1)),
+      justifySelf: 'center',
+      alignSelf: 'center',
+    };
+  }
+  return { gridRow: '1', gridColumn: '1', justifySelf: 'center', alignSelf: 'center' };
+}
+
+// Position player bubble based on their progress through their own path
+// Each player has a different path and progresses independently
 function playerBubblePosition(player) {
   const prog = Math.max(0, Math.min(1, Number(player.progress) || 0));
   const map = props.versusPathsByPlayer || {};
   const fallback = props.path || [];
   const playerPath = Array.isArray(map[player?.id]) && map[player.id].length ? map[player.id] : fallback;
   const pathLength = playerPath.length || 1;
-
-  // Position on the last validated cell: nextIndex/len -> last index is nextIndex-1
-  // For remote players, we receive progress ~= nextIndex/len rounded
-  const lastIndex = Math.floor(prog * pathLength) - 1;
+  
+  // Calculate which cell the player is currently on based on their progress
+  // progress is nextIndex/pathLength, so nextIndex = progress * pathLength
+  // Position on the last validated cell: nextIndex - 1
+  const nextIndex = Math.round(prog * pathLength);
+  const lastIndex = Math.max(0, nextIndex - 1);
   const actualIndex = Math.max(0, Math.min(lastIndex, pathLength - 1));
+  
   if (actualIndex >= 0 && actualIndex < playerPath.length) {
     const cell = playerPath[actualIndex];
     if (cell) {
@@ -295,6 +347,18 @@ function playerBubblePosition(player) {
       };
     }
   }
+  
+  // Default to first cell if no valid position
+  if (playerPath.length > 0) {
+    const firstCell = playerPath[0];
+    return {
+      gridRow: String((firstCell.r + 1)),
+      gridColumn: String((firstCell.c + 1)),
+      justifySelf: 'center',
+      alignSelf: 'center',
+    };
+  }
+  
   return { gridRow: '1', gridColumn: '1', justifySelf: 'center', alignSelf: 'center' };
 }
 
@@ -404,13 +468,28 @@ function brokenCrackStyle(crackIndex) {
   overflow: hidden;
 }
 
+/* Solo player avatar overlay */
+.solo-player-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: -2px;
+  pointer-events: none;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  grid-template-rows: repeat(var(--rows), 1fr);
+  gap: 5px;
+}
+
 /* Versus player bubbles overlay */
 .versus-players-overlay {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  right: 0;
+  right: -2px;
   pointer-events: none;
   z-index: 10;
   display: grid;

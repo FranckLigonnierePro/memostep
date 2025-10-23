@@ -46,6 +46,7 @@
     <VersusView
       v-else-if="showVersusView"
       :code="versusCode"
+      :selectedAvatar="selectedAvatar"
       :pauseMainMusic="pauseMainMusic"
       :resumeMainMusic="resumeMainMusic"
       @close="handleCloseVersusView"
@@ -86,6 +87,8 @@
       :shakeActive="shakeActive"
       :wrongCrackTexture="crackTexture"
       :selfId="playerId"
+      :selectedAvatar="selectedAvatar"
+      :playerProgress="state.nextIndex"
       @cellClick="onCellClick"
       @goHome="goHome"
       @newGame="newGame"
@@ -567,19 +570,26 @@ const versusPlayers = computed(() => {
 
 // Map each player to a deterministic path and a fixed starting column (0..3)
 const versusPathsByPlayer = computed(() => {
+  console.log('[versusPathsByPlayer] 🔵 CALLED - mode:', state.mode, 'seed:', versusSeed.value);
   if (state.mode !== 'versus') return {};
   const room = versusRoom.value;
   const roster = (room && Array.isArray(room.players)) ? room.players.slice(0, COLS) : [];
-  if (!versusSeed.value || !versusStartAtMs.value) return {};
+  if (!versusSeed.value || !versusStartAtMs.value) {
+    console.log('[versusPathsByPlayer] ⚠️ Missing seed or startAtMs, returning empty');
+    return {};
+  }
   const roundSeed = Number(versusSeed.value) || 0;
   const map = {};
+  console.log('[versusPathsByPlayer] Roster order:', roster.map((p, i) => ({ idx: i, id: p.id?.slice(0,6), name: p.name })));
   roster.forEach((p, idx) => {
     const startCol = idx % COLS; // fixed column assignment per join order
     // Derive a stable seed per player to vary paths while staying in sync across clients
-    const idHash = Math.abs(hashString(String(p.id || p.name || ''))) % 100000;
-    const seed = roundSeed + (idx + 1) * 10000 + idHash;
+    const idHash = Math.abs(hashString(String(p.id || p.name || ''))) % 1000000;
+    // Use a much larger multiplier to ensure very different seeds per player
+    const seed = roundSeed + (idx + 1) * 987654321 + idHash;
     const rng = seededRng(seed >>> 0);
     map[p.id] = randomPathWithRngAndStart(rng, startCol);
+    console.log('[versusPathsByPlayer] Player', idx, ':', p.name, 'col:', startCol, 'seed:', seed);
   });
   return map;
 });
@@ -1576,7 +1586,6 @@ async function handleStartVersus() {
 
 function beginVersus(baseSeed, startAtMs, currentRound = 1) {
   // Calculer le seed pour ce round spécifique
-  // Tous les joueurs au même round auront le même parcours
   const seed = baseSeed + (currentRound - 1) * 1000000;
   
   versusSeed.value = seed;
@@ -1585,9 +1594,29 @@ function beginVersus(baseSeed, startAtMs, currentRound = 1) {
   state.showHome = false;
   // Reset local cached progress so the bubble starts on the first cell
   versusLastProgress.value = 0;
-  // Prepare deterministic path
-  const rng = seededRng(seed);
-  state.path = randomPathWithRng(rng);
+  
+  // Generate the local player's unique path based on their position in the roster
+  const me = playerId.value || ensurePlayerId();
+  const room = versusRoom.value;
+  const roster = (room && Array.isArray(room.players)) ? room.players.slice(0, COLS) : [];
+  console.log('[beginVersus] Roster order:', roster.map((p, i) => ({ idx: i, id: p.id?.slice(0,6), name: p.name })));
+  console.log('[beginVersus] My ID:', me?.slice(0,6));
+  const myIndex = roster.findIndex(p => p && p.id === me);
+  
+  if (myIndex >= 0) {
+    const startCol = myIndex % COLS;
+    const idHash = Math.abs(hashString(String(me))) % 1000000;
+    const mySeed = seed + (myIndex + 1) * 987654321 + idHash;
+    const rng = seededRng(mySeed >>> 0);
+    state.path = randomPathWithRngAndStart(rng, startCol);
+    console.log('[beginVersus] Joueur index:', myIndex, 'colonne:', startCol, 'seed:', mySeed, 'path first cell:', state.path[0]);
+  } else {
+    // Fallback: generate a random path if player not found in roster
+    const rng = seededRng(seed);
+    state.path = randomPathWithRng(rng);
+    console.log('[beginVersus] ⚠️ Joueur non trouvé dans le roster, chemin par défaut');
+  }
+  
   state.nextIndex = 0;
   state.correctSet.clear();
   state.wrongSet.clear();
@@ -1595,7 +1624,7 @@ function beginVersus(baseSeed, startAtMs, currentRound = 1) {
   stopChrono();
   chronoMs.value = 0;
   
-  console.log('[beginVersus] Round', currentRound, 'avec seed', seed, '(base:', baseSeed, ')');
+  console.log('[beginVersus] Round', currentRound, 'avec seed de base', seed, '(base:', baseSeed, ')');
   
   // Show power wheel overlay first (DISABLED)
   // showPowerWheel.value = true;
@@ -1740,6 +1769,10 @@ function cellClass(r, c) {
   const key = `${r}-${c}`;
 
   if (state.revealed) {
+    // Log the path being used (only once per reveal)
+    if (r === 0 && c === 0 && state.path.length > 0) {
+      console.log('[cellClass] 🎯 Current path first cell:', state.path[0], 'last cell:', state.path[state.path.length - 1]);
+    }
     const idx = state.path.findIndex(p => p.r === r && p.c === c);
     if (idx !== -1) {
       classes.push('path');

@@ -87,7 +87,8 @@ async function getRoomPlayers(roomCode) {
     progress: p.progress,
     current_round: p.current_round || 1,
     frozen_clicks: p.frozen_clicks ?? 0,
-    pending_freeze: p.pending_freeze ?? false
+    pending_freeze: p.pending_freeze ?? false,
+    avatar_url: p.avatar_url || null
   }));
 }
 
@@ -295,13 +296,14 @@ export async function setPlayerProgress(code, playerId, progress) {
 
 /**
  * Join a room as a player
- * Creates player if new, updates name if existing
+ * Creates player if new, updates name and avatar if existing
  * @param {string} code - Room code
  * @param {string} playerId - Player ID
  * @param {string} name - Player name
+ * @param {string} avatarUrl - Optional avatar URL
  * @returns {Promise<Object>} Updated room with players
  */
-export async function joinRoom(code, playerId, name) {
+export async function joinRoom(code, playerId, name, avatarUrl = null) {
   initRealtime();
   
   // Verify room exists
@@ -325,10 +327,13 @@ export async function joinRoom(code, playerId, name) {
   if (getErr) throw getErr;
   
   if (existing) {
-    // Update existing player's name
+    // Update existing player's name and avatar
     const { error: upErr } = await supabase
       .from('players')
-      .update({ name: name || existing.name || 'Player' })
+      .update({ 
+        name: name || existing.name || 'Player',
+        avatar_url: avatarUrl 
+      })
       .eq('room_code', code)
       .eq('player_id', playerId);
     if (upErr) throw upErr;
@@ -351,7 +356,8 @@ export async function joinRoom(code, playerId, name) {
         score: 0,
         lives: GAME_CONFIG.INITIAL_LIVES,
         progress: 0,
-        current_round: 1
+        current_round: 1,
+        avatar_url: avatarUrl
       }]);
     if (insErr) throw insErr;
   }
@@ -377,9 +383,10 @@ function randomCode(len = GAME_CONFIG.CODE_LENGTH) {
  * Create a new room with host player
  * @param {string} hostId - Host player ID
  * @param {string} hostName - Host player name
+ * @param {string} avatarUrl - Optional avatar URL for the host
  * @returns {Promise<string>} Generated room code
  */
-export async function createRoom(hostId, hostName) {
+export async function createRoom(hostId, hostName, avatarUrl = null) {
   initRealtime();
   const code = randomCode();
   const hostColor = pickAvailableColor([]);
@@ -406,7 +413,8 @@ export async function createRoom(hostId, hostName) {
       color: hostColor,
       score: 0,
       lives: GAME_CONFIG.INITIAL_LIVES,
-      progress: 0
+      progress: 0,
+      avatar_url: avatarUrl
     }]);
   
   if (playerErr) throw playerErr;

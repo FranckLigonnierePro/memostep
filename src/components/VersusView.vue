@@ -23,8 +23,8 @@
         <div style="margin:10px 0; font-weight:600;">Joueurs ({{ (versusRoom?.players || defaultPlayers).length }}/4)</div>
         <div class="slots">
           <div v-for="i in 4" :key="i" class="slot">
-            <div class="badge" :style="{ background: slotColor(i-1), borderColor: slotColor(i-1) }">{{ i }}</div>
-            <img v-if="slots[i-1]" class="slot-avatar" :src="getAvatar(slots[i-1])" :alt="slotName(i-1)" />
+            <div v-if="!slots[i-1]" class="badge" :style="{ background: slotColor(i-1), borderColor: slotColor(i-1) }"></div>
+            <img v-if="slots[i-1]" class="slot-avatar" :src="getPlayerAvatar(slots[i-1])" :alt="slotName(i-1)" />
             <div class="name">
               {{ slotName(i-1) }}
             </div>
@@ -57,6 +57,7 @@ const emit = defineEmits(['close', 'begin']);
 
 const props = defineProps({
   code: { type: String, default: '' },
+  selectedAvatar: { type: Object, default: null },
   pauseMainMusic: { type: Function, default: null },
   resumeMainMusic: { type: Function, default: null },
 });
@@ -153,6 +154,23 @@ function getAvatar(p) {
   const k = playerKey(p);
   if (!k) return AVATARS[0];
   return avatarByKey.value[k] || AVATARS[Math.abs(hashString(k)) % AVATARS.length];
+}
+
+// Get player avatar - use their selected avatar if available, otherwise fallback to random
+function getPlayerAvatar(p) {
+  // If this is the local player and they have selected an avatar, use it
+  const me = playerId.value || ensurePlayerId();
+  if (p && p.id === me && props.selectedAvatar && props.selectedAvatar.img) {
+    return props.selectedAvatar.img;
+  }
+  
+  // If player has an avatar_url stored in the database, use it
+  if (p && p.avatar_url) {
+    return p.avatar_url;
+  }
+  
+  // Fallback to the random avatar system
+  return getAvatar(p);
 }
 
 function slotName(idx) {
@@ -267,7 +285,8 @@ async function handleCreateRoom() {
   } catch (e) { versusError.value = 'Supabase non configuré'; return; }
   try {
     const pid = playerId.value || ensurePlayerId();
-    const code = await createRoom(pid, name);
+    const avatarUrl = (props.selectedAvatar && props.selectedAvatar.img) ? props.selectedAvatar.img : null;
+    const code = await createRoom(pid, name, avatarUrl);
     versusCode.value = code;
     versusIsHost.value = true;
     subscribeToRoom(code);
@@ -288,8 +307,9 @@ async function handleJoinRoom() {
   } catch (e) { versusError.value = 'Supabase non configuré'; return; }
   try {
     const pid = playerId.value || ensurePlayerId();
+    const avatarUrl = (props.selectedAvatar && props.selectedAvatar.img) ? props.selectedAvatar.img : null;
     console.log('[VersusView] Tentative de rejoindre la room:', code);
-    const room = await joinRoom(code, pid, name);
+    const room = await joinRoom(code, pid, name, avatarUrl);
     console.log('[VersusView] Join réussi, room reçue avec', room?.players?.length, 'joueurs');
     versusCode.value = code;
     versusIsHost.value = false;
