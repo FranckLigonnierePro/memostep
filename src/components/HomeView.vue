@@ -24,7 +24,7 @@
           <Heart :size="18" />
           <span>{{ $t('home.support') }}</span>
         </a>
-        <div class="w-full h-12 mt-6 flex justify-center relative">
+        <div class="w-full h-12 mt-4 flex justify-center align-center relative">
           <button class="menu-btn mr-2 w-11 h-11" @click="emit('help')" :aria-label="$t('home.help')" :title="$t('home.help')">
             <HelpCircle :size="20" />
           </button>

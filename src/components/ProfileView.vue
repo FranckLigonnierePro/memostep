@@ -1,6 +1,6 @@
 <template>
   <div class="profile-view">
-    <div class="flex flex-col mt-4 w-full grow justify-center " style="height: 100%;">
+    <div class="flex flex-col mt-4 w-full grow justify-center" style="height: 100%;">
       <p class="profile-title">Choisis ton personnage</p>
       <div class="cards-grid">
         <button
@@ -74,12 +74,13 @@ const cards = [
 
 .cards-grid {
   display: grid;
+  align-items: center;
+  height: 420px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   /* Make the grid scrollable within the available space */
   max-height: 60vh;
   overflow: auto;
-  padding-right: 4px; /* room for scrollbar */
 }
 
 .char-card {

@@ -15,7 +15,7 @@
           : {}"
         @click="openProfile"
       >
-        <span v-if="!selectedAvatar || !selectedAvatar.img">Profil</span>
+        <span v-if="!selectedAvatar || !selectedAvatar.img">          <User :size="18" aria-hidden="true" /></span>
       </button>
     </div>
     
@@ -255,6 +255,7 @@ import frFlag from './assets/fr.png';
 import enFlag from './assets/en.png';
 import esFlag from './assets/es.png';
 import deFlag from './assets/de.png';
+import { User } from 'lucide-vue-next';
 import themeUrl from './assets/memosteptheme.mp3';
 import crackTexture from './assets/crack.png';
 import {
