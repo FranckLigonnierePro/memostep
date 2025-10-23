@@ -374,29 +374,48 @@ function bubbleTextColor(bg) {
   return '#0f1020';
 }
 
-// Get avatar for a player from current no-duplicate mapping, with stable fallback
+// Get avatar for a player: prefer real avatar (self selectedAvatar or player.avatar_url),
+// then fallback to no-duplicate mapping. Apply frost variant only for built-in avatars.
 function getAvatar(player) {
   const key = playerKey(player);
   if (!key) return AVATARS[0];
-  const mapped = avatarByKey.value[key];
-  // If player is frozen, switch to frost variant based on their base avatar
+
+  // Determine frozen state
   const isSelf = !!(player && props && String(player.id || '') === String(props.selfId || ''));
   const localFrozen = !!(isSelf && props && props.frozenGrid);
   const isFrozen = !!(player && (player.isFrozen || (player.frozenClicks || player.frozen_clicks || 0) > 0 || localFrozen));
-  if (isFrozen && mapped) {
-    if (mapped === warriorAvatar) return warriorFrost;
-    if (mapped === mageAvatar) return mageFrost;
-    // For generated avatars, default to mage frost
-    return mageFrost;
+
+  // 1) Self-selected avatar takes priority
+  if (isSelf && props.selectedAvatar && props.selectedAvatar.img) {
+    const base = props.selectedAvatar.img;
+    // For custom avatars, keep the same image when frozen (visual effect comes from CSS)
+    return base;
   }
-  if (mapped) return mapped;
-  // Fallback: hash-based pick (should rarely be used)
+
+  // 2) Player-provided avatar from backend
+  if (player && player.avatar_url) {
+    const base = player.avatar_url;
+    return base;
+  }
+
+  // 3) Fallback to mapped built-in avatars without duplicates among current players
+  const mapped = avatarByKey.value[key];
+  if (mapped) {
+    if (isFrozen) {
+      if (mapped === warriorAvatar) return warriorFrost;
+      if (mapped === mageAvatar) return mageFrost;
+      return mapped; // keep generated/custom mapped image as-is
+    }
+    return mapped;
+  }
+
+  // 4) Last-resort: hash-based pick
   const idx = Math.abs(hashString(key)) % AVATARS.length;
   const base = AVATARS[idx];
   if (isFrozen) {
     if (base === warriorAvatar) return warriorFrost;
     if (base === mageAvatar) return mageFrost;
-    return mageFrost;
+    return base;
   }
   return base;
 }

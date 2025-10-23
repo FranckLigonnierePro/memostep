@@ -9,6 +9,7 @@
         <img :src="logoSrc" alt="Logo" class="logo" :width="state.showHome ? 200 : 125" :height="state.showHome ? 200 : 100">
       </div>
       <button
+      v-if="state.showHome"
         class="menu-btn w-11 h-11"
         :style="(selectedAvatar && selectedAvatar.img)
           ? { backgroundImage: `url(${selectedAvatar.img})`, backgroundSize: '180%', backgroundPosition: '45% 20%', backgroundRepeat: 'no-repeat' }
@@ -564,12 +565,14 @@ const versusPlayers = computed(() => {
     const frozenClicks = Number(p && p.frozen_clicks != null ? p.frozen_clicks : 0);
     const isFrozen = frozenClicks > 0;
     console.log('[versusPlayers] Player:', { id: p?.id?.slice(0,6), name, progress, storedProg, isMe: p?.id === me, frozenClicks, isFrozen });
-    return { id: p.id, name, wins, progress, color, frozenClicks, isFrozen };
+    // Include avatar_url so BoardView can render the correct image
+    return { id: p.id, name, wins, progress, color, frozenClicks, isFrozen, avatar_url: p.avatar_url };
   });
 });
 
 // Map each player to a deterministic path and a fixed starting column (0..3)
 const versusPathsByPlayer = computed(() => {
+  console.log('[versusPathsByPlayer] CALLED - mode:', state.mode, 'seed:', versusSeed.value);
   console.log('[versusPathsByPlayer] 🔵 CALLED - mode:', state.mode, 'seed:', versusSeed.value);
   if (state.mode !== 'versus') return {};
   const room = versusRoom.value;
