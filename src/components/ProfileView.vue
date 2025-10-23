@@ -40,6 +40,10 @@ import imgDanseur from '../assets/profils/danseur.png';
 import imgInventeur from '../assets/profils/inventeur.png';
 import imgShadow from '../assets/profils/shadow.png';
 import imgAstre from '../assets/profils/astre.png';
+import imgColosse from '../assets/profils/colosse.png';
+import imgChrono from '../assets/profils/chrono.png';
+import imgHack from '../assets/profils/hack.png';
+import imgArchie from '../assets/profils/archie.png';
 
 const cards = [
   { id: 'guerriere', name: 'Guerrière', img: imgGuerriere, color: '#ff5a8a', glow: 'rgba(255,90,138,0.45)' },
@@ -54,7 +58,10 @@ const cards = [
   { id: 'inventeur', name: 'Inventeur', img: imgInventeur, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
   { id: 'shadow', name: 'Shadow', img: imgShadow, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
   { id: 'astre', name: 'Astre', img: imgAstre, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
-  { id: 'astre', name: 'Astre', img: imgAstre, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
+  { id: 'colosse', name: 'Colosse', img: imgColosse, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
+  { id: 'chrono', name: 'Chrono', img: imgChrono, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
+  { id: 'hack', name: 'Hack', img: imgHack, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
+  { id: 'archie', name: 'Archie', img: imgArchie, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
 ];
 </script>
 
