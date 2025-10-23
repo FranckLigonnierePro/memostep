@@ -1,8 +1,8 @@
 <template>
   <div class="app-frame">
-    <!-- <div class="left-view">
+    <div class="left-view">
       <KoFiDonors src="/api/Supporters_638967188676245800.csv" />
-    </div> -->
+    </div> 
     <div class="content" :style="{ transform: `scale(${rootScale})`}">
     <div :class="'header' + (!state.showHome ? ' small' : '')">
       <div class="logo-container">
@@ -1992,14 +1992,6 @@ html, body, #app {
   100% { transform: scale(1); }
 }
 
-.left-view {
-    display: flex;
-    height: 100%;
-    flex: 1 1 0%;
-    flex-direction: column;
-    align-items: flex-end;
-    justify-content: center;
-}
 .menu-btn {
   padding: 12px;
   border-radius: 10px;

@@ -160,7 +160,7 @@ onMounted(async () => {
 <template>
 <section>
 
-<ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+<ul class="grid grid-cols-1 gap-4">
 <li v-for="(d, i) in donors" :key="d.id || i" class="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-4 shadow-sm hover:shadow-md transition">
 <div class="flex items-center gap-3">
 <div class="shrink-0 w-12 h-12 rounded-full overflow-hidden border" :style="{ borderColor: color }">
