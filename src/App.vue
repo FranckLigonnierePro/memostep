@@ -558,7 +558,11 @@ const versusPlayers = computed(() => {
   return roster.map(p => {
     const wins = Number(p && p.score != null ? p.score : 0);
     // Prefer live local progress for self, otherwise use stored progress
-    const storedProg = Number(p && p.progress != null ? p.progress : 0);
+    let storedProg = Number(p && p.progress != null ? p.progress : 0);
+    // Support integer percentage (0..100) or float (0..1)
+    if (storedProg > 1) {
+      storedProg = Math.min(1, storedProg / 100);
+    }
     const progress = (p && p.id === me) ? (Number(versusProgress.value) || 0) : storedProg;
     const name = (p && p.name) ? String(p.name) : 'Player';
     const color = (p && p.color) ? String(p.color) : '#ffffff';
@@ -1027,6 +1031,7 @@ function hidePath() {
   if (state.mode === 'versus') {
     // Start auto-publish ticker
     startProgressAutoPublish();
+    if (versusCode.value && !versusUnsub) { subscribeToRoom(versusCode.value); }
   }
 
   // Trigger flip wave animation briefly
@@ -1466,7 +1471,7 @@ function handleBeginVersusFromLobby(payload) {
         beginVersus(payload.seed, payload.startAtMs);
       }
       // VersusView keeps its subscription alive; App.vue will also subscribe to ensure updates during gameplay
-      if (versusCode.value && !versusUnsub) subscribeToRoom(versusCode.value);
+      if (versusCode.value) { if (versusUnsub) { try { versusUnsub(); } catch (_) {} } subscribeToRoom(versusCode.value); }
     }
   } finally {
     showVersusView.value = false;

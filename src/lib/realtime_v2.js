@@ -254,11 +254,12 @@ export async function usePower(code, playerId, powerType) {
 export async function setPlayerProgress(code, playerId, progress) {
   initRealtime();
   const p = Math.max(0, Math.min(1, Number(progress) || 0));
+  const percent = Math.round(p * 100);
   
   // Try update first (more performant than read-then-write)
   const { data: updated, error: upErr } = await supabase
     .from('players')
-    .update({ progress: p })
+    .update({ progress: percent })
     .eq('room_code', code)
     .eq('player_id', playerId)
     .select();
@@ -284,7 +285,7 @@ export async function setPlayerProgress(code, playerId, progress) {
         color,
         score: 0,
         lives: GAME_CONFIG.INITIAL_LIVES,
-        progress: p,
+        progress: percent,
         current_round: 1
       }]);
     if (insErr) throw insErr;
