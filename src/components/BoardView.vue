@@ -11,10 +11,10 @@
             <div
               v-for="(cell, idx) in cells"
               :key="idx"
-              :class="['cell', { 'no-interaction': !revealComplete }]"
+              :class="['cell', { 'no-interaction': !revealComplete || !canClickCell(cell.r, cell.c) }]"
               :data-r="cell.r"
               :data-c="cell.c"
-              @click="revealComplete ? emit('cellClick', cell.r, cell.c) : null"
+              @click="(revealComplete && canClickCell(cell.r, cell.c)) ? emit('cellClick', cell.r, cell.c) : null"
             >
               <div class="cell-inner" :class="{ frozen: frozenGrid }" :style="pathRevealStyle(cell.r, cell.c)">
                 <div class="cell-face front" :class="cellClass(cell.r, cell.c)">
@@ -57,7 +57,7 @@
                 v-for="p in (versusPlayers || [])"
                 :key="p.id || p.name"
                 :class="['player-bubble', { frozen: playerIsFrozen(p), 'just-frozen': isJustFrozen(p) }]"
-                :style="playerBubblePosition(p)"
+                :style="playerBubbleStyle(p)"
                 :title="`${p.name}`"
               >
                 <div class="bubble-content">
@@ -174,6 +174,14 @@ const AVATARS = [mageAvatar, warriorAvatar, genAvatar1, genAvatar2];
 
 function playerKey(player) {
   return String(player?.id || player?.name || '');
+}
+
+// Merge position with z-index so the local player's bubble renders above others when overlapping
+function playerBubbleStyle(player) {
+  const base = playerBubblePosition(player);
+  const isSelf = !!(player && String(player.id || '') === String(props.selfId || ''));
+  const z = isSelf ? 100 : 10;
+  return { ...base, zIndex: String(z) };
 }
 
 // Determines if the given player is currently frozen (includes local self freeze)
@@ -447,6 +455,28 @@ function showHeart(r, c) {
   return props.heartCell.r === r && props.heartCell.c === c;
 }
 
+// Compute the next playable row from the local player's path and nextIndex (playerProgress)
+function nextPlayableRow() {
+  try {
+    const path = Array.isArray(props.path) ? props.path : [];
+    const nextIndex = Math.max(0, Math.min(Number(props.playerProgress) || 0, path.length));
+    if (nextIndex >= path.length) return null; // no more moves
+    const nextCell = path[nextIndex];
+    return (nextCell && typeof nextCell.r === 'number') ? Number(nextCell.r) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Allow click only on cells that are on the next playable row
+function canClickCell(r, c) {
+  // Only during input phase (revealComplete true) — class/click already guard this, but be explicit
+  if (!props.revealComplete) return false;
+  const row = nextPlayableRow();
+  if (row == null) return false;
+  return Number(r) === Number(row);
+}
+
 // Generate broken crack patterns
 function brokenCrackStyle(crackIndex) {
   const patterns = [
@@ -525,6 +555,8 @@ function brokenCrackStyle(crackIndex) {
   transition: all 0.3s ease-out;
   pointer-events: none;
   animation: bubbleBounce 0.5s ease-out;
+  position: relative; /* enable z-index stacking within grid cell */
+  z-index: 1;
 }
 
 /* When frozen: keep a subtle scale up and blue glow */
