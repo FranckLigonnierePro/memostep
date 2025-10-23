@@ -10,6 +10,7 @@ const GAME_CONFIG = {
   INITIAL_LIVES: 3,
   ROUND_DELAY_MS: 1500,
   CODE_LENGTH: 6,
+  MAX_PLAYERS: 4,
 };
 
 let supabase = null;
@@ -266,6 +267,10 @@ export async function setPlayerProgress(code, playerId, progress) {
   // If no rows updated, player doesn't exist yet - create it
   if (!updated || updated.length === 0) {
     const players = await getRoomPlayers(code);
+    // Do not create a new player if room is full
+    if (players.length >= GAME_CONFIG.MAX_PLAYERS) {
+      return null;
+    }
     const usedColors = players.map(pl => pl.color);
     const color = pickAvailableColor(usedColors);
     
@@ -330,6 +335,9 @@ export async function joinRoom(code, playerId, name) {
   } else {
     // Create new player
     const players = await getRoomPlayers(code);
+    if (players.length >= GAME_CONFIG.MAX_PLAYERS) {
+      throw new Error('La salle est pleine (4 joueurs max)');
+    }
     const usedColors = players.map(p => p.color);
     const color = pickAvailableColor(usedColors);
     
@@ -628,6 +636,11 @@ export async function reportLifeLoss(code, loserId, winnerIdIfBusted) {
   } else {
     // Create player if doesn't exist
     const players = await getRoomPlayers(code);
+    // If room is full, do not create a new player entry
+    if (players.length >= GAME_CONFIG.MAX_PLAYERS) {
+      const room = await getRoomWithPlayers(code);
+      return room;
+    }
     const usedColors = players.map(p => p.color);
     const color = pickAvailableColor(usedColors);
     

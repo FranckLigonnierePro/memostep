@@ -20,9 +20,9 @@
         <div style="display:flex; gap:8px; align-items:center; justify-content:center;">
           <button class="btn" @click="copyJoinLink">{{ copied ? 'Code copié' : 'Copier le code d\'invitation' }}</button>
         </div>
-        <div style="margin:10px 0; font-weight:600;">Joueurs ({{ (versusRoom?.players || defaultPlayers).length }}/8)</div>
+        <div style="margin:10px 0; font-weight:600;">Joueurs ({{ (versusRoom?.players || defaultPlayers).length }}/4)</div>
         <div class="slots">
-          <div v-for="i in 8" :key="i" class="slot">
+          <div v-for="i in 4" :key="i" class="slot">
             <div class="badge" :style="{ background: slotColor(i-1), borderColor: slotColor(i-1) }">{{ i }}</div>
             <img v-if="slots[i-1]" class="slot-avatar" :src="getAvatar(slots[i-1])" :alt="slotName(i-1)" />
             <div class="name">
@@ -132,8 +132,8 @@ const defaultPlayers = computed(defaultPlayersComputed);
 
 const slots = computed(() => {
   const list = (versusRoom.value && Array.isArray(versusRoom.value.players)) ? versusRoom.value.players : defaultPlayers.value;
-  const arr = new Array(8).fill(null);
-  for (let i = 0; i < Math.min(8, list.length); i++) arr[i] = list[i];
+  const arr = new Array(4).fill(null);
+  for (let i = 0; i < Math.min(4, list.length); i++) arr[i] = list[i];
   return arr;
 });
 

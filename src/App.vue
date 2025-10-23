@@ -80,6 +80,7 @@
       :showSnowstorm="state.showSnowstorm"
       :powerAvailable="!state.powerUsed"
       :path="state.path"
+      :versusPathsByPlayer="versusPathsByPlayer"
       :revealed="state.revealed"
       :heartCell="state.heartCell"
       :shakeActive="shakeActive"
@@ -564,6 +565,25 @@ const versusPlayers = computed(() => {
   });
 });
 
+// Map each player to a deterministic path and a fixed starting column (0..3)
+const versusPathsByPlayer = computed(() => {
+  if (state.mode !== 'versus') return {};
+  const room = versusRoom.value;
+  const roster = (room && Array.isArray(room.players)) ? room.players.slice(0, COLS) : [];
+  if (!versusSeed.value || !versusStartAtMs.value) return {};
+  const roundSeed = Number(versusSeed.value) || 0;
+  const map = {};
+  roster.forEach((p, idx) => {
+    const startCol = idx % COLS; // fixed column assignment per join order
+    // Derive a stable seed per player to vary paths while staying in sync across clients
+    const idHash = Math.abs(hashString(String(p.id || p.name || ''))) % 100000;
+    const seed = roundSeed + (idx + 1) * 10000 + idHash;
+    const rng = seededRng(seed >>> 0);
+    map[p.id] = randomPathWithRngAndStart(rng, startCol);
+  });
+  return map;
+});
+
 // Update local freeze state from room data
 function updateFreezeState() {
   if (state.mode !== 'versus') return;
@@ -779,9 +799,34 @@ function seededRng(seed) {
   };
 }
 
+// Simple deterministic string hash
+function hashString(s) {
+  let hash = 0;
+  const str = String(s || '');
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
+}
+
 function randomPathWithRng(rng) {
   const arr = [];
   let c = Math.floor(rng() * COLS);
+  for (let r = ROWS - 1; r >= 0; r--) {
+    if (r < ROWS - 1) {
+      const moves = [-1, 0, 1].map(d => c + d).filter(nc => nc >= 0 && nc < COLS);
+      c = moves[Math.floor(rng() * moves.length)];
+    }
+    arr.push({ r, c });
+  }
+  return arr;
+}
+
+// Variant that forces a given starting column at the bottom row
+function randomPathWithRngAndStart(rng, startCol) {
+  const arr = [];
+  let c = Math.max(0, Math.min(COLS - 1, startCol));
   for (let r = ROWS - 1; r >= 0; r--) {
     if (r < ROWS - 1) {
       const moves = [-1, 0, 1].map(d => c + d).filter(nc => nc >= 0 && nc < COLS);
@@ -1538,6 +1583,8 @@ function beginVersus(baseSeed, startAtMs, currentRound = 1) {
   versusStartAtMs.value = startAtMs;
   state.mode = 'versus';
   state.showHome = false;
+  // Reset local cached progress so the bubble starts on the first cell
+  versusLastProgress.value = 0;
   // Prepare deterministic path
   const rng = seededRng(seed);
   state.path = randomPathWithRng(rng);

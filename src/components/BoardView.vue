@@ -39,6 +39,20 @@
                 </div>
               </div>
             </div>
+            <!-- Versus player bubbles positioned over the grid (inside board for perfect alignment) -->
+            <div v-if="mode === 'versus'" class="versus-players-overlay">
+              <div
+                v-for="p in (versusPlayers || [])"
+                :key="p.id || p.name"
+                :class="['player-bubble', { frozen: playerIsFrozen(p), 'just-frozen': isJustFrozen(p) }]"
+                :style="playerBubblePosition(p)"
+                :title="`${p.name}`"
+              >
+                <div class="bubble-content">
+                  <img class="bubble-avatar" :src="getAvatar(p)" :alt="p.name" />
+                </div>
+              </div>
+            </div>
           </div>
           <!-- Frozen clicks counter (centered over grid) -->
           <div v-if="frozenGrid" class="frozen-counter">
@@ -47,21 +61,7 @@
           </div>
         </div>
       </div>
-      <!-- Versus player bubbles positioned on the board -->
-      <div v-if="mode === 'versus'" class="versus-players-overlay">
-        <div
-          v-for="p in (versusPlayers || [])"
-          :key="p.id || p.name"
-          :class="['player-bubble', { frozen: playerIsFrozen(p), 'just-frozen': isJustFrozen(p) }]"
-          :style="playerBubblePosition(p)"
-          :title="`${p.name} - ${p.wins || 0}/5 victoires`"
-        >
-          <div class="bubble-content">
-            <img class="bubble-avatar" :src="getAvatar(p)" :alt="p.name" />
-          </div>
-          <div class="bubble-score">{{ p.wins || 0 }}/5</div>
-        </div>
-      </div>
+      
       <div class="flex flex-col items-center">
         <div class="side-actions">
           <div v-if="mode === 'solo'" class="card">
@@ -139,6 +139,7 @@ const props = defineProps({
   versusWins: { type: Number, default: 0 },
   versusProgress: { type: Number, default: 0 },
   versusPlayers: { type: Array, default: () => [] },
+  versusPathsByPlayer: { type: Object, default: () => ({}) },
   livesUsed: { type: Number, default: 0 },
   justLost: { type: Boolean, default: false },
   lastExtinguishedIndex: { type: Number, default: -1 },
@@ -274,47 +275,27 @@ function initial(name) {
 // Position player bubble vertically based on progress through the path
 function playerBubblePosition(player) {
   const prog = Math.max(0, Math.min(1, Number(player.progress) || 0));
-  const pathLength = props.path.length || 1;
-  
-  // Calculate which cell index the player is at
-  const cellIndex = Math.floor(prog * pathLength);
-  const actualIndex = Math.min(cellIndex, pathLength - 1);
-  
-  // Get the cell position from the path
-  if (actualIndex >= 0 && actualIndex < props.path.length) {
-    const cell = props.path[actualIndex];
+  const map = props.versusPathsByPlayer || {};
+  const fallback = props.path || [];
+  const playerPath = Array.isArray(map[player?.id]) && map[player.id].length ? map[player.id] : fallback;
+  const pathLength = playerPath.length || 1;
+
+  // Position on the last validated cell: nextIndex/len -> last index is nextIndex-1
+  // For remote players, we receive progress ~= nextIndex/len rounded
+  const lastIndex = Math.floor(prog * pathLength) - 1;
+  const actualIndex = Math.max(0, Math.min(lastIndex, pathLength - 1));
+  if (actualIndex >= 0 && actualIndex < playerPath.length) {
+    const cell = playerPath[actualIndex];
     if (cell) {
-      // Calculate vertical position based on row
-      const rowPercent = ((cell.r + 0.5) / props.rowsCount) * 100;
-      
-      // Check how many players are at the same cell index
-      const playersAtSameLevel = (props.versusPlayers || []).filter(p => {
-        const pProg = Math.max(0, Math.min(1, Number(p.progress) || 0));
-        const pCellIndex = Math.floor(pProg * pathLength);
-        return pCellIndex === cellIndex;
-      });
-      
-      // Find this player's index among players at the same level
-      const playerIndex = playersAtSameLevel.findIndex(p => 
-        (p.id || p.name) === (player.id || player.name)
-      );
-      
-      // Calculate horizontal offset based on player index
-      // Space players horizontally: -40px, 0px, 40px, etc.
-      const horizontalOffset = playerIndex * 45;
-      
       return {
-        top: `${rowPercent}%`,
-        left: `${horizontalOffset}px`,
+        gridRow: String((cell.r + 1)),
+        gridColumn: String((cell.c + 1)),
+        justifySelf: 'center',
+        alignSelf: 'center',
       };
     }
   }
-  
-  // Default to top if no valid position
-  return {
-    top: '5%',
-    left: '0px',
-  };
+  return { gridRow: '1', gridColumn: '1', justifySelf: 'center', alignSelf: 'center' };
 }
 
 function bubbleTextColor(bg) {
@@ -428,19 +409,21 @@ function brokenCrackStyle(crackIndex) {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: -60px;
-  width: 200px;
+  left: 0;
+  right: 0;
   pointer-events: none;
   z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  grid-template-rows: repeat(var(--rows), 1fr);
+  gap: 5px;
 }
 
 .player-bubble {
-  position: absolute;
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 6px;
-  transform: translateY(-50%);
   transition: all 0.3s ease-out;
   pointer-events: none;
   animation: bubbleBounce 0.5s ease-out;
@@ -463,12 +446,12 @@ function brokenCrackStyle(crackIndex) {
 }
 
 @keyframes frozenShake {
-  0%   { transform: translateY(-50%) translateX(0) scale(1); }
-  20%  { transform: translateY(-50%) translateX(-6px) scale(1.18); }
-  40%  { transform: translateY(-50%) translateX(6px)  scale(1.18); }
-  60%  { transform: translateY(-50%) translateX(-3px) scale(1.1); }
-  80%  { transform: translateY(-50%) translateX(3px)  scale(1.05); }
-  100% { transform: translateY(-50%) translateX(0)  scale(1); }
+  0%   { transform: translateX(0) scale(1); }
+  20%  { transform: translateX(-6px) scale(1.18); }
+  40%  { transform: translateX(6px)  scale(1.18); }
+  60%  { transform: translateX(-3px) scale(1.1); }
+  80%  { transform: translateX(3px)  scale(1.05); }
+  100% { transform: translateX(0)  scale(1); }
 }
 
 /* Subtle continuous wiggle for frozen bubble content (keeps base scale) */
@@ -525,14 +508,14 @@ function brokenCrackStyle(crackIndex) {
 
 @keyframes bubbleBounce {
   0% {
-    transform: translateY(-50%) scale(0.5);
+    transform: scale(0.5);
     opacity: 0;
   }
   60% {
-    transform: translateY(-50%) scale(1.1);
+    transform: scale(1.1);
   }
   100% {
-    transform: translateY(-50%) scale(1);
+    transform: scale(1);
     opacity: 1;
   }
 }
@@ -628,6 +611,7 @@ function brokenCrackStyle(crackIndex) {
   max-width: 100%;
   aspect-ratio: var(--cols) / var(--rows);
   perspective: 800px; /* enable 3D flip effect */
+  position: relative; /* positioning context for player overlay */
 }
 
 .board.shake {
