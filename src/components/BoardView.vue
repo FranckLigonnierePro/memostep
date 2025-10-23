@@ -18,6 +18,7 @@
             >
               <div class="cell-inner" :class="{ frozen: frozenGrid }" :style="pathRevealStyle(cell.r, cell.c)">
                 <div class="cell-face front" :class="cellClass(cell.r, cell.c)">
+                  <img v-if="!hasDecor(cell.r, cell.c)" class="cell-stone" :src="stone" alt="" />
                   <!-- Broken cell overlay for wrong cells -->
                   <div v-if="isCellWrong(cell.r, cell.c)" class="broken-overlay">
                     <div v-if="wrongCrackTexture" class="broken-image" :style="{ backgroundImage: `url(${wrongCrackTexture})` }"></div>
@@ -30,7 +31,9 @@
                     <Heart />
                   </div>
                 </div>
-                <div class="cell-face back" :class="cellClass(cell.r, cell.c)" />
+                <div class="cell-face back" :class="cellClass(cell.r, cell.c)">
+                  <img v-if="!hasDecor(cell.r, cell.c)" class="cell-stone" :src="stone" alt="" />
+                </div>
                 <!-- Ice overlay for frozen grid -->
                 <div v-if="frozenGrid" class="ice-overlay" :class="{ cracking: frozenClicksLeft <= 4 }">
                   <div class="ice-cracks" v-if="frozenClicksLeft <= 4">
@@ -125,6 +128,7 @@
 import { computed, ref, watch } from 'vue';
 import { Home, RotateCcw, Heart, Snowflake } from 'lucide-vue-next';
 import bgFirst from '../assets/bg-first.png';
+import stone from '../assets/stone.png';
 import mageAvatar from '../assets/mage/content.png';
 import warriorAvatar from '../assets/guerriere/fcontent.png';
 import mageFrost from '../assets/mage/givré.png';
@@ -446,6 +450,14 @@ function pathRevealStyle(r, c) {
 function isCellWrong(r, c) {
   const classes = props.cellClass(r, c);
   return classes.includes('wrong');
+}
+
+function hasDecor(r, c) {
+  const classes = props.cellClass(r, c) || [];
+  if (Array.isArray(classes)) {
+    return classes.includes('path') || classes.includes('start') || classes.includes('end') || classes.includes('correct') || classes.includes('wrong');
+  }
+  return false;
 }
 
 // Show heart only during input phase (revealComplete true and not revealed), on the exact cell
@@ -792,7 +804,7 @@ function brokenCrackStyle(crackIndex) {
   transition: all .12s ease;
   will-change: transform, background, border-color, box-shadow;
   box-shadow: 
-    0 4px 0 #0f1020,
+    0 4px 0 #2f2f2f,
     0 6px 10px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     inset 0 -1px 0 rgba(0, 0, 0, 0.3);
@@ -800,7 +812,7 @@ function brokenCrackStyle(crackIndex) {
 
 /* Front visuals (path/start/end/correct/wrong) */
 .cell-face.front { 
-  background: linear-gradient(145deg, #1f2340, #15172a);
+  background: transparent;
 }
 .cell-face.front.path { 
   background: linear-gradient(145deg, #1e90ff, #0b61d0);
@@ -892,14 +904,19 @@ function brokenCrackStyle(crackIndex) {
 }
 
 /* Outline the path on the back face */
-.cell-face.back.path  { 
-  background: linear-gradient(145deg, #1e90ff, #0b61d0);
-}
-.cell-face.back.start { 
-  background: linear-gradient(145deg, #1e90ff, #0b61d0);
-}
-.cell-face.back.end   { 
-  background: linear-gradient(145deg, #1e90ff, #0b61d0);
+.cell-face.back.path  { background: linear-gradient(145deg, #1e90ff, #0b61d0); }
+.cell-face.back.start { background: linear-gradient(145deg, #1e90ff, #0b61d0); }
+.cell-face.back.end   { background: linear-gradient(145deg, #1e90ff, #0b61d0); }
+
+/* Stone image filling the cell face */
+.cell-stone {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
 }
 
 /* Broken cell overlay for wrong cells */
