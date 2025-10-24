@@ -19,6 +19,11 @@
               <div class="cell-inner" :class="{ frozen: frozenGrid }" :style="pathRevealStyle(cell.r, cell.c)">
                 <div class="cell-face front" :class="cellClass(cell.r, cell.c)">
                   <img v-if="!hasDecor(cell.r, cell.c)" class="cell-stone" :src="stone" alt="" />
+                  <div v-if="isCellWrong(cell.r, cell.c)" class="stone-fade">
+                    <img class="stone-frame f1" :src="stone" alt="" />
+                    <img class="stone-frame f2" :src="stone2" alt="" />
+                    <img class="stone-frame f3" :src="stone3" alt="" />
+                  </div>
                   <!-- Broken cell overlay for wrong cells -->
                   <div v-if="isCellWrong(cell.r, cell.c)" class="broken-overlay">
                     <div v-if="wrongCrackTexture" class="broken-image" :style="{ backgroundImage: `url(${wrongCrackTexture})` }"></div>
@@ -129,6 +134,8 @@ import { computed, ref, watch } from 'vue';
 import { Home, RotateCcw, Heart, Snowflake } from 'lucide-vue-next';
 import bgFirst from '../assets/bg-first.png';
 import stone from '../assets/stone.png';
+import stone2 from '../assets/stone2.png';
+import stone3 from '../assets/stone3.png';
 import mageAvatar from '../assets/mage/content.png';
 import warriorAvatar from '../assets/guerriere/fcontent.png';
 import mageFrost from '../assets/mage/givré.png';
@@ -779,7 +786,7 @@ function brokenCrackStyle(crackIndex) {
   pointer-events: none;
 }
 
-.cell:hover .cell-face.front { 
+.cell:hover .cell-face.front:not(.wrong) { 
   filter: brightness(1.1);
 }
 .cell:active .cell-face.front { 
@@ -871,14 +878,13 @@ function brokenCrackStyle(crackIndex) {
   animation: correctPulse 0.6s ease-out;
 }
 .cell-face.front.wrong { 
-  background: linear-gradient(145deg, #e74c3c, #c0392b);
+  background: radial-gradient(circle at center center, #ff0000 , #e63d1f , #4400ff00 , #4400ff00);
   box-shadow: 
-    0 4px 0 var(--bad),
-    0 6px 20px rgba(239, 68, 68, 0.8),
-    0 0 30px rgba(239, 68, 68, 0.6),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-  filter: brightness(1.3);
+    0 4px 0 #232020,
+    0 6px 10px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(189, 182, 182, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  filter: brightness(1.8);
   animation: wrongPulse 0.6s ease-out;
 }
 
@@ -917,6 +923,47 @@ function brokenCrackStyle(crackIndex) {
   object-fit: cover;
   border-radius: inherit;
   display: block;
+}
+
+.stone-fade {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.stone-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  opacity: 0;
+}
+
+.stone-frame.f1 { animation: stoneFade1 420ms ease-out forwards; }
+.stone-frame.f2 { animation: stoneFade2 420ms ease-out forwards; }
+.stone-frame.f3 { animation: stoneFade3 420ms ease-out forwards; }
+
+@keyframes stoneFade1 {
+  0% { opacity: 1; }
+  33% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+@keyframes stoneFade2 {
+  0% { opacity: 0; }
+  33% { opacity: 1; }
+  66% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+@keyframes stoneFade3 {
+  0% { opacity: 0; }
+  66% { opacity: 1; }
+  100% { opacity: 1; }
 }
 
 /* Broken cell overlay for wrong cells */
@@ -1106,7 +1153,7 @@ function brokenCrackStyle(crackIndex) {
   filter: brightness(1.3);
   animation: correctPulse 0.6s ease-out;
 }
-.cell-face.back.wrong { 
+/* .cell-face.back.wrong { 
   background: linear-gradient(145deg, #e74c3c, #c0392b);
   box-shadow: 
     0 4px 0 var(--bad),
@@ -1116,7 +1163,7 @@ function brokenCrackStyle(crackIndex) {
     inset 0 -1px 0 rgba(0, 0, 0, 0.2);
   filter: brightness(1.3);
   animation: wrongPulse 0.6s ease-out;
-}
+} */
 
 /* Ice overlay for frozen grid */
 .ice-overlay {

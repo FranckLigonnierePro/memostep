@@ -36,14 +36,16 @@ function timeAgo(input?: string | number | Date) {
   if (!input) return ''
   const d = new Date(input)
   if (isNaN(d.getTime())) return ''
-  const diff = Math.floor((Date.now() - d.getTime()) / 1000)
-  if (diff < 60) return `il y a ${diff}s`
-  const m = Math.floor(diff / 60)
-  if (m < 60) return `il y a ${m}min`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `il y a ${h}h`
-  const days = Math.floor(h / 24)
-  return `il y a ${days}j`
+  const seconds = Math.trunc((d.getTime() - Date.now()) / 1000)
+  const rtf = new Intl.RelativeTimeFormat((typeof navigator !== 'undefined' && navigator.language) ? navigator.language : 'fr-FR', { numeric: 'auto' })
+  const abs = Math.abs(seconds)
+  if (abs < 60) return rtf.format(seconds, 'second')
+  const minutes = Math.trunc(seconds / 60)
+  if (Math.abs(minutes) < 60) return rtf.format(minutes, 'minute')
+  const hours = Math.trunc(minutes / 60)
+  if (Math.abs(hours) < 24) return rtf.format(hours, 'hour')
+  const days = Math.trunc(hours / 24)
+  return rtf.format(days, 'day')
 }
 
 function formatAmount(amount?: number, currency?: string) {
@@ -110,6 +112,15 @@ function toNumberEU(s?: string): number | undefined {
   return Number.isFinite(n) ? n : undefined
 }
 
+function normalizeUtc(s: string): string {
+  const t = s.trim()
+  if (!t) return t
+  // If timezone information already present, keep as-is
+  if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(t)) return t
+  // Replace space with 'T' if present and append 'Z' to mark UTC
+  return t.replace(' ', 'T') + 'Z'
+}
+
 function mapCsvDonors(rows: Record<string, string>[]): Donor[] {
   return rows.map((r, idx) => {
     // handle potential quoted/bom headers
@@ -120,7 +131,7 @@ function mapCsvDonors(rows: Record<string, string>[]): Donor[] {
       id: r['LastestTransactionId'] || idx,
       from_name: name,
       is_public: true,
-      timestamp: ts,
+      timestamp: ts ? normalizeUtc(ts) : undefined,
       amount: toNumberEU(total),
       currency: 'EUR',
       message: undefined,
