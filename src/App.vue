@@ -1905,8 +1905,8 @@ onBeforeUnmount(() => {
   --gap: 8px;            /* espace entre cases */
   --pad: 12px;           /* padding du board */
   --accent: #6F08EF;
-  --ok: #12b886;
-  --bad: #ff2e5f;
+  --ok: #12b847;
+  --bad: #fd1919;
   --bg: #0f1020;
   --panel: #17192c;
   --text: #e7e7ee;

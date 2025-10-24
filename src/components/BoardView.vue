@@ -838,7 +838,7 @@ function brokenCrackStyle(crackIndex) {
 .cell-face.front.path { 
   background: linear-gradient(145deg, #1e90ff, #0b61d0);
   box-shadow: 
-    0 4px 0 #0b3a7a,
+    0 4px 0 #2276ed,
     0 0 18px rgba(30, 144, 255, 0.9),
     0 0 36px rgba(30, 144, 255, 0.7),
     inset 0 1px 0 rgba(255, 255, 255, 0.25),
@@ -865,7 +865,7 @@ function brokenCrackStyle(crackIndex) {
 .cell-face.front.start { 
   background: linear-gradient(145deg, #1e90ff, #0b61d0);
   box-shadow: 
-    0 4px 0 #0b3a7a,
+    0 4px 0 #2276ed,
     0 0 18px rgba(30, 144, 255, 0.9),
     0 0 36px rgba(30, 144, 255, 0.7),
     inset 0 1px 0 rgba(255, 255, 255, 0.25),
@@ -874,7 +874,7 @@ function brokenCrackStyle(crackIndex) {
 .cell-face.front.end { 
   background: linear-gradient(145deg, #1e90ff, #0b61d0);
   box-shadow: 
-    0 4px 0 #0b3a7a,
+    0 4px 0 #2276ed,
     0 0 18px rgba(30, 144, 255, 0.9),
     0 0 36px rgba(30, 144, 255, 0.7),
     inset 0 1px 0 rgba(255, 255, 255, 0.25),
@@ -1157,7 +1157,7 @@ function brokenCrackStyle(crackIndex) {
 
 /* Override when the cell is marked correct/wrong during play */
 .cell-face.back.correct { 
-  background: linear-gradient(145deg, #2ecc71, #27ae60);
+  background: linear-gradient(145deg, #2ecc4b, #27ae44);
   box-shadow: 
     0 4px 0 var(--ok),
     0 6px 20px rgba(18, 184, 134, 0.8),
