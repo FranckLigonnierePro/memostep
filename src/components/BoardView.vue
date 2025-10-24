@@ -26,13 +26,6 @@
                     <img class="stone-frame f2" :src="stone2" alt="" />
                     <img class="stone-frame f3" :src="stone3" alt="" />
                   </div>
-                  <!-- Broken cell overlay for wrong cells -->
-                  <div v-if="isCellWrong(cell.r, cell.c)" class="broken-overlay">
-                    <div v-if="wrongCrackTexture" class="broken-image" :style="{ backgroundImage: `url(${wrongCrackTexture})` }"></div>
-                    <div v-else class="broken-cracks">
-                      <div v-for="n in 6" :key="n" class="broken-crack" :style="brokenCrackStyle(n)"></div>
-                    </div>
-                  </div>
                   <!-- Heart drop (solo reward) -->
                   <div v-if="showHeart(cell.r, cell.c)" class="heart-drop" title="+1 vie">
                     <Heart />
@@ -825,7 +818,7 @@ function brokenCrackStyle(crackIndex) {
   transition: all .12s ease;
   will-change: transform, background, border-color, box-shadow;
   box-shadow: 
-    0 4px 0 #2f2f2f,
+    0 4px 0 #3d3f3d,
     0 6px 10px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     inset 0 -1px 0 rgba(0, 0, 0, 0.3);
@@ -894,11 +887,11 @@ function brokenCrackStyle(crackIndex) {
 .cell-face.front.wrong { 
   background: radial-gradient(circle at center center, #ff0000 , #e63d1f , #4400ff00 , #4400ff00);
   box-shadow: 
-    0 4px 0 #232020,
+    0 4px 0 #3d3f3d,
     0 6px 10px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(189, 182, 182, 0.1),
     inset 0 -1px 0 rgba(0, 0, 0, 0.3);
-  filter: brightness(1.8);
+  filter: brightness(0.9);
   animation: wrongPulse 0.6s ease-out;
 }
 
@@ -980,64 +973,6 @@ function brokenCrackStyle(crackIndex) {
   100% { opacity: 1; }
 }
 
-/* Broken cell overlay for wrong cells */
-.broken-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(145deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6));
-  border-radius: 10px;
-  pointer-events: none;
-  z-index: 5;
-  animation: brokenAppear 0.3s ease-out;
-}
-
-.broken-image {
-  position: absolute;
-  inset: 0;
-  border-radius: 10px;
-  background-repeat: no-repeat;
-  background-size: cover;
-  background-position: center;
-  opacity: 0.9;
-  filter: drop-shadow(0 0 6px rgba(0,0,0,0.4));
-}
-
-.broken-cracks {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  border-radius: 10px;
-}
-
-.broken-crack {
-  position: absolute;
-  background: rgba(255, 255, 255, 0.3);
-  box-shadow: 
-    0 0 3px rgba(0, 0, 0, 0.8),
-    inset 0 0 2px rgba(255, 255, 255, 0.5);
-  transform-origin: center;
-  animation: crackGrow 0.3s ease-out;
-}
-
-@keyframes brokenAppear {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes crackGrow {
-  from {
-    opacity: 0;
-    transform: scale(0.5);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
 
 /* Heart blink animation for power card */
 .heart.blink {
@@ -1202,13 +1137,6 @@ function brokenCrackStyle(crackIndex) {
   overflow: hidden;
 }
 
-.crack {
-  position: absolute;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
-  transform-origin: center;
-  animation: crackAppear 0.3s ease-out;
-}
 
 @keyframes crackAppear {
   from {
