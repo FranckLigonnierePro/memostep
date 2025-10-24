@@ -271,6 +271,19 @@
       </div>
     </div>
 
+    <!-- Username prompt modal -->
+    <div v-if="showNameModal" class="modal-overlay" @click.self="closeNameModal">
+      <div class="modal-card">
+        <h2 class="modal-title">Choisis un pseudo</h2>
+        <div class="modal-body" style="display:flex; gap:8px; justify-content:center;">
+          <input v-model="nameModalInput" placeholder="Ton pseudo" class="input" style="height: 42px; width: 70%;" />
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn" @click="saveNameFromModal">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Power Wheel for Versus mode (DISABLED) -->
     <!-- <PowerWheel
       :visible="showPowerWheel"
@@ -507,6 +520,36 @@ const playerId = ref(null);
 const versusRoom = ref(null); // latest room snapshot
 const versusLastProgress = ref(0); // Keep last progress to avoid bubble drop between rounds
 const defaultPlayers = computed(() => [{ id: playerId.value || ensurePlayerId(), name: (usernameInput.value || 'Player') }]);
+
+// Username modal state and helpers
+const showNameModal = ref(false);
+const nameModalInput = ref('');
+
+function openNameModalIfNeeded() {
+  try {
+    const raw = localStorage.getItem('memostep_username');
+    const saved = (raw == null ? '' : String(raw)).trim();
+    if (!saved && state.showHome && !showProfileView.value && !showVersusView.value) {
+      nameModalInput.value = '';
+      showNameModal.value = true;
+    }
+  } catch (_) {
+    if (state.showHome && !showProfileView.value && !showVersusView.value) {
+      nameModalInput.value = '';
+      showNameModal.value = true;
+    }
+  }
+}
+
+function saveNameFromModal() {
+  const v = String(nameModalInput.value || '').trim();
+  if (!v) return;
+  try { localStorage.setItem('memostep_username', v); } catch(_) {}
+  usernameInput.value = v;
+  showNameModal.value = false;
+}
+
+function closeNameModal() { showNameModal.value = false; }
 
 // Language state
 const currentLang = ref('fr');
@@ -1839,6 +1882,8 @@ async function goHome() {
   } catch (_) { dailyAttempts.value = 0; }
   // reset solo lives when returning home
   soloLivesUsed.value = 0;
+  // Prompt for username if missing when back on Home
+  openNameModalIfNeeded();
 }
 
 function startRevealTicker() {
@@ -1964,6 +2009,8 @@ onMounted(() => {
       selectedAvatar.value = JSON.parse(savedAvatar);
     }
   } catch (_) {}
+  // If starting on Home, prompt for username if missing
+  openNameModalIfNeeded();
 });
 
 onBeforeUnmount(() => {
