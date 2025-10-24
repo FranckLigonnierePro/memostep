@@ -1,7 +1,7 @@
 <template>
   <div class="app-frame">
     <div class="left-view">
-      <KoFiDonors src="/api/Supporters_638967188676245800.csv" />
+      <KoFiDonors src="/api/supporters.csv" />
     </div> 
     <div class="content" :style="{ transform: `scale(${rootScale})`}">
     <div :class="'header' + (!state.showHome ? ' small' : '')">
