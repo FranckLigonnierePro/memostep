@@ -1,8 +1,23 @@
 <template>
   <div class="app-frame">
-    <div class="left-view">
+    <div class="content left-view" :style="{ transform: `scale(${rootScale})`}">
+       <div :class="'header' + (!state.showHome ? ' small' : '')">
+      <div class="logo-container">
+        <img :src="logoSrc" alt="Logo" class="logo" :width="state.showHome ? 200 : 125" :height="state.showHome ? 200 : 100">
+      </div>
+      <button
+      v-if="state.showHome"
+        class="menu-btn w-11 h-11"
+        :style="(selectedAvatar && selectedAvatar.img)
+          ? { backgroundImage: `url(${selectedAvatar.img})`, backgroundSize: '180%', backgroundPosition: '45% 20%', backgroundRepeat: 'no-repeat' }
+          : {}"
+        @click="openProfile"
+      >
+        <span v-if="!selectedAvatar || !selectedAvatar.img">          <User :size="18" aria-hidden="true" /></span>
+      </button>
+    </div>
       <KoFiDonors src="/api/supporters.csv" />
-    </div> 
+    </div>
     <div class="content" :style="{ transform: `scale(${rootScale})`}">
     <div :class="'header' + (!state.showHome ? ' small' : '')">
       <div class="logo-container">
@@ -96,6 +111,25 @@
     />
 
    
+    </div>
+    <div class="content right-view" :style="{ transform: `scale(${rootScale})`}">
+       <div :class="'header' + (!state.showHome ? ' small' : '')">
+      <div class="logo-container">
+        <img :src="logoSrc" alt="Logo" class="logo" :width="state.showHome ? 200 : 125" :height="state.showHome ? 200 : 100">
+      </div>
+      <button
+      v-if="state.showHome"
+        class="menu-btn w-11 h-11"
+        :style="(selectedAvatar && selectedAvatar.img)
+          ? { backgroundImage: `url(${selectedAvatar.img})`, backgroundSize: '180%', backgroundPosition: '45% 20%', backgroundRepeat: 'no-repeat' }
+          : {}"
+        @click="openProfile"
+      >
+        <span v-if="!selectedAvatar || !selectedAvatar.img">          <User :size="18" aria-hidden="true" /></span>
+      </button>
+    </div>
+    
+    <Leaderboard :ranking="versusRanking" :roomCode="versusCode" :soloRanking="[]" />
     </div>
   </div>
 
@@ -255,6 +289,7 @@ import KoFiDonors from './components/KoFiDonors.vue';
 import VersusView from './components/VersusView.vue';
 import PowerWheel from './components/PowerWheel.vue';
 import ProfileView from './components/ProfileView.vue';
+import Leaderboard from './components/Leaderboard.vue';
 // Import flag assets so Vite resolves URLs correctly
 import frFlag from './assets/fr.png';
 import enFlag from './assets/en.png';
@@ -280,6 +315,48 @@ let supabase = null;
 function getSupabase() {
   if (!supabase) supabase = initRealtime();
   return supabase;
+}
+
+// Upsert global solo leaderboard entry into Supabase
+async function upsertSoloScore({ playerId: pid, name, bestLevel, timeMs }) {
+  try {
+    const sb = getSupabase();
+    // Fetch existing
+    const { data: existing, error: getErr } = await sb
+      .from('solo_scores')
+      .select('*')
+      .eq('player_id', pid)
+      .maybeSingle();
+    if (getErr) throw getErr;
+    if (existing) {
+      const newBestLevel = Math.max(Number(existing.best_level || 0), Number(bestLevel || 0));
+      const newBestTime = (existing.best_time_ms == null)
+        ? Number(timeMs || 0)
+        : Math.min(Number(existing.best_time_ms || 0), Number(timeMs || 0));
+      const newTotal = Number(existing.total_levels || 0) + 1;
+      await sb
+        .from('solo_scores')
+        .update({
+          name: name || existing.name || 'Player',
+          best_level: newBestLevel,
+          best_time_ms: newBestTime,
+          total_levels: newTotal,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('player_id', pid);
+    } else {
+      await sb
+        .from('solo_scores')
+        .insert([{ 
+          player_id: pid,
+          name: name || 'Player',
+          best_level: Number(bestLevel || 0),
+          best_time_ms: Number(timeMs || 0),
+          total_levels: 1,
+          updated_at: new Date().toISOString(),
+        }]);
+    }
+  } catch (_) { /* ignore leaderboard errors */ }
 }
 
 // Try to load a real logo from assets if present (supports memostep or memostep-logo)
@@ -1126,6 +1203,12 @@ function onCellClick(r, c) {
         } else if (state.mode === 'solo') {
           // Solo: increment level, prepare next path, auto-advance without win modal
           soloLevel.value = (soloLevel.value || 0) + 1;
+          // Record/update global solo leaderboard
+          try {
+            const me = playerId.value || ensurePlayerId();
+            const name = (usernameInput.value || 'Player');
+            await upsertSoloScore({ playerId: me, name, bestLevel: soloLevel.value, timeMs: chronoMs.value });
+          } catch (_) {}
           // Prepare next solo path and place a heart on it only if not at full lives
           const nextPath = randomPath();
           state.soloPath = nextPath;
@@ -1956,25 +2039,19 @@ html, body, #app {
   height: 100vh;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-evenly;
   overflow: hidden;
-}
-
-/* Left donors sidebar that doesn't affect centering */
-.left-view {
-  position: fixed;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  max-height: 90vh;
-  overflow: auto;
-  z-index: 5;
 }
 
 /* Hide donors sidebar on narrow screens to preserve space */
 @media (max-width: 900px) {
   .left-view { display: none; }
 }
+
+@media (max-width: 900px) {
+  .right-view { display: none; }
+}
+
 
 /* Modal */
 .modal-overlay {
