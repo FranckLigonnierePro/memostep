@@ -19,6 +19,7 @@
               <div class="cell-inner" :class="{ frozen: frozenGrid }" :style="pathRevealStyle(cell.r, cell.c)">
                 <div class="cell-face front" :class="cellClass(cell.r, cell.c)">
                   <img v-if="!hasDecor(cell.r, cell.c)" class="cell-stone" :src="stone" alt="" />
+                  <img v-if="isPathCell(cell.r, cell.c)" class="cell-stone path-stone" :src="stoneGood" alt="" />
                   <div v-if="isCellWrong(cell.r, cell.c)" class="stone-fade">
                     <img class="stone-frame f1" :src="stone" alt="" />
                     <img class="stone-frame f2" :src="stone2" alt="" />
@@ -136,6 +137,7 @@ import bgFirst from '../assets/bg-first.png';
 import stone from '../assets/stone.png';
 import stone2 from '../assets/stone2.png';
 import stone3 from '../assets/stone3.png';
+import stoneGood from '../assets/stone_good.png';
 import mageAvatar from '../assets/mage/content.png';
 import warriorAvatar from '../assets/guerriere/fcontent.png';
 import mageFrost from '../assets/mage/givré.png';
@@ -465,6 +467,11 @@ function hasDecor(r, c) {
     return classes.includes('path') || classes.includes('start') || classes.includes('end') || classes.includes('correct') || classes.includes('wrong');
   }
   return false;
+}
+
+function isPathCell(r, c) {
+  const classes = props.cellClass(r, c) || [];
+  return Array.isArray(classes) ? classes.includes('path') : String(classes || '').includes('path');
 }
 
 // Show heart only during input phase (revealComplete true and not revealed), on the exact cell
