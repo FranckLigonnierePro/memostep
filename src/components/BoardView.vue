@@ -20,6 +20,7 @@
                 <div class="cell-face front" :class="cellClass(cell.r, cell.c)">
                   <img v-if="!hasDecor(cell.r, cell.c)" class="cell-stone" :src="stone" alt="" />
                   <img v-if="isPathCell(cell.r, cell.c)" class="cell-stone path-stone" :src="stoneGood" alt="" />
+                  <img v-if="isCorrectCell(cell.r, cell.c)" class="cell-stone correct-stone" :src="stoneGreen" alt="" />
                   <div v-if="isCellWrong(cell.r, cell.c)" class="stone-fade">
                     <img class="stone-frame f1" :src="stone" alt="" />
                     <img class="stone-frame f2" :src="stone2" alt="" />
@@ -138,6 +139,7 @@ import stone from '../assets/stone.png';
 import stone2 from '../assets/stone2.png';
 import stone3 from '../assets/stone3.png';
 import stoneGood from '../assets/stone_good.png';
+import stoneGreen from '../assets/stone_green.png';
 import mageAvatar from '../assets/mage/content.png';
 import warriorAvatar from '../assets/guerriere/fcontent.png';
 import mageFrost from '../assets/mage/givré.png';
@@ -472,6 +474,11 @@ function hasDecor(r, c) {
 function isPathCell(r, c) {
   const classes = props.cellClass(r, c) || [];
   return Array.isArray(classes) ? classes.includes('path') : String(classes || '').includes('path');
+}
+
+function isCorrectCell(r, c) {
+  const classes = props.cellClass(r, c) || [];
+  return Array.isArray(classes) ? classes.includes('correct') : String(classes || '').includes('correct');
 }
 
 // Show heart only during input phase (revealComplete true and not revealed), on the exact cell
@@ -874,7 +881,7 @@ function brokenCrackStyle(crackIndex) {
     inset 0 -1px 0 rgba(0, 0, 0, 0.35);
 }
 .cell-face.front.correct { 
-  background: linear-gradient(145deg, #2ecc71, #27ae60);
+  background: linear-gradient(145deg, #24a95b, #27ae60);
   box-shadow: 
     0 4px 0 var(--ok),
     0 6px 20px rgba(18, 184, 134, 0.8),
