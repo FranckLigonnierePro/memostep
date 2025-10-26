@@ -135,6 +135,13 @@
         />
       </div>
     </div>
+    <!-- Versus Ready Countdown Overlay -->
+    <div v-if="versusReadyCountdown > 0" class="modal-overlay">
+      <div class="countdown-display">
+        <div class="countdown-number">{{ versusReadyCountdown }}</div>
+        <div class="countdown-text">{{ $t('versus.starting') || 'Démarrage...' }}</div>
+      </div>
+    </div>
     <div class="content right-view" :style="{ transform: `scale(${rootScale})`}">
        <div :class="'header' + (!state.showHome ? ' small' : '')">
       <div class="logo-container">
@@ -305,7 +312,7 @@
   </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, reactive, ref, computed } from 'vue';
+import { onMounted, onBeforeUnmount, reactive, ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import HomeView from './components/HomeView.vue';
 import BoardView from './components/BoardView.vue';
@@ -573,6 +580,9 @@ const defaultPlayers = computed(() => [{ id: playerId.value || ensurePlayerId(),
 const showChampionSelector = ref(false);
 const selectSecondsLeft = ref(0);
 let selectTimerId = null;
+// Versus ready countdown state
+const versusReadyCountdown = ref(0);
+let versusReadyTimerId = null;
 // List of champions available
 const avatarCards = [
   { id: 'guerriere', name: 'Guerrière', img: imgGuerriere, color: '#ff5a8a', glow: 'rgba(255,90,138,0.45)' },
@@ -599,6 +609,28 @@ const takenAvatars = computed(() => {
   return roster.map(p => p?.avatar_url).filter(u => !!u);
 });
 
+// Watch for all players ready in versus mode
+watch(versusRoom, (room) => {
+  if (state.mode !== 'versus' || !showChampionSelector.value || versusReadyCountdown.value > 0) return;
+  if (!room || !Array.isArray(room.players)) return;
+  
+  const allReady = room.players.every(p => p && p.champion_ready === true);
+  if (allReady && room.players.length >= 1) {
+    // All players have chosen - start 3s countdown
+    closeChampionSelector();
+    versusReadyCountdown.value = 3;
+    if (versusReadyTimerId) clearInterval(versusReadyTimerId);
+    versusReadyTimerId = setInterval(() => {
+      versusReadyCountdown.value = Math.max(0, versusReadyCountdown.value - 1);
+      if (versusReadyCountdown.value <= 0) {
+        clearInterval(versusReadyTimerId);
+        versusReadyTimerId = null;
+        // Game will start via normal versus flow (beginVersus will be called by subscription)
+      }
+    }, 1000);
+  }
+}, { deep: true });
+
 function pickRandomAvailableAvatar() {
   const taken = new Set(takenAvatars.value);
   const candidates = avatarCards.filter(c => !taken.has(c.img));
@@ -611,7 +643,7 @@ async function updatePlayerAvatarUrl(url) {
   const me = playerId.value || ensurePlayerId();
   try {
     const sb = getSupabase();
-    await sb.from('players').update({ avatar_url: url }).eq('room_code', versusCode.value).eq('player_id', me);
+    await sb.from('players').update({ avatar_url: url, champion_ready: true }).eq('room_code', versusCode.value).eq('player_id', me);
   } catch (_) {}
 }
 
@@ -623,11 +655,15 @@ function closeChampionSelector() {
 function handleChampionPick(card) {
   selectedAvatar.value = card;
   try { localStorage.setItem('selectedAvatar', JSON.stringify(card)); } catch (_) {}
-  if (state.mode === 'versus') updatePlayerAvatarUrl(card.img);
-  closeChampionSelector();
-  // If a deferred start was waiting (solo), call showPath now if not already revealing
-  if (!state.revealed && !state.inPlay && (state.mode === 'solo')) {
-    showPath();
+  if (state.mode === 'versus') {
+    updatePlayerAvatarUrl(card.img);
+    // Don't close selector yet in versus - wait for all players
+  } else {
+    closeChampionSelector();
+    // If a deferred start was waiting (solo), call showPath now if not already revealing
+    if (!state.revealed && !state.inPlay && (state.mode === 'solo')) {
+      showPath();
+    }
   }
 }
 
@@ -1992,6 +2028,22 @@ async function handleStartVersus() {
 }
 
 function beginVersus(baseSeed, startAtMs, currentRound = 1) {
+  // Reset champion ready state for new round
+  versusReadyCountdown.value = 0;
+  if (versusReadyTimerId) {
+    clearInterval(versusReadyTimerId);
+    versusReadyTimerId = null;
+  }
+  
+  // Reset champion_ready flag in database for this player
+  if (versusCode.value) {
+    const me = playerId.value || ensurePlayerId();
+    try {
+      const sb = getSupabase();
+      sb.from('players').update({ champion_ready: false }).eq('room_code', versusCode.value).eq('player_id', me).then(() => {});
+    } catch (_) {}
+  }
+  
   // Calculer le seed pour ce round spécifique
   const seed = baseSeed + (currentRound - 1) * 1000000;
   
@@ -2410,6 +2462,38 @@ html, body, #app {
 }
 .modal-title { margin: 0; font-size: 20px; color: var(--text); }
 .modal-actions { display: flex; gap: 8px; justify-content: center; }
+
+/* Versus Ready Countdown */
+.countdown-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.countdown-number {
+  font-size: 120px;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 
+    0 0 20px rgba(255, 255, 255, 0.8),
+    0 0 40px rgba(59, 130, 246, 0.6),
+    0 4px 8px rgba(0, 0, 0, 0.5);
+  animation: countdownPulse 1s ease-in-out;
+}
+.countdown-text {
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+@keyframes countdownPulse {
+  0% { transform: scale(0.5); opacity: 0; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
 
 .header {
   width: 300px;
