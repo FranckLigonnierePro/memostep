@@ -2,25 +2,14 @@
   <div class="profile-view">
     <div class="profile-body mt-4" style="height: 100%;">
       <p class="profile-title">Choisis ton personnage</p>
-      <div style="display:flex; flex-direction:column; gap:8px; align-items:center; margin-bottom:8px;">
-        <input
-          v-model="username"
-          @change="saveName"
-          @keyup.enter="saveName"
-          class="input"
-          :placeholder="'Ton pseudo'"
-          style="height: 36px; width: 70%; max-width: 420px;"
-        />
-        <button v-if="isGuest" class="btn" @click="$emit('linkAccount')" style="margin-top:0;">
-          Lier un compte
-        </button>
-      </div>
+      <div v-if="secondsLeft != null" style="margin-bottom:8px; color:#cbd5e1; font-weight:600;">Départ dans {{ secondsLeft }}s</div>
       <div class="cards-grid">
         <button
           v-for="(card, idx) in cards"
           :key="idx"
           class="char-card"
-          :style="{ '--accent': card.color, '--glow': card.glow }"
+          :style="{ '--accent': card.color, '--glow': card.glow, opacity: isTaken(card) ? .4 : 1 }"
+          :disabled="isTaken(card)"
           @click="$emit('select', card)"
         >
           <div class="card-media">
@@ -33,7 +22,7 @@
         </button>
       </div>
       <div class="footer">
-        <button class="btn" @click="$emit('close')">Retour</button>
+        <button class="btn" @click="$emit('close')">Fermer</button>
       </div>
     </div>
   </div>
@@ -41,52 +30,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import imgCasseur from '../assets/profils/casseur.png';
-import imgDark from '../assets/profils/dark.png';
-import imgElectrik from '../assets/profils/electrik.png';
-import imgForest from '../assets/profils/forest.jpg';
-import imgFrozen from '../assets/profils/frozen.png';
-import imgGuerriere from '../assets/profils/guerriere.png';
-import imgMage from '../assets/profils/mage.png';
-import imgPixel from '../assets/profils/pixel.png';
-import imgDanseur from '../assets/profils/danseur.png';
-import imgInventeur from '../assets/profils/inventeur.png';
-import imgShadow from '../assets/profils/shadow.png';
-import imgAstre from '../assets/profils/astre.png';
-import imgColosse from '../assets/profils/colosse.png';
-import imgChrono from '../assets/profils/chrono.png';
-import imgHack from '../assets/profils/hack.png';
-import imgArchie from '../assets/profils/archie.png';
-
-const username = ref('');
-onMounted(() => {
-  try { username.value = String(localStorage.getItem('memostep_username') || '').trim(); } catch (_) { username.value = ''; }
+const props = defineProps({
+  cards: { type: Array, default: () => [] },
+  taken: { type: Array, default: () => [] }, // array of avatar_url strings taken (match against card.img)
+  secondsLeft: { type: Number, default: null },
 });
-function saveName() {
-  const v = String(username.value || '').trim();
-  try { localStorage.setItem('memostep_username', v); } catch (_) {}
-}
-const isGuest = computed(() => /^Memoguest\d{4}$/.test(String(username.value || '').trim()));
 
-const cards = [
-  { id: 'guerriere', name: 'Guerrière', img: imgGuerriere, color: '#ff5a8a', glow: 'rgba(255,90,138,0.45)' },
-  { id: 'mage', name: 'Mage', img: imgMage, color: '#8b5cf6', glow: 'rgba(139,92,246,0.45)' },
-  { id: 'casseur', name: 'Casseur', img: imgCasseur, color: '#fb923c', glow: 'rgba(251,146,60,0.45)' },
-  { id: 'dark', name: 'Dark', img: imgDark, color: '#7c3aed', glow: 'rgba(124,58,237,0.45)' },
-  { id: 'electrik', name: 'Electrik', img: imgElectrik, color: '#22d3ee', glow: 'rgba(34,211,238,0.45)' },
-  { id: 'frozen', name: 'Frozen', img: imgFrozen, color: '#60a5fa', glow: 'rgba(96,165,250,0.45)' },
-  { id: 'forest', name: 'Forest', img: imgForest, color: '#34d399', glow: 'rgba(52,211,153,0.45)' },
-  { id: 'pixel', name: 'Pixel', img: imgPixel, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
-  { id: 'danseur', name: 'Danseur', img: imgDanseur, color: '#f43f5e', glow: 'rgba(244,63,94,0.45)' },
-  { id: 'inventeur', name: 'Inventeur', img: imgInventeur, color: '#14b8a6', glow: 'rgba(20,184,166,0.45)' },
-  { id: 'shadow', name: 'Shadow', img: imgShadow, color: '#0ea5e9', glow: 'rgba(14,165,233,0.45)' },
-  { id: 'astre', name: 'Astre', img: imgAstre, color: '#a3e635', glow: 'rgba(163,230,53,0.45)' },
-  { id: 'colosse', name: 'Colosse', img: imgColosse, color: '#ef4444', glow: 'rgba(239,68,68,0.45)' },
-  { id: 'chrono', name: 'Chrono', img: imgChrono, color: '#06b6d4', glow: 'rgba(6,182,212,0.45)' },
-  { id: 'hack', name: 'Hack', img: imgHack, color: '#6366f1', glow: 'rgba(99,102,241,0.45)' },
-  { id: 'archie', name: 'Archie', img: imgArchie, color: '#f59e0b', glow: 'rgba(245,158,11,0.45)' },
-];
+function isTaken(card) {
+  try { return Array.isArray(props.taken) && props.taken.includes(card.img); } catch (_) { return false; }
+}
 </script>
 
 <style scoped>

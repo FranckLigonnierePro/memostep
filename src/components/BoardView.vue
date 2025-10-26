@@ -17,7 +17,7 @@
               @click="(revealComplete && canClickCell(cell.r, cell.c)) ? emit('cellClick', cell.r, cell.c) : null"
             >
               <div class="cell-inner" :class="{ frozen: frozenGrid }" :style="pathRevealStyle(cell.r, cell.c)">
-                <div class="cell-face front" :class="cellClass(cell.r, cell.c)">
+                <div class="cell-face front" :class="[cellClass(cell.r, cell.c), { 'stun-shadow': isStunCell(cell.r, cell.c) }]">
                   <img v-if="!hasDecor(cell.r, cell.c)" class="cell-stone" :src="stone" alt="" />
                   <img v-if="isPathCell(cell.r, cell.c)" class="cell-stone path-stone" :src="stoneGood" alt="" />
                   <img v-if="isCorrectCell(cell.r, cell.c)" class="cell-stone correct-stone" :src="stoneGreen" alt="" />
@@ -26,6 +26,13 @@
                     <img class="stone-frame f2" :src="stone2" alt="" />
                     <img class="stone-frame f3" :src="stone3" alt="" />
                   </div>
+                  <!-- Markers: always show
+                       - triangle on stun cells
+                       - cross on rollback cells
+                       - circle on any other non-path cell -->
+                  <div v-if="isStunCell(cell.r, cell.c)" class="mark mark-triangle" aria-hidden="true"></div>
+                  <div v-else-if="isRollbackCell(cell.r, cell.c)" class="mark mark-cross" aria-hidden="true"></div>
+                  <div v-else-if="isNonPathCell(cell.r, cell.c)" class="mark mark-circle" aria-hidden="true"></div>
                   <!-- Heart drop (solo reward) -->
                   <div v-if="showHeart(cell.r, cell.c)" class="heart-drop" title="+1 vie">
                     <Heart />
@@ -51,6 +58,8 @@
               >
                 <div class="bubble-content">
                   <img class="bubble-avatar" :src="selectedAvatar.img" :alt="selectedAvatar.name" />
+                  <!-- Circular loader when stunned -->
+                  <div v-if="stunActive" class="bubble-loader" aria-hidden="true"></div>
                 </div>
               </div>
             </div>
@@ -175,6 +184,10 @@ const props = defineProps({
   heartCell: { type: Object, default: null }, // { r, c } when a heart is present on this path
   selectedAvatar: { type: Object, default: null }, // Avatar selected by player
   playerProgress: { type: Number, default: 0 }, // Current nextIndex for solo/daily player position
+  rollbackKeys: { type: Array, default: () => [] }, // ['r-c'] cells that cause rollback
+  lifeLossKeys: { type: Array, default: () => [] }, // ['r-c'] cells that cause life loss
+  stunKeys: { type: Array, default: () => [] }, // ['r-c'] cells that stun
+  stunActive: { type: Boolean, default: false }, // show loader on solo avatar when stunned
 });
 const emit = defineEmits(['cellClick', 'goHome']);
 
@@ -456,6 +469,26 @@ function isCellWrong(r, c) {
   return classes.includes('wrong');
 }
 
+function isRollbackCell(r, c) {
+  try {
+    const key = `${r}-${c}`;
+    return Array.isArray(props.rollbackKeys) && props.rollbackKeys.includes(key);
+  } catch (_) { return false; }
+}
+
+function isNonPathCell(r, c) {
+  // Non-path means not currently part of path or correct cells
+  const onPath = isPathCell(r, c) || isCorrectCell(r, c);
+  return !onPath;
+}
+
+function isStunCell(r, c) {
+  try {
+    const key = `${r}-${c}`;
+    return Array.isArray(props.stunKeys) && props.stunKeys.includes(key);
+  } catch (_) { return false; }
+}
+
 function hasDecor(r, c) {
   const classes = props.cellClass(r, c) || [];
   if (Array.isArray(classes)) {
@@ -637,6 +670,7 @@ function brokenCrackStyle(crackIndex) {
     inset 0 2px 4px rgba(255, 255, 255, 0.3);
   overflow: hidden;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  position: relative;
 }
 
 .bubble-avatar {
@@ -645,21 +679,54 @@ function brokenCrackStyle(crackIndex) {
   border-radius: 999px;
   object-fit: cover;
   display: block;
-  transform: scale(2) translateY(-2px) translateX(1.3px);
-  transform-origin: top center;
-  will-change: transform;
-}
-
-.bubble-score {
-  background: rgba(15, 16, 32, 0.9);
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 6px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   white-space: nowrap;
+}
+
+.mark-circle {
+  width: 68%;
+  height: 68%;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  box-shadow: 0 0 8px rgba(255,255,255,0.35);
+}
+
+.mark-triangle {
+  width: 0;
+  height: 0;
+  border-left: 16px solid transparent;
+  border-right: 16px solid transparent;
+  border-bottom: 28px solid rgba(255, 210, 64, 0.95);
+  filter: drop-shadow(0 0 6px rgba(255, 210, 64, 0.5));
+}
+
+/* Yellow glow for stun cells */
+.cell-face.front.stun-shadow::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  box-shadow:
+    0 0 14px rgba(255, 210, 64, 0.8),
+    0 0 28px rgba(255, 210, 64, 0.55);
+  pointer-events: none;
+}
+
+/* Circular loader on solo avatar when stunned */
+.bubble-loader {
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: rgba(255, 210, 64, 0.95);
+  animation: bubbleSpin 0.9s linear infinite;
+  z-index: 2;
+}
+@keyframes bubbleSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 @keyframes bubbleBounce {

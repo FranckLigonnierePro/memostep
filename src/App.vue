@@ -7,13 +7,12 @@
       </div>
       <button
       v-if="state.showHome"
-        class="menu-btn w-11 h-11"
-        :style="(selectedAvatar && selectedAvatar.img)
-          ? { backgroundImage: `url(${selectedAvatar.img})`, backgroundSize: '180%', backgroundPosition: '45% 20%', backgroundRepeat: 'no-repeat' }
-          : {}"
+        class="menu-btn h-11 px-3"
         @click="openProfile"
+        :aria-label="$t('home.settings')"
+        :title="displayName"
       >
-        <span v-if="!selectedAvatar || !selectedAvatar.img">          <User :size="18" aria-hidden="true" /></span>
+        {{ displayName }}
       </button>
     </div>
       <KoFiDonors src="/api/supporters.csv" />
@@ -25,18 +24,26 @@
       </div>
       <button
       v-if="state.showHome"
-        class="menu-btn w-11 h-11"
-        :style="(selectedAvatar && selectedAvatar.img)
-          ? { backgroundImage: `url(${selectedAvatar.img})`, backgroundSize: '180%', backgroundPosition: '45% 20%', backgroundRepeat: 'no-repeat' }
-          : {}"
+        class="menu-btn h-11 px-3"
         @click="openProfile"
+        :aria-label="$t('home.settings')"
+        :title="displayName"
       >
-        <span v-if="!selectedAvatar || !selectedAvatar.img">          <User :size="18" aria-hidden="true" /></span>
+        {{ displayName }}
       </button>
     </div>
     
+    <UsernameModal
+      v-if="state.showHome && showNameModal && !showProfileView && !showVersusView"
+      :name="nameModalInput"
+      :error="nameError"
+      @update:name="(v) => nameModalInput = v"
+      @continueAsGuest="continueAsGuest"
+      @openProfile="openProfileFromNameModal"
+    />
+
     <HomeView
-      v-if="state.showHome && !showProfileView"
+      v-else-if="state.showHome && !showProfileView"
       :logoSrc="logoSrc"
       :dailyDone="dailyDone"
       :currentFlag="currentFlag"
@@ -105,12 +112,28 @@
       :selfId="playerId"
       :selectedAvatar="selectedAvatar"
       :playerProgress="state.nextIndex"
+      :rollbackKeys="Array.from(state.rollback || [])"
+      :lifeLossKeys="Array.from(state.lifeLoss || [])"
+      :stunKeys="Array.from(state.stun || [])"
+      :stunActive="stunActive"
       @cellClick="onCellClick"
       @goHome="goHome"
       @newGame="newGame"
     />
 
    
+    </div>
+    <!-- Pre-game Champion Selector Overlay -->
+    <div v-if="showChampionSelector" class="modal-overlay">
+      <div class="modal-card" style="max-width:720px; width:90%;">
+        <ChampionSelector
+          :cards="avatarCards"
+          :taken="takenAvatars"
+          :secondsLeft="selectSecondsLeft"
+          @select="handleChampionPick"
+          @close="closeChampionSelector"
+        />
+      </div>
     </div>
     <div class="content right-view" :style="{ transform: `scale(${rootScale})`}">
        <div :class="'header' + (!state.showHome ? ' small' : '')">
@@ -119,13 +142,12 @@
       </div>
       <button
       v-if="state.showHome"
-        class="menu-btn w-11 h-11"
-        :style="(selectedAvatar && selectedAvatar.img)
-          ? { backgroundImage: `url(${selectedAvatar.img})`, backgroundSize: '180%', backgroundPosition: '45% 20%', backgroundRepeat: 'no-repeat' }
-          : {}"
+        class="menu-btn h-11 px-3"
         @click="openProfile"
+        :aria-label="$t('home.settings')"
+        :title="displayName"
       >
-        <span v-if="!selectedAvatar || !selectedAvatar.img">          <User :size="18" aria-hidden="true" /></span>
+        {{ displayName }}
       </button>
     </div>
     
@@ -271,18 +293,7 @@
       </div>
     </div>
 
-    <!-- Username prompt modal -->
-    <div v-if="showNameModal" class="modal-overlay" @click.self="closeNameModal">
-      <div class="modal-card">
-        <h2 class="modal-title">Choisis un pseudo</h2>
-        <div class="modal-body" style="display:flex; gap:8px; justify-content:center;">
-          <input v-model="nameModalInput" placeholder="Ton pseudo" class="input" style="height: 42px; width: 70%;" />
-        </div>
-        <div class="modal-actions">
-          <button class="modal-btn" @click="saveNameFromModal">Enregistrer</button>
-        </div>
-      </div>
-    </div>
+    
 
     <!-- Power Wheel for Versus mode (DISABLED) -->
     <!-- <PowerWheel
@@ -302,7 +313,9 @@ import KoFiDonors from './components/KoFiDonors.vue';
 import VersusView from './components/VersusView.vue';
 import PowerWheel from './components/PowerWheel.vue';
 import ProfileView from './components/ProfileView.vue';
+import ChampionSelector from './components/ChampionSelector.vue';
 import Leaderboard from './components/Leaderboard.vue';
+import UsernameModal from './components/UsernameModal.vue';
 // Import flag assets so Vite resolves URLs correctly
 import frFlag from './assets/fr.png';
 import enFlag from './assets/en.png';
@@ -311,6 +324,23 @@ import deFlag from './assets/de.png';
 import { User } from 'lucide-vue-next';
 import themeUrl from './assets/memosteptheme.mp3';
 import crackTexture from './assets/crack.png';
+// Avatar assets for champion selection
+import imgCasseur from './assets/profils/casseur.png';
+import imgDark from './assets/profils/dark.png';
+import imgElectrik from './assets/profils/electrik.png';
+import imgForest from './assets/profils/forest.jpg';
+import imgFrozen from './assets/profils/frozen.png';
+import imgGuerriere from './assets/profils/guerriere.png';
+import imgMage from './assets/profils/mage.png';
+import imgPixel from './assets/profils/pixel.png';
+import imgDanseur from './assets/profils/danseur.png';
+import imgInventeur from './assets/profils/inventeur.png';
+import imgShadow from './assets/profils/shadow.png';
+import imgAstre from './assets/profils/astre.png';
+import imgColosse from './assets/profils/colosse.png';
+import imgChrono from './assets/profils/chrono.png';
+import imgHack from './assets/profils/hack.png';
+import imgArchie from './assets/profils/archie.png';
 import {
   ensurePlayerId,
   setCurrentDay,
@@ -468,6 +498,12 @@ const state = reactive({
   heartCell: null,       // { r, c } or null, active heart on current path
   // Solo decoy cells (adjacent to path), active from level >= 5
   decoys: new Set(), // 'r-c'
+  // Rollback cells (adjacent to path) that cause -2 steps instead of losing a life (solo/daily)
+  rollback: new Set(), // 'r-c'
+  // Trap cells (adjacent to path) that stun for 1s (solo/daily)
+  stun: new Set(), // 'r-c'
+  // Life-loss cells on border (solo/daily) — explicit 20%
+  lifeLoss: new Set(), // 'r-c'
   // Freeze power state (versus mode)
   frozenGrid: false,    // whether entire grid is frozen
   frozenClicksLeft: 0,  // how many clicks left to break ice (starts at 8)
@@ -478,6 +514,8 @@ const state = reactive({
 // Flip wave animation control (top -> bottom)
 const flipActive = ref(false);
 const flipBackActive = ref(false);
+// Stun visual indicator for solo/daily
+const stunActive = ref(false);
 
 // Face-down colors control
 const faceDownActive = ref(false);
@@ -510,6 +548,16 @@ const selectedPower = ref(null); // currently selected power
 const versusCode = ref('');
 const joinInput = ref('');
 const usernameInput = ref('');
+// Display name for Home header (falls back to saved username or 'Player')
+const displayName = computed(() => {
+  const direct = String(usernameInput.value || '').trim();
+  if (direct) return direct;
+  try {
+    const saved = String(localStorage.getItem('memostep_username') || '').trim();
+    if (saved) return saved;
+  } catch (_) {}
+  return 'Player';
+});
 const versusIsHost = ref(false);
 const versusError = ref('');
 let versusUnsub = null;
@@ -521,9 +569,95 @@ const versusRoom = ref(null); // latest room snapshot
 const versusLastProgress = ref(0); // Keep last progress to avoid bubble drop between rounds
 const defaultPlayers = computed(() => [{ id: playerId.value || ensurePlayerId(), name: (usernameInput.value || 'Player') }]);
 
+// Champion selection overlay state
+const showChampionSelector = ref(false);
+const selectSecondsLeft = ref(0);
+let selectTimerId = null;
+// List of champions available
+const avatarCards = [
+  { id: 'guerriere', name: 'Guerrière', img: imgGuerriere, color: '#ff5a8a', glow: 'rgba(255,90,138,0.45)' },
+  { id: 'mage', name: 'Mage', img: imgMage, color: '#8b5cf6', glow: 'rgba(139,92,246,0.45)' },
+  { id: 'casseur', name: 'Casseur', img: imgCasseur, color: '#fb923c', glow: 'rgba(251,146,60,0.45)' },
+  { id: 'dark', name: 'Dark', img: imgDark, color: '#7c3aed', glow: 'rgba(124,58,237,0.45)' },
+  { id: 'electrik', name: 'Electrik', img: imgElectrik, color: '#22d3ee', glow: 'rgba(34,211,238,0.45)' },
+  { id: 'frozen', name: 'Frozen', img: imgFrozen, color: '#60a5fa', glow: 'rgba(96,165,250,0.45)' },
+  { id: 'forest', name: 'Forest', img: imgForest, color: '#34d399', glow: 'rgba(52,211,153,0.45)' },
+  { id: 'pixel', name: 'Pixel', img: imgPixel, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
+  { id: 'danseur', name: 'Danseur', img: imgDanseur, color: '#f43f5e', glow: 'rgba(244,63,94,0.45)' },
+  { id: 'inventeur', name: 'Inventeur', img: imgInventeur, color: '#14b8a6', glow: 'rgba(20,184,166,0.45)' },
+  { id: 'shadow', name: 'Shadow', img: imgShadow, color: '#0ea5e9', glow: 'rgba(14,165,233,0.45)' },
+  { id: 'astre', name: 'Astre', img: imgAstre, color: '#a3e635', glow: 'rgba(163,230,53,0.45)' },
+  { id: 'colosse', name: 'Colosse', img: imgColosse, color: '#ef4444', glow: 'rgba(239,68,68,0.45)' },
+  { id: 'chrono', name: 'Chrono', img: imgChrono, color: '#06b6d4', glow: 'rgba(6,182,212,0.45)' },
+  { id: 'hack', name: 'Hack', img: imgHack, color: '#6366f1', glow: 'rgba(99,102,241,0.45)' },
+  { id: 'archie', name: 'Archie', img: imgArchie, color: '#f59e0b', glow: 'rgba(245,158,11,0.45)' },
+];
+const takenAvatars = computed(() => {
+  if (state.mode !== 'versus') return [];
+  const room = versusRoom.value;
+  const roster = (room && Array.isArray(room.players)) ? room.players : [];
+  return roster.map(p => p?.avatar_url).filter(u => !!u);
+});
+
+function pickRandomAvailableAvatar() {
+  const taken = new Set(takenAvatars.value);
+  const candidates = avatarCards.filter(c => !taken.has(c.img));
+  if (!candidates.length) return avatarCards[Math.floor(Math.random() * avatarCards.length)];
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+async function updatePlayerAvatarUrl(url) {
+  if (state.mode !== 'versus' || !versusCode.value) return;
+  const me = playerId.value || ensurePlayerId();
+  try {
+    const sb = getSupabase();
+    await sb.from('players').update({ avatar_url: url }).eq('room_code', versusCode.value).eq('player_id', me);
+  } catch (_) {}
+}
+
+function closeChampionSelector() {
+  if (selectTimerId) { clearInterval(selectTimerId); selectTimerId = null; }
+  showChampionSelector.value = false;
+}
+
+function handleChampionPick(card) {
+  selectedAvatar.value = card;
+  try { localStorage.setItem('selectedAvatar', JSON.stringify(card)); } catch (_) {}
+  if (state.mode === 'versus') updatePlayerAvatarUrl(card.img);
+  closeChampionSelector();
+  // If a deferred start was waiting (solo), call showPath now if not already revealing
+  if (!state.revealed && !state.inPlay && (state.mode === 'solo')) {
+    showPath();
+  }
+}
+
+function startChampionSelection({ mode = state.mode, delayStart = false } = {}) {
+  // In versus, do not delay the synchronized start; in solo we can delay
+  showChampionSelector.value = true;
+  selectSecondsLeft.value = 10;
+  if (selectTimerId) { clearInterval(selectTimerId); selectTimerId = null; }
+  selectTimerId = setInterval(() => {
+    selectSecondsLeft.value = Math.max(0, (selectSecondsLeft.value || 0) - 1);
+    if (selectSecondsLeft.value <= 0) {
+      clearInterval(selectTimerId); selectTimerId = null;
+      if (!selectedAvatar.value) {
+        const pick = pickRandomAvailableAvatar();
+        handleChampionPick(pick);
+      } else {
+        closeChampionSelector();
+      }
+      // If solo and we wanted to delay the start, ensure it starts now
+      if (delayStart && mode === 'solo' && !state.revealed && !state.inPlay) {
+        showPath();
+      }
+    }
+  }, 1000);
+}
+
 // Username modal state and helpers
 const showNameModal = ref(false);
 const nameModalInput = ref('');
+const nameError = ref('');
 
 function openNameModalIfNeeded() {
   try {
@@ -531,11 +665,13 @@ function openNameModalIfNeeded() {
     const saved = (raw == null ? '' : String(raw)).trim();
     if (!saved && state.showHome && !showProfileView.value && !showVersusView.value) {
       nameModalInput.value = '';
+      nameError.value = '';
       showNameModal.value = true;
     }
   } catch (_) {
     if (state.showHome && !showProfileView.value && !showVersusView.value) {
       nameModalInput.value = '';
+      nameError.value = '';
       showNameModal.value = true;
     }
   }
@@ -550,6 +686,29 @@ function saveNameFromModal() {
 }
 
 function closeNameModal() { showNameModal.value = false; }
+
+function generateGuestName() {
+  const n = Math.floor(Math.random() * 10000);
+  const suffix = String(n).padStart(4, '0');
+  return `Memoguest${suffix}`;
+}
+
+function continueAsGuest() {
+  let v = String(nameModalInput.value || '').trim();
+  if (!v) {
+    v = generateGuestName();
+  }
+  nameError.value = '';
+  try { localStorage.setItem('memostep_username', v); } catch(_) {}
+  usernameInput.value = v;
+  showNameModal.value = false;
+}
+
+function openProfileFromNameModal() {
+  showNameModal.value = false;
+  showProfileView.value = true;
+  state.showHome = false;
+}
 
 // Language state
 const currentLang = ref('fr');
@@ -1021,6 +1180,71 @@ function generateSoloDecoys() {
   for (const k of picks) state.decoys.add(k);
 }
 
+function generateRollbackCells() {
+  state.rollback.clear();
+  // Only for solo and daily
+  if (state.mode !== 'solo' && state.mode !== 'daily') return;
+  const pathSet = new Set(state.path.map(p => `${p.r}-${p.c}`));
+  const candidates = new Set();
+  for (const p of state.path) {
+    const neigh = [
+      { r: p.r - 1, c: p.c },
+      { r: p.r + 1, c: p.c },
+      { r: p.r, c: p.c - 1 },
+      { r: p.r, c: p.c + 1 },
+    ];
+    for (const n of neigh) {
+      if (n.r < 0 || n.r >= ROWS || n.c < 0 || n.c >= COLS) continue;
+      const key = `${n.r}-${n.c}`;
+      if (!pathSet.has(key)) candidates.add(key);
+    }
+  }
+  const candArr = Array.from(candidates);
+  // Shuffle and pick ~60% of border cells
+  for (let i = candArr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candArr[i], candArr[j]] = [candArr[j], candArr[i]];
+  }
+  const take = Math.floor(candArr.length * 0.6);
+  const picks = candArr.slice(0, take);
+  for (const k of picks) state.rollback.add(k);
+}
+
+// Partition border cells into 40% rollback, 40% stun, 20% life-loss (solo/daily/versus)
+function generateBorderHazards() {
+  state.rollback.clear();
+  state.stun.clear();
+  state.lifeLoss.clear();
+  if (state.mode !== 'solo' && state.mode !== 'daily' && state.mode !== 'versus') return;
+  const pathSet = new Set(state.path.map(p => `${p.r}-${p.c}`));
+  const candidates = new Set();
+  for (const p of state.path) {
+    const neigh = [
+      { r: p.r - 1, c: p.c }, { r: p.r + 1, c: p.c },
+      { r: p.r, c: p.c - 1 }, { r: p.r, c: p.c + 1 },
+    ];
+    for (const n of neigh) {
+      if (n.r < 0 || n.r >= ROWS || n.c < 0 || n.c >= COLS) continue;
+      const key = `${n.r}-${n.c}`;
+      if (!pathSet.has(key)) candidates.add(key);
+    }
+  }
+  const arr = Array.from(candidates);
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  const total = arr.length;
+  const takeRollback = Math.floor(total * 0.4);
+  const takeStun = Math.floor(total * 0.4);
+  const rollbackSlice = arr.slice(0, takeRollback);
+  const stunSlice = arr.slice(takeRollback, takeRollback + takeStun);
+  const lifeSlice = arr.slice(takeRollback + takeStun);
+  for (const k of rollbackSlice) state.rollback.add(k);
+  for (const k of stunSlice) state.stun.add(k);
+  for (const k of lifeSlice) state.lifeLoss.add(k);
+}
+
 function dailySeed() {
   const d = new Date();
   // Use UTC date so the daily seed is identical worldwide (YYYYMMDD)
@@ -1038,16 +1262,9 @@ function startMode(mode) {
         const s = getState();
         // Display the stored time in the win modal
         chronoMs.value = s.currentDaily.timeMs ?? 0;
-      } catch (_) {
-        chronoMs.value = 0;
-      }
-      // Ensure a clean non-playing board state
-      state.inPlay = false;
-      state.revealed = false;
-      faceDownActive.value = false;
-      stopChrono();
-      // Mark the daily flag and show win modal immediately
+      } catch (_) {}
       dailyDone.value = true;
+      // Show the win modal after recording a successful daily
       winActive.value = true;
       return; // Do not start a new game sequence
     }
@@ -1059,11 +1276,6 @@ function startMode(mode) {
       const attempts = s.currentDaily?.attemptsBeforeWin || 0;
       dailyAttempts.value = attempts;
       if (attempts >= 3) {
-        // Ensure a clean non-playing board state
-        state.inPlay = false;
-        state.revealed = false;
-        faceDownActive.value = false;
-        stopChrono();
         loseActive.value = true;
         return;
       }
@@ -1071,6 +1283,7 @@ function startMode(mode) {
     // start normal daily
     const rng = seededRng(dailySeed());
     state.path = randomPathWithRng(rng);
+    generateBorderHazards();
   } else if (mode === 'solo') {
     // reset solo lives at the start of a solo session
     soloLivesUsed.value = 0;
@@ -1083,6 +1296,7 @@ function startMode(mode) {
     state.heartCell = null;
     state.preparedHeart = null;
     generateSoloDecoys();
+    generateBorderHazards();
   } else if (mode === 'versus' || mode === 'battle') {
     // Placeholder: start like solo for now
     state.path = randomPath();
@@ -1093,7 +1307,17 @@ function startMode(mode) {
   state.nextIndex = 0;
   state.correctSet.clear();
   state.wrongSet.clear();
-  showPath();
+  if (mode === 'solo' || mode === 'daily') {
+    // Show champion selector and start after selection or timeout
+    // For daily we don't show champion selector; keep normal flow
+    if (mode === 'solo') {
+      startChampionSelection({ mode: 'solo', delayStart: true });
+    } else {
+      showPath();
+    }
+  } else {
+    showPath();
+  }
 }
 
 function showPath() {
@@ -1372,6 +1596,15 @@ function onCellClick(r, c) {
     // Mark the wrong cell with X
     state.wrongSet.add(key);
     state.statusText = t('status.miss');
+
+    // If this is a stun cell (solo/daily), handle stun effect and skip shake/heart animations
+    const isStunCell = state.stun.has(key);
+    if (isStunCell && state.mode !== 'versus') {
+      clickBlocked.value = true;
+      stunActive.value = true;
+      setTimeout(() => { clickBlocked.value = false; stunActive.value = false; }, 1000);
+      return;
+    }
     
     // Trigger shake animation and block clicks for 1.5 seconds
     shakeActive.value = true;
@@ -1385,7 +1618,35 @@ function onCellClick(r, c) {
     
     // Handle versus mode separately
     if (state.mode === 'versus') {
-      // Versus mode: report life loss to server
+      // Check stun first: if stun cell, block input 1s without life loss or server report
+      const isStunCell = state.stun.has(key);
+      if (isStunCell) {
+        clickBlocked.value = true;
+        stunActive.value = true;
+        setTimeout(() => { clickBlocked.value = false; stunActive.value = false; }, 1000);
+        return;
+      }
+      // Check rollback: if rollback cell, move back 2 steps without life loss or server report
+      if (state.rollback.has(key)) {
+        const prevIndex = state.nextIndex;
+        const newIndex = Math.max(0, prevIndex - 2);
+        for (let i = prevIndex - 1; i >= newIndex; i--) {
+          const p = state.path[i];
+          if (!p) break;
+          state.correctSet.delete(`${p.r}-${p.c}`);
+        }
+        state.nextIndex = newIndex;
+        // Update server progress
+        const prog = state.path.length > 0 ? state.nextIndex / state.path.length : 0;
+        if (versusCode.value) {
+          const me = playerId.value || ensurePlayerId();
+          updatePlayerProgress(versusCode.value, me, prog).catch(err => {
+            console.error('[App] Error updating progress after rollback:', err);
+          });
+        }
+        return;
+      }
+      // Report wrong click to server (async, non-blocking)
       (async () => {
         try {
           const snapshot = await getRoom(versusCode.value).catch(() => versusRoom.value);
@@ -1433,7 +1694,19 @@ function onCellClick(r, c) {
         }
       })();
     } else {
-      // Daily/Solo modes: lose a heart
+      // Daily/Solo modes: if cell is a rollback cell, move back 2 steps instead of losing a heart
+      if (state.rollback.has(key)) {
+        const prevIndex = state.nextIndex;
+        const newIndex = Math.max(0, prevIndex - 2);
+        for (let i = prevIndex - 1; i >= newIndex; i--) {
+          const p = state.path[i];
+          if (!p) break;
+          state.correctSet.delete(`${p.r}-${p.c}`);
+        }
+        state.nextIndex = newIndex;
+        return; // no life loss
+      }
+      // Otherwise: lose a heart
       if (state.mode === 'daily') {
         try {
           const attempts = markDailyAttempt();
@@ -1754,6 +2027,7 @@ function beginVersus(baseSeed, startAtMs, currentRound = 1) {
   state.nextIndex = 0;
   state.correctSet.clear();
   state.wrongSet.clear();
+  generateBorderHazards();
   faceDownActive.value = false;
   stopChrono();
   chronoMs.value = 0;
@@ -1762,6 +2036,9 @@ function beginVersus(baseSeed, startAtMs, currentRound = 1) {
   
   // Show power wheel overlay first (DISABLED)
   // showPowerWheel.value = true;
+
+  // Show champion selector without delaying the synced start
+  startChampionSelection({ mode: 'versus', delayStart: false });
   
   // Schedule reveal to start exactly at startAtMs
   const delay = Math.max(0, startAtMs - Date.now());
@@ -1813,6 +2090,7 @@ function newGame() {
     } catch (_) {}
     const rng = seededRng(dailySeed());
     state.path = randomPathWithRng(rng); // deterministic for the day
+    generateBorderHazards();
   } else if (state.mode === 'solo') {
     // In solo: keep the same path after a loss; use the prepared next path after a win
     state.path = (state.soloPath && state.soloPath.length) ? state.soloPath : randomPath();
@@ -1820,6 +2098,7 @@ function newGame() {
     state.heartCell = state.preparedHeart || null;
     state.preparedHeart = null;
     generateSoloDecoys();
+    generateBorderHazards();
   } else if (state.mode === 'versus' || state.mode === 'battle') {
     // Placeholder: same as solo for now
     state.path = randomPath();
@@ -2088,6 +2367,10 @@ html, body, #app {
   align-items: center;
   justify-content: space-evenly;
   overflow: hidden;
+  background-image: url('./assets/home-bg.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 /* Hide donors sidebar on narrow screens to preserve space */
