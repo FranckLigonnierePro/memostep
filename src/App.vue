@@ -617,6 +617,7 @@ watch(versusRoom, (room) => {
   const allReady = room.players.every(p => p && p.champion_ready === true);
   if (allReady && room.players.length >= 1) {
     // All players have chosen - start 3s countdown
+    console.log('[App] All players ready, starting countdown');
     closeChampionSelector();
     versusReadyCountdown.value = 3;
     if (versusReadyTimerId) clearInterval(versusReadyTimerId);
@@ -625,7 +626,8 @@ watch(versusRoom, (room) => {
       if (versusReadyCountdown.value <= 0) {
         clearInterval(versusReadyTimerId);
         versusReadyTimerId = null;
-        // Game will start via normal versus flow (beginVersus will be called by subscription)
+        console.log('[App] Countdown finished');
+        // Countdown finished - showPath will be called by the scheduled timer in beginVersus
       }
     }, 1000);
   }
@@ -643,8 +645,18 @@ async function updatePlayerAvatarUrl(url) {
   const me = playerId.value || ensurePlayerId();
   try {
     const sb = getSupabase();
-    await sb.from('players').update({ avatar_url: url, champion_ready: true }).eq('room_code', versusCode.value).eq('player_id', me);
-  } catch (_) {}
+    // Try to update with champion_ready, but fallback to just avatar_url if column doesn't exist
+    const { error } = await sb.from('players').update({ avatar_url: url, champion_ready: true }).eq('room_code', versusCode.value).eq('player_id', me);
+    if (error && error.message?.includes('champion_ready')) {
+      // Column doesn't exist, just update avatar_url and close selector immediately
+      await sb.from('players').update({ avatar_url: url }).eq('room_code', versusCode.value).eq('player_id', me);
+      closeChampionSelector();
+      return false; // Indicate feature not available
+    }
+    return true; // Feature available
+  } catch (_) {
+    return false;
+  }
 }
 
 function closeChampionSelector() {
@@ -652,12 +664,13 @@ function closeChampionSelector() {
   showChampionSelector.value = false;
 }
 
-function handleChampionPick(card) {
+async function handleChampionPick(card) {
   selectedAvatar.value = card;
   try { localStorage.setItem('selectedAvatar', JSON.stringify(card)); } catch (_) {}
   if (state.mode === 'versus') {
-    updatePlayerAvatarUrl(card.img);
-    // Don't close selector yet in versus - wait for all players
+    const hasFeature = await updatePlayerAvatarUrl(card.img);
+    // If champion_ready feature not available, selector is already closed by updatePlayerAvatarUrl
+    // Don't close selector yet if feature is available - wait for all players
   } else {
     closeChampionSelector();
     // If a deferred start was waiting (solo), call showPath now if not already revealing
@@ -680,7 +693,13 @@ function startChampionSelection({ mode = state.mode, delayStart = false } = {}) 
         const pick = pickRandomAvailableAvatar();
         handleChampionPick(pick);
       } else {
-        closeChampionSelector();
+        // Player already has an avatar - use it
+        if (mode === 'versus') {
+          // In versus, need to mark as ready
+          handleChampionPick(selectedAvatar.value);
+        } else {
+          closeChampionSelector();
+        }
       }
       // If solo and we wanted to delay the start, ensure it starts now
       if (delayStart && mode === 'solo' && !state.revealed && !state.inPlay) {
@@ -1959,12 +1978,12 @@ function subscribeToRoom(code) {
       const myPlayer = room.players?.find(p => p && p.id === me);
       const myRound = myPlayer?.current_round || 1;
       
-      // Ne redémarrer que si on a changé de round
+      // Ne redémarrer que si on a changé de round OU si on n'est pas en train de jouer
       // Comparer le round actuel avec le round précédent
-      const needsRestart = versusCurrentRound.value !== myRound;
+      const needsRestart = versusCurrentRound.value !== myRound || !state.inPlay;
       
       if (needsRestart) {
-        console.log('[App] Démarrage du round', myRound, 'pour le joueur', me, '(précédent round:', versusCurrentRound.value, ')');
+        console.log('[App] Démarrage du round', myRound, 'pour le joueur', me, '(précédent round:', versusCurrentRound.value, ', inPlay:', state.inPlay, ')');
         versusCurrentRound.value = myRound;
         beginVersus(room.seed, room.start_at_ms, myRound);
         // Do not toggle back to home; just hide the VersusView so BoardView shows
@@ -2035,12 +2054,12 @@ function beginVersus(baseSeed, startAtMs, currentRound = 1) {
     versusReadyTimerId = null;
   }
   
-  // Reset champion_ready flag in database for this player
+  // Reset champion_ready flag in database for this player (if column exists)
   if (versusCode.value) {
     const me = playerId.value || ensurePlayerId();
     try {
       const sb = getSupabase();
-      sb.from('players').update({ champion_ready: false }).eq('room_code', versusCode.value).eq('player_id', me).then(() => {});
+      sb.from('players').update({ champion_ready: false }).eq('room_code', versusCode.value).eq('player_id', me).then(() => {}).catch(() => {});
     } catch (_) {}
   }
   
@@ -2094,8 +2113,10 @@ function beginVersus(baseSeed, startAtMs, currentRound = 1) {
   
   // Schedule reveal to start exactly at startAtMs
   const delay = Math.max(0, startAtMs - Date.now());
+  console.log('[beginVersus] Scheduling showPath in', delay, 'ms (at', new Date(startAtMs).toISOString(), ')');
   if (state.timerId) clearTimeout(state.timerId);
   state.timerId = setTimeout(() => {
+    console.log('[beginVersus] Calling showPath now');
     showPath();
   }, delay);
 }
