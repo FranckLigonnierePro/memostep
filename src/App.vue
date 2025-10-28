@@ -118,6 +118,9 @@
       :stunActive="stunActive"
       :gridContent="state.gridContent"
       :collectedBonuses="Array.from(state.collectedBonuses || [])"
+      :playerGold="playerGold"
+      :playerEssence="playerEssence"
+      :playerGems="playerGems"
       @cellClick="onCellClick"
       @goHome="goHome"
       @newGame="newGame"
@@ -862,6 +865,10 @@ const soloLivesUsed = ref(0);
 const soloLevel = ref(0);
 // Compteurs globaux pour maxPerRun (gemmes, potions) - réinitialisés à chaque session solo
 const runCounters = ref({ gem: 0, potion: 0 });
+// Ressources collectées par le joueur
+const playerGold = ref(0);
+const playerEssence = ref(0);
+const playerGems = ref(0);
 const versusLivesUsed = computed(() => {
   if (state.mode !== 'versus') return 0;
   const room = versusRoom.value;
@@ -1534,9 +1541,25 @@ function onCellClick(r, c) {
         state.correctSet.add(keyAlready);
         state.collectedBonuses.add(keyAlready);
         state.nextIndex++; // Avancer à la ligne suivante
-        console.log(`[Bonus collecté] ${cell.type} à (${r},${c}) - Progression: ${state.nextIndex}/${state.path.length}`);
         
-        // TODO: Ajouter les effets (or, gemme, essence, potion)
+        // Appliquer les effets des bonus
+        if (cell.type === 'gold') {
+          const goldValue = cell.value || 5;
+          playerGold.value += goldValue;
+          console.log(`[Bonus collecté] +${goldValue} 💰 Or - Total: ${playerGold.value}`);
+        } else if (cell.type === 'gem') {
+          playerGems.value += 1;
+          console.log(`[Bonus collecté] +1 💎 Gemme - Total: ${playerGems.value}`);
+        } else if (cell.type === 'essence') {
+          playerEssence.value += 1;
+          console.log(`[Bonus collecté] +1 ⚡ Essence - Total: ${playerEssence.value}`);
+        } else if (cell.type === 'potion') {
+          // Restaurer 1 vie
+          soloLivesUsed.value = Math.max(0, soloLivesUsed.value - 1);
+          console.log(`[Bonus collecté] +1 🧪 Potion - Vies: ${3 - soloLivesUsed.value}/3`);
+        }
+        
+        console.log(`[Progression] ${state.nextIndex}/${state.path.length}`)
         
         // Vérifier si c'est la fin du chemin
         if (state.nextIndex === state.path.length) {

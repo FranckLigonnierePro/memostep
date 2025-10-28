@@ -122,6 +122,22 @@
       
       <div class="flex flex-col items-center">
         <div class="side-actions">
+          <!-- Ressources collectées -->
+          <div v-if="mode === 'solo'" class="resources-card">
+            <div class="resource-item" title="Or collecté">
+              <span class="resource-icon">💰</span>
+              <span class="resource-value">{{ playerGold }}</span>
+            </div>
+            <div class="resource-item" title="Essence collectée">
+              <span class="resource-icon">⚡</span>
+              <span class="resource-value">{{ playerEssence }}</span>
+            </div>
+            <div class="resource-item" title="Gemmes collectées">
+              <span class="resource-icon">💎</span>
+              <span class="resource-value">{{ playerGems }}</span>
+            </div>
+          </div>
+          
           <div v-if="mode === 'solo'" class="card">
             <div class="card-body">
               <div class="score-text">{{ score }}</div>
@@ -224,6 +240,9 @@ const props = defineProps({
   stunActive: { type: Boolean, default: false }, // show loader on solo avatar when stunned
   gridContent: { type: [Array, Object], default: null }, // grid[r][c] with bonus/trap info
   collectedBonuses: { type: Array, default: () => [] }, // ['r-c'] collected bonus cells
+  playerGold: { type: Number, default: 0 }, // Or collecté
+  playerEssence: { type: Number, default: 0 }, // Essence collectée
+  playerGems: { type: Number, default: 0 }, // Gemmes collectées
 });
 const emit = defineEmits(['cellClick', 'goHome']);
 
@@ -868,6 +887,48 @@ function hasPotionBonus(r, c) {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* Resources card */
+.resources-card {
+  background: linear-gradient(145deg, #2a2e52, #1f2238);
+  border-radius: 14px;
+  border: 1px solid #3a3f5d;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 
+    0 2px 0 #1a1c30,
+    0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.resource-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  transition: background 0.2s ease;
+}
+
+.resource-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.resource-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.resource-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  min-width: 24px;
+  text-align: right;
 }
 
 .icon-btn {
