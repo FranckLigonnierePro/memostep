@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Génération Grilles MémoStep</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0f1020;
+      color: #e0e0e0;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #1e90ff;
+      text-align: center;
+    }
+    .test-section {
+      margin: 30px 0;
+      padding: 20px;
+      background: #1a1c30;
+      border-radius: 10px;
+      border: 2px solid #2a2e52;
+    }
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 5px;
+      margin: 20px 0;
+      max-width: 600px;
+    }
+    .cell {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 5px;
+      text-align: center;
+      word-break: break-word;
+    }
+    .cell-path {
+      background: linear-gradient(145deg, #1e90ff, #0b61d0);
+      color: white;
+      box-shadow: 0 0 10px rgba(30, 144, 255, 0.5);
+    }
+    .cell-neutral {
+      background: #3a3f3d;
+      color: #888;
+    }
+    .cell-trap_life {
+      background: linear-gradient(145deg, #e74c3c, #c0392b);
+      color: white;
+    }
+    .cell-trap_back2 {
+      background: linear-gradient(145deg, #f39c12, #e67e22);
+      color: white;
+    }
+    .cell-trap_stun {
+      background: linear-gradient(145deg, #f1c40f, #f39c12);
+      color: #333;
+    }
+    .cell-gold {
+      background: linear-gradient(145deg, #ffd700, #ffb700);
+      color: #333;
+    }
+    .cell-gem {
+      background: linear-gradient(145deg, #9b59b6, #8e44ad);
+      color: white;
+    }
+    .cell-essence {
+      background: linear-gradient(145deg, #3498db, #2980b9);
+      color: white;
+    }
+    .cell-potion {
+      background: linear-gradient(145deg, #2ecc71, #27ae60);
+      color: white;
+    }
+    .stats {
+      background: #0f1020;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 15px;
+      font-size: 13px;
+      line-height: 1.8;
+    }
+    .stats-title {
+      color: #1e90ff;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    button {
+      background: linear-gradient(145deg, #1e90ff, #0b61d0);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: linear-gradient(145deg, #0b61d0, #1e90ff);
+    }
+    .floor-title {
+      color: #12b886;
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎮 Test Génération Grilles MémoStep 🎮</h1>
+  
+  <div style="text-align: center; margin: 20px 0;">
+    <button onclick="runTests()">🔄 Générer de nouvelles grilles</button>
+    <button onclick="location.reload()">🏠 Recharger la page</button>
+  </div>
+  
+  <div id="results"></div>
+
+  <script type="module">
+    import { generateEnrichedGrid, generateRandomPath, debugGrid } from './src/lib/gridGenerator.js';
+    
+    window.runTests = function() {
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '';
+      
+      const runCounters = { gem: 0, potion: 0 };
+      
+      // Test étage 1
+      generateAndDisplay(1, runCounters);
+      
+      // Test étage 10
+      generateAndDisplay(10, runCounters);
+      
+      // Test étage 25
+      generateAndDisplay(25, runCounters);
+      
+      console.log('✅ Tests terminés !');
+    };
+    
+    function generateAndDisplay(floorNumber, runCounters) {
+      const path = generateRandomPath();
+      const { grid, runCounters: newCounters } = generateEnrichedGrid(path, floorNumber, { ...runCounters });
+      
+      // Mettre à jour les compteurs
+      Object.assign(runCounters, newCounters);
+      
+      // Afficher dans la console
+      debugGrid(grid, floorNumber);
+      
+      // Afficher dans le HTML
+      displayGrid(grid, floorNumber, runCounters);
+    }
+    
+    function displayGrid(grid, floorNumber, runCounters) {
+      const resultsDiv = document.getElementById('results');
+      
+      const section = document.createElement('div');
+      section.className = 'test-section';
+      
+      const title = document.createElement('div');
+      title.className = 'floor-title';
+      title.textContent = `Étage ${floorNumber}`;
+      section.appendChild(title);
+      
+      const gridContainer = document.createElement('div');
+      gridContainer.className = 'grid-container';
+      
+      const stats = {
+        path: 0,
+        neutral: 0,
+        trap_life: 0,
+        trap_back2: 0,
+        trap_stun: 0,
+        gold: 0,
+        gem: 0,
+        essence: 0,
+        potion: 0,
+        pathWithGold: 0,
+        pathWithEssence: 0
+      };
+      
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 4; c++) {
+          const cell = grid[r][c];
+          const cellDiv = document.createElement('div');
+          cellDiv.className = 'cell';
+          
+          if (cell.type === 'path') {
+            cellDiv.classList.add('cell-path');
+            stats.path++;
+            if (cell.gold) {
+              cellDiv.textContent = `PATH\n+${cell.gold}💰`;
+              stats.pathWithGold++;
+            } else if (cell.essence) {
+              cellDiv.textContent = `PATH\n+${cell.essence}⚡`;
+              stats.pathWithEssence++;
+            } else {
+              cellDiv.textContent = 'PATH';
+            }
+          } else if (cell.type === 'neutral') {
+            cellDiv.classList.add('cell-neutral');
+            cellDiv.textContent = '—';
+            stats.neutral++;
+          } else if (cell.type === 'trap_life') {
+            cellDiv.classList.add('cell-trap_life');
+            cellDiv.textContent = '💔 -1❤️';
+            stats.trap_life++;
+          } else if (cell.type === 'trap_back2') {
+            cellDiv.classList.add('cell-trap_back2');
+            cellDiv.textContent = '⬅️ -2';
+            stats.trap_back2++;
+          } else if (cell.type === 'trap_stun') {
+            cellDiv.classList.add('cell-trap_stun');
+            cellDiv.textContent = '⚡ STUN';
+            stats.trap_stun++;
+          } else if (cell.type === 'gold') {
+            cellDiv.classList.add('cell-gold');
+            cellDiv.textContent = `${cell.value}💰`;
+            stats.gold++;
+          } else if (cell.type === 'gem') {
+            cellDiv.classList.add('cell-gem');
+            cellDiv.textContent = '💎';
+            stats.gem++;
+          } else if (cell.type === 'essence') {
+            cellDiv.classList.add('cell-essence');
+            cellDiv.textContent = '⚡';
+            stats.essence++;
+          } else if (cell.type === 'potion') {
+            cellDiv.classList.add('cell-potion');
+            cellDiv.textContent = '🧪 +1❤️';
+            stats.potion++;
+          }
+          
+          gridContainer.appendChild(cellDiv);
+        }
+      }
+      
+      section.appendChild(gridContainer);
+      
+      // Statistiques
+      const statsDiv = document.createElement('div');
+      statsDiv.className = 'stats';
+      statsDiv.innerHTML = `
+        <div class="stats-title">📊 Statistiques</div>
+        <strong>Cases:</strong><br>
+        • Chemin: ${stats.path} | Neutres: ${stats.neutral}<br>
+        <br>
+        <strong>Pièges:</strong><br>
+        • Perte de vie (💔): ${stats.trap_life}<br>
+        • Recul -2 (⬅️): ${stats.trap_back2}<br>
+        • Stun (⚡): ${stats.trap_stun}<br>
+        <br>
+        <strong>Bonus:</strong><br>
+        • Or hors chemin: ${stats.gold}<br>
+        • Or sur chemin: ${stats.pathWithGold}<br>
+        • Gemmes: ${stats.gem}<br>
+        • Essence hors chemin: ${stats.essence}<br>
+        • Essence sur chemin: ${stats.pathWithEssence}<br>
+        • Potions: ${stats.potion}<br>
+        <br>
+        <strong>Compteurs globaux (run):</strong><br>
+        • Gemmes totales: ${runCounters.gem}/1<br>
+        • Potions totales: ${runCounters.potion}/1
+      `;
+      section.appendChild(statsDiv);
+      
+      resultsDiv.appendChild(section);
+    }
+    
+    // Lancer les tests au chargement
+    window.runTests();
+  </script>
+</body>
+</html>

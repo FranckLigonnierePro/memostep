@@ -1,0 +1,125 @@
+{
+  "cells": {
+    "path": {
+      "type": "path",
+      "description": "Case correcte du parcours",
+      "maxPerLine": 1,
+      "placement": "always_one_per_line",
+      "onClick": "advance",
+      "canContain": {
+        "gold": {
+          "baseChance": 0.05,
+          "perFloorBonus": 0.01,
+          "maxChance": 0.15,
+          "valueMin": 3,
+          "valueMax": 6
+        },
+        "essence": {
+          "baseChance": 0.02,
+          "perFloorBonus": 0.005,
+          "maxChance": 0.08,
+          "value": 1
+        }
+      }
+    },
+
+    "neutral": {
+      "type": "neutral",
+      "description": "Mauvaise case sans piège",
+      "onClick": "bounce_to_last_safe",
+      "fx": { "sound": "fail_soft", "shake": true }
+    }
+  },
+
+  "traps": {
+    "life_loss": {
+      "type": "trap_life",
+      "description": "Perd 1 coeur",
+      "baseChancePerLine": 0.05,
+      "perFloorBonus": 0.005,
+      "maxChance": 0.10,
+      "placement": "adjacent_to_path",
+      "limits": {
+        "maxPerLine": 1,
+        "noTrapBeforeFloor": 1
+      },
+      "onClick": {
+        "loseHeart": 1,
+        "bounceToLastSafe": true,
+        "invulnerabilityMs": 800
+      }
+    },
+
+    "back_two": {
+      "type": "trap_back2",
+      "description": "Recul de 2 cases",
+      "baseChancePerLine": 0.06,
+      "perFloorBonus": 0.005,
+      "maxChance": 0.12,
+      "placement": "adjacent_to_path",
+      "limits": {
+        "maxPerLine": 1,
+        "noTrapBeforeFloor": 2
+      },
+      "onClick": {
+        "moveBack": 2,
+        "invulnerabilityMs": 600
+      }
+    },
+
+    "stun": {
+      "type": "trap_stun",
+      "description": "Stun 1 seconde",
+      "baseChancePerLine": 0.06,
+      "perFloorBonus": 0.005,
+      "maxChance": 0.12,
+      "placement": "adjacent_to_path",
+      "limits": {
+        "maxPerLine": 1,
+        "noTrapBeforeFloor": 3
+      },
+      "onClick": {
+        "stunMs": 1000,
+        "invulnerabilityMs": 600
+      }
+    }
+  },
+
+  "bonuses": {
+    "gold": {
+      "type": "gold",
+      "baseChancePerFloor": 0.20,
+      "perFloorBonus": 0.02,
+      "maxChance": 0.40,
+      "placement": "adjacent_to_path",
+      "maxPerFloor": 2,
+      "valueMin": 3,
+      "valueMax": 7
+    },
+    "gem": {
+      "type": "gem",
+      "baseChancePerFloor": 0.02,
+      "perFloorBonus": 0.003,
+      "maxChance": 0.06,
+      "placement": "adjacent_to_path",
+      "maxPerRun": 1
+    },
+    "essence": {
+      "type": "essence",
+      "baseChancePerFloor": 0.08,
+      "perFloorBonus": 0.02,
+      "maxChance": 0.20,
+      "placement": "on_path_or_adjacent",
+      "maxPerFloor": 1
+    },
+    "potion": {
+      "type": "potion",
+      "baseChancePerFloor": 0.06,
+      "perFloorBonus": 0.01,
+      "maxChance": 0.12,
+      "placement": "adjacent_to_path_not_first_line",
+      "maxPerRun": 1,
+      "effect": "restore_1_heart"
+    }
+  }
+}

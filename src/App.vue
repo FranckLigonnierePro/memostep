@@ -359,6 +359,7 @@ import {
   setAudioMuted,
 } from './lib/storage.js';
 import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult, reportLifeLoss, setPlayerProgress, resetRoom, usePower, leaveRoom } from './lib/realtime_v2.js';
+import { generateEnrichedGrid } from './lib/gridGenerator.js';
 
 // Get supabase instance for direct updates
 let supabase = null;
@@ -853,6 +854,8 @@ function resumeMainMusic() {
 const justLost = ref(false);
 const soloLivesUsed = ref(0);
 const soloLevel = ref(0);
+// Compteurs globaux pour maxPerRun (gemmes, potions) - réinitialisés à chaque session solo
+const runCounters = ref({ gem: 0, potion: 0 });
 const versusLivesUsed = computed(() => {
   if (state.mode !== 'versus') return 0;
   const room = versusRoom.value;
@@ -1300,6 +1303,50 @@ function generateBorderHazards() {
   for (const k of lifeSlice) state.lifeLoss.add(k);
 }
 
+/**
+ * Nouvelle fonction : Applique la grille enrichie générée par gridGenerator.js
+ * Lit gridContent.json et applique les probabilités dynamiques selon l'étage
+ * @param {number} floorNumber - Numéro de l'étage (commence à 1)
+ * @param {Object} runCounters - Compteurs globaux pour maxPerRun
+ */
+function applyEnrichedGrid(floorNumber = 1, runCounters = { gem: 0, potion: 0 }) {
+  // Générer la grille enrichie basée sur gridContent.json
+  const { grid, runCounters: newCounters } = generateEnrichedGrid(state.path, floorNumber, runCounters);
+  
+  // Réinitialiser les sets existants
+  state.rollback.clear();
+  state.stun.clear();
+  state.lifeLoss.clear();
+  state.decoys.clear();
+  
+  // Parcourir la grille et appliquer les éléments au state
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const cell = grid[r][c];
+      const key = `${r}-${c}`;
+      
+      // Appliquer les pièges
+      if (cell.type === 'trap_life') {
+        state.lifeLoss.add(key);
+      } else if (cell.type === 'trap_back2') {
+        state.rollback.add(key);
+      } else if (cell.type === 'trap_stun') {
+        state.stun.add(key);
+      }
+      
+      // Les bonus (or, gemme, essence, potion) sont gérés visuellement
+      // mais ne nécessitent pas de modification du state actuel
+      // car le système existant ne les affiche pas encore
+      
+      // Note: Pour afficher les bonus, il faudrait étendre le state
+      // avec une structure comme state.gridContent = grid
+      // et modifier BoardView pour afficher les icônes de bonus
+    }
+  }
+  
+  return newCounters;
+}
+
 function dailySeed() {
   const d = new Date();
   // Use UTC date so the daily seed is identical worldwide (YYYYMMDD)
@@ -1344,14 +1391,17 @@ function startMode(mode) {
     soloLivesUsed.value = 0;
     // reset solo level at the start of a solo session
     soloLevel.value = 0;
+    // Réinitialiser les compteurs globaux pour une nouvelle session
+    runCounters.value = { gem: 0, potion: 0 };
     // starting solo from home should create a new path
     state.soloPath = randomPath();
     state.path = state.soloPath;
     // First level: no heart yet; future heart will be prepared after this level is passed
     state.heartCell = null;
     state.preparedHeart = null;
-    generateSoloDecoys();
-    generateBorderHazards();
+    // Utiliser le nouveau système de génération basé sur gridContent.json
+    // L'étage commence à 1
+    runCounters.value = applyEnrichedGrid(1, runCounters.value);
   } else if (mode === 'versus' || mode === 'battle') {
     // Placeholder: start like solo for now
     state.path = randomPath();
@@ -2170,8 +2220,10 @@ function newGame() {
     // Activate prepared heart for this new path (if any), then clear preparation
     state.heartCell = state.preparedHeart || null;
     state.preparedHeart = null;
-    generateSoloDecoys();
-    generateBorderHazards();
+    // Utiliser le nouveau système de génération basé sur gridContent.json
+    // L'étage est soloLevel + 1 (car on vient de l'incrémenter avant d'appeler newGame)
+    const currentFloor = Math.max(1, (soloLevel.value || 0) + 1);
+    runCounters.value = applyEnrichedGrid(currentFloor, runCounters.value);
   } else if (state.mode === 'versus' || state.mode === 'battle') {
     // Placeholder: same as solo for now
     state.path = randomPath();
