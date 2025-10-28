@@ -18,28 +18,62 @@
             >
               <div class="cell-inner" :class="{ frozen: frozenGrid }" :style="pathRevealStyle(cell.r, cell.c)">
                 <div class="cell-face front" :class="[cellClass(cell.r, cell.c), { 'stun-shadow': isStunCell(cell.r, cell.c) }]">
-                  <img v-if="!hasDecor(cell.r, cell.c)" class="cell-stone" :src="stone" alt="" />
-                  <img v-if="isPathCell(cell.r, cell.c)" class="cell-stone path-stone" :src="stoneGood" alt="" />
-                  <img v-if="isCorrectCell(cell.r, cell.c)" class="cell-stone correct-stone" :src="stoneGreen" alt="" />
-                  <div v-if="isCellWrong(cell.r, cell.c)" class="stone-fade">
-                    <img class="stone-frame f1" :src="stone" alt="" />
-                    <img class="stone-frame f2" :src="stone2" alt="" />
-                    <img class="stone-frame f3" :src="stone3" alt="" />
+                  <!-- Indicateurs visuels selon le type de case -->
+                  
+                  <!-- BONUS (cases valides en violet) -->
+                  <div v-if="isBonusCell(cell.r, cell.c)" class="cell-indicator bonus-indicator">
+                    <div class="indicator-icon">{{ getBonusIcon(cell.r, cell.c) }}</div>
+                    <div class="indicator-label">BONUS</div>
                   </div>
-                  <!-- Markers: always show
-                       - triangle on stun cells
-                       - cross on rollback cells
-                       - circle on any other non-path cell -->
-                  <div v-if="isStunCell(cell.r, cell.c)" class="mark mark-triangle" aria-hidden="true"></div>
-                  <div v-else-if="isRollbackCell(cell.r, cell.c)" class="mark mark-cross" aria-hidden="true"></div>
-                  <div v-else-if="isNonPathCell(cell.r, cell.c)" class="mark mark-circle" aria-hidden="true"></div>
+                  
+                  <!-- CHEMIN (PATH) -->
+                  <div v-else-if="isPathCell(cell.r, cell.c)" class="cell-indicator path-indicator">
+                    <div class="indicator-icon">✓</div>
+                    <div class="indicator-label">CHEMIN</div>
+                  </div>
+                  
+                  <!-- CORRECT (validé) -->
+                  <div v-else-if="isCorrectCell(cell.r, cell.c)" class="cell-indicator correct-indicator">
+                    <div class="indicator-icon">✓</div>
+                    <div class="indicator-label">VALIDÉ</div>
+                  </div>
+                  
+                  <!-- WRONG (erreur) -->
+                  <div v-else-if="isCellWrong(cell.r, cell.c)" class="cell-indicator wrong-indicator">
+                    <div class="indicator-icon">✗</div>
+                    <div class="indicator-label">ERREUR</div>
+                  </div>
+                  
+                  <!-- PIÈGES -->
+                  <div v-else-if="isStunCell(cell.r, cell.c)" class="cell-indicator trap-indicator stun">
+                    <div class="indicator-icon">⚡</div>
+                    <div class="indicator-label">STUN</div>
+                  </div>
+                  <div v-else-if="isRollbackCell(cell.r, cell.c)" class="cell-indicator trap-indicator rollback">
+                    <div class="indicator-icon">⬅</div>
+                    <div class="indicator-label">RECUL -2</div>
+                  </div>
+                  <div v-else-if="lifeLossKeys.includes(`${cell.r}-${cell.c}`)" class="cell-indicator trap-indicator life">
+                    <div class="indicator-icon">💔</div>
+                    <div class="indicator-label">-1 VIE</div>
+                  </div>
+                  
+                  <!-- NEUTRE (par défaut) -->
+                  <div v-else class="cell-indicator neutral-indicator">
+                    <div class="indicator-icon">○</div>
+                    <div class="indicator-label">NEUTRE</div>
+                  </div>
+                  
                   <!-- Heart drop (solo reward) -->
                   <div v-if="showHeart(cell.r, cell.c)" class="heart-drop" title="+1 vie">
                     <Heart />
                   </div>
                 </div>
                 <div class="cell-face back" :class="cellClass(cell.r, cell.c)">
-                  <img v-if="!hasDecor(cell.r, cell.c)" class="cell-stone" :src="stone" alt="" />
+                  <!-- Back face simple -->
+                  <div class="cell-indicator back-indicator">
+                    <div class="indicator-icon">?</div>
+                  </div>
                 </div>
                 <!-- Ice overlay for frozen grid -->
                 <div v-if="frozenGrid" class="ice-overlay" :class="{ cracking: frozenClicksLeft <= 4 }">
@@ -188,6 +222,8 @@ const props = defineProps({
   lifeLossKeys: { type: Array, default: () => [] }, // ['r-c'] cells that cause life loss
   stunKeys: { type: Array, default: () => [] }, // ['r-c'] cells that stun
   stunActive: { type: Boolean, default: false }, // show loader on solo avatar when stunned
+  gridContent: { type: [Array, Object], default: null }, // grid[r][c] with bonus/trap info
+  collectedBonuses: { type: Array, default: () => [] }, // ['r-c'] collected bonus cells
 });
 const emit = defineEmits(['cellClick', 'goHome']);
 
@@ -548,6 +584,91 @@ function brokenCrackStyle(crackIndex) {
   ];
   return patterns[(crackIndex - 1) % patterns.length];
 }
+
+// Get cell content from gridContent
+function getCellContent(r, c) {
+  if (!props.gridContent || !Array.isArray(props.gridContent)) {
+    if (r === 0 && c === 0) {
+      console.log('[getCellContent] gridContent non disponible:', props.gridContent);
+    }
+    return null;
+  }
+  if (r < 0 || r >= props.gridContent.length) return null;
+  if (c < 0 || !props.gridContent[r] || c >= props.gridContent[r].length) return null;
+  return props.gridContent[r][c];
+}
+
+// Check if bonus is already collected
+function isBonusCollected(r, c) {
+  const key = `${r}-${c}`;
+  return props.collectedBonuses && props.collectedBonuses.includes(key);
+}
+
+// Check if cell is a bonus cell (gold, gem, essence, potion)
+function isBonusCell(r, c) {
+  if (isBonusCollected(r, c)) return false;
+  const cell = getCellContent(r, c);
+  if (!cell) return false;
+  return cell.type === 'gold' || cell.type === 'gem' || 
+         cell.type === 'essence' || cell.type === 'potion';
+}
+
+// Get bonus icon for display
+function getBonusIcon(r, c) {
+  const cell = getCellContent(r, c);
+  if (!cell) return '?';
+  const icons = {
+    'gold': '💰',
+    'gem': '💎',
+    'essence': '⚡',
+    'potion': '🧪'
+  };
+  return icons[cell.type] || '?';
+}
+
+// Check if cell has gold bonus (on path or adjacent)
+function hasGoldBonus(r, c) {
+  if (isBonusCollected(r, c)) return false;
+  const cell = getCellContent(r, c);
+  if (!cell) return false;
+  // Gold on path
+  if (cell.type === 'path' && cell.gold) {
+    console.log(`[hasGoldBonus] Or trouvé sur chemin (${r},${c}):`, cell.gold);
+    return { value: cell.gold, onPath: true };
+  }
+  // Gold adjacent to path
+  if (cell.type === 'gold' && cell.value) {
+    console.log(`[hasGoldBonus] Or trouvé adjacent (${r},${c}):`, cell.value);
+    return { value: cell.value, onPath: false };
+  }
+  return false;
+}
+
+// Check if cell has gem bonus
+function hasGemBonus(r, c) {
+  if (isBonusCollected(r, c)) return false;
+  const cell = getCellContent(r, c);
+  return cell && cell.type === 'gem';
+}
+
+// Check if cell has essence bonus
+function hasEssenceBonus(r, c) {
+  if (isBonusCollected(r, c)) return false;
+  const cell = getCellContent(r, c);
+  if (!cell) return false;
+  // Essence on path
+  if (cell.type === 'path' && cell.essence) return { value: cell.essence, onPath: true };
+  // Essence adjacent to path
+  if (cell.type === 'essence') return { value: 1, onPath: false };
+  return false;
+}
+
+// Check if cell has potion bonus
+function hasPotionBonus(r, c) {
+  if (isBonusCollected(r, c)) return false;
+  const cell = getCellContent(r, c);
+  return cell && cell.type === 'potion';
+}
 </script>
 
 <style scoped>
@@ -880,7 +1001,7 @@ function brokenCrackStyle(crackIndex) {
   position: absolute;
   inset: 0;
   border-radius: 10px;
-  border: none;
+  border: 2px solid rgba(255, 255, 255, 0.1);
   backface-visibility: hidden;
   transition: all .12s ease;
   will-change: transform, background, border-color, box-shadow;
@@ -889,6 +1010,94 @@ function brokenCrackStyle(crackIndex) {
     0 6px 10px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Indicateurs visuels */
+.cell-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  gap: 4px;
+}
+
+.indicator-icon {
+  font-size: 24px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.indicator-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.9;
+}
+
+/* BONUS - Cases bonus valides (violet) */
+.bonus-indicator {
+  background: linear-gradient(145deg, #9b59b6, #8e44ad);
+  color: white;
+}
+
+/* PATH - Chemin (bleu) */
+.path-indicator {
+  background: linear-gradient(145deg, #1e90ff, #0b61d0);
+  color: white;
+}
+
+/* CORRECT - Validé (vert) */
+.correct-indicator {
+  background: linear-gradient(145deg, #24a95b, #27ae60);
+  color: white;
+}
+
+/* WRONG - Erreur (rouge) */
+.wrong-indicator {
+  background: linear-gradient(145deg, #e74c3c, #c0392b);
+  color: white;
+  animation: wrongPulse 0.6s ease-out;
+}
+
+/* TRAP - Pièges (orange/jaune) */
+.trap-indicator {
+  color: white;
+}
+
+.trap-indicator.stun {
+  background: linear-gradient(145deg, #f1c40f, #f39c12);
+  color: #333;
+}
+
+.trap-indicator.rollback {
+  background: linear-gradient(145deg, #f39c12, #e67e22);
+}
+
+.trap-indicator.life {
+  background: linear-gradient(145deg, #e74c3c, #c0392b);
+}
+
+/* NEUTRAL - Neutre (gris) */
+.neutral-indicator {
+  background: linear-gradient(145deg, #5a5f6d, #3a3f3d);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* BACK - Face arrière */
+.back-indicator {
+  background: linear-gradient(145deg, #2a2e52, #1a1c30);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.back-indicator .indicator-icon {
+  font-size: 32px;
 }
 
 /* Front visuals (path/start/end/correct/wrong) */
@@ -983,62 +1192,56 @@ function brokenCrackStyle(crackIndex) {
   50% { transform: translateY(-2px); opacity: 1; }
 }
 
+/* Bonus icons overlay */
+.bonus-icon {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  font-size: 16px;
+  z-index: 7;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  animation: bonusFloat 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.gold-icon {
+  animation-delay: 0s;
+}
+
+.gem-icon {
+  animation-delay: 0.2s;
+  font-size: 18px;
+}
+
+.essence-icon {
+  animation-delay: 0.4s;
+  bottom: 4px;
+  left: 4px;
+  right: auto;
+}
+
+.potion-icon {
+  animation-delay: 0.6s;
+  font-size: 18px;
+}
+
+@keyframes bonusFloat {
+  0%, 100% { 
+    transform: translateY(0) scale(1); 
+    opacity: 0.9; 
+  }
+  50% { 
+    transform: translateY(-3px) scale(1.1); 
+    opacity: 1; 
+  }
+}
+
 /* Outline the path on the back face */
 .cell-face.back.path  { background: linear-gradient(145deg, #1e90ff, #0b61d0); }
 .cell-face.back.start { background: linear-gradient(145deg, #1e90ff, #0b61d0); }
 .cell-face.back.end   { background: linear-gradient(145deg, #1e90ff, #0b61d0); }
 
-/* Stone image filling the cell face */
-.cell-stone {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: inherit;
-  display: block;
-}
-
-.stone-fade {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 4;
-}
-
-.stone-frame {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: inherit;
-  opacity: 0;
-}
-
-.stone-frame.f1 { animation: stoneFade1 420ms ease-out forwards; }
-.stone-frame.f2 { animation: stoneFade2 420ms ease-out forwards; }
-.stone-frame.f3 { animation: stoneFade3 420ms ease-out forwards; }
-
-@keyframes stoneFade1 {
-  0% { opacity: 1; }
-  33% { opacity: 0; }
-  100% { opacity: 0; }
-}
-
-@keyframes stoneFade2 {
-  0% { opacity: 0; }
-  33% { opacity: 1; }
-  66% { opacity: 0; }
-  100% { opacity: 0; }
-}
-
-@keyframes stoneFade3 {
-  0% { opacity: 0; }
-  66% { opacity: 1; }
-  100% { opacity: 1; }
-}
+/* Styles obsolètes supprimés - remplacés par les indicateurs visuels */
 
 
 /* Heart blink animation for power card */

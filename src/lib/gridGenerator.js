@@ -39,6 +39,14 @@ function isAdjacentToPath(r, c, pathSet) {
 
 /**
  * Génère une grille enrichie avec pièges et bonus selon gridContent.json
+ * 
+ * RÈGLES STRICTES :
+ * - 1 case chemin par ligne
+ * - Pièges : TOUJOURS adjacent au chemin, MAX 1 par ligne, JAMAIS sur chemin
+ * - Bonus sur chemin : SEULEMENT or et essence
+ * - Bonus adjacent : or, gemme, essence, potion
+ * - Gemme et potion : JAMAIS sur le chemin
+ * 
  * @param {Array} path - Chemin [{r, c}, ...]
  * @param {number} floorNumber - Numéro de l'étage (commence à 1)
  * @param {Object} runCounters - Compteurs pour maxPerRun {gem: 0, potion: 0}
@@ -53,19 +61,20 @@ export function generateEnrichedGrid(path, floorNumber = 1, runCounters = { gem:
   // Créer un Set du chemin pour recherche rapide
   const pathSet = new Set(path.map(p => `${p.r}-${p.c}`));
   
-  // Marquer les cases du chemin
+  // Marquer les cases du chemin (sans bonus pour l'instant)
   path.forEach(p => {
     grid[p.r][p.c] = { type: 'path' };
   });
   
   // Compteurs pour les limites par étage
   const floorCounters = {
-    gold: 0,
-    essence: 0,
-    traps: 0 // 1 piège max par ligne
+    goldPath: 0,      // Or sur le chemin
+    goldAdjacent: 0,  // Or adjacent au chemin
+    essencePath: 0,   // Essence sur le chemin
+    essenceAdjacent: 0 // Essence adjacent au chemin
   };
   
-  // === PHASE 1: Placer les bonus et pièges sur les cases NON-CHEMIN ===
+  // === PHASE 1: Placer les PIÈGES sur les cases ADJACENTES au chemin ===
   
   // Collecter toutes les cases adjacentes au chemin (non-chemin)
   const adjacentCells = [];
@@ -145,26 +154,10 @@ export function generateEnrichedGrid(path, floorNumber = 1, runCounters = { gem:
         }
       }
       
-      // === BONUS (adjacent_to_path) ===
+      // === BONUS ADJACENTS (JAMAIS sur le chemin) ===
+      // RÈGLE: Gemme et Potion ne peuvent PAS être sur le chemin
       
-      // Or (maxPerFloor: 2)
-      const bonusGold = gridConfig.bonuses.gold;
-      if (floorCounters.gold < bonusGold.maxPerFloor) {
-        const chanceGold = calculateChance(
-          bonusGold.baseChancePerFloor / ROWS, // Diviser par lignes pour avoir une chance par case
-          bonusGold.perFloorBonus / ROWS,
-          bonusGold.maxChance / ROWS,
-          floorNumber
-        );
-        if (Math.random() < chanceGold) {
-          const value = randomInt(bonusGold.valueMin, bonusGold.valueMax);
-          grid[r][c] = { type: bonusGold.type, value };
-          floorCounters.gold++;
-          continue;
-        }
-      }
-      
-      // Gemme (maxPerRun: 1)
+      // Gemme (UNIQUEMENT adjacent, maxPerRun: 1)
       const bonusGem = gridConfig.bonuses.gem;
       if (runCounters.gem < bonusGem.maxPerRun) {
         const chanceGem = calculateChance(
@@ -180,7 +173,7 @@ export function generateEnrichedGrid(path, floorNumber = 1, runCounters = { gem:
         }
       }
       
-      // Potion (maxPerRun: 1, pas sur première ligne)
+      // Potion (UNIQUEMENT adjacent, maxPerRun: 1, pas sur première ligne)
       const bonusPotion = gridConfig.bonuses.potion;
       if (r > 0 && runCounters.potion < bonusPotion.maxPerRun) {
         const chancePotion = calculateChance(
@@ -196,9 +189,28 @@ export function generateEnrichedGrid(path, floorNumber = 1, runCounters = { gem:
         }
       }
       
-      // Essence (adjacent, maxPerFloor: 1) - NE PAS placer sur le chemin ici
+      // Or adjacent (maxPerFloor: 2 au total, compteur séparé)
+      const bonusGold = gridConfig.bonuses.gold;
+      const totalGold = floorCounters.goldPath + floorCounters.goldAdjacent;
+      if (totalGold < bonusGold.maxPerFloor) {
+        const chanceGold = calculateChance(
+          bonusGold.baseChancePerFloor / ROWS,
+          bonusGold.perFloorBonus / ROWS,
+          bonusGold.maxChance / ROWS,
+          floorNumber
+        );
+        if (Math.random() < chanceGold) {
+          const value = randomInt(bonusGold.valueMin, bonusGold.valueMax);
+          grid[r][c] = { type: bonusGold.type, value };
+          floorCounters.goldAdjacent++;
+          continue;
+        }
+      }
+      
+      // Essence adjacent (maxPerFloor: 1 au total, compteur séparé)
       const bonusEssence = gridConfig.bonuses.essence;
-      if (floorCounters.essence < bonusEssence.maxPerFloor) {
+      const totalEssence = floorCounters.essencePath + floorCounters.essenceAdjacent;
+      if (totalEssence < bonusEssence.maxPerFloor) {
         const chanceEssence = calculateChance(
           bonusEssence.baseChancePerFloor / ROWS,
           bonusEssence.perFloorBonus / ROWS,
@@ -207,35 +219,41 @@ export function generateEnrichedGrid(path, floorNumber = 1, runCounters = { gem:
         );
         if (Math.random() < chanceEssence) {
           grid[r][c] = { type: bonusEssence.type };
-          floorCounters.essence++;
+          floorCounters.essenceAdjacent++;
           continue;
         }
       }
     }
   }
   
-  // === PHASE 2: Enrichir les cases du CHEMIN avec or/essence ===
+  // === PHASE 2: Enrichir les cases du CHEMIN avec or/essence UNIQUEMENT ===
+  // RÈGLE: Seuls l'or et l'essence peuvent être sur le chemin
   
   for (const p of path) {
     const { r, c } = p;
     
-    // Or sur le chemin
+    // Or sur le chemin (maxPerFloor: 2 au total avec adjacent)
     const pathGold = gridConfig.cells.path.canContain.gold;
-    const chancePathGold = calculateChance(
-      pathGold.baseChance,
-      pathGold.perFloorBonus,
-      pathGold.maxChance,
-      floorNumber
-    );
-    if (Math.random() < chancePathGold) {
-      const value = randomInt(pathGold.valueMin, pathGold.valueMax);
-      grid[r][c] = { type: 'path', gold: value };
-      continue;
+    const totalGold = floorCounters.goldPath + floorCounters.goldAdjacent;
+    if (totalGold < gridConfig.bonuses.gold.maxPerFloor) {
+      const chancePathGold = calculateChance(
+        pathGold.baseChance,
+        pathGold.perFloorBonus,
+        pathGold.maxChance,
+        floorNumber
+      );
+      if (Math.random() < chancePathGold) {
+        const value = randomInt(pathGold.valueMin, pathGold.valueMax);
+        grid[r][c] = { type: 'path', gold: value };
+        floorCounters.goldPath++;
+        continue;
+      }
     }
     
-    // Essence sur le chemin (si pas déjà atteint maxPerFloor)
-    if (floorCounters.essence < gridConfig.bonuses.essence.maxPerFloor) {
-      const pathEssence = gridConfig.cells.path.canContain.essence;
+    // Essence sur le chemin (maxPerFloor: 1 au total avec adjacent)
+    const pathEssence = gridConfig.cells.path.canContain.essence;
+    const totalEssence = floorCounters.essencePath + floorCounters.essenceAdjacent;
+    if (totalEssence < gridConfig.bonuses.essence.maxPerFloor) {
       const chancePathEssence = calculateChance(
         pathEssence.baseChance,
         pathEssence.perFloorBonus,
@@ -244,7 +262,7 @@ export function generateEnrichedGrid(path, floorNumber = 1, runCounters = { gem:
       );
       if (Math.random() < chancePathEssence) {
         grid[r][c] = { type: 'path', essence: pathEssence.value };
-        floorCounters.essence++;
+        floorCounters.essencePath++;
         continue;
       }
     }

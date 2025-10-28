@@ -116,6 +116,8 @@
       :lifeLossKeys="Array.from(state.lifeLoss || [])"
       :stunKeys="Array.from(state.stun || [])"
       :stunActive="stunActive"
+      :gridContent="state.gridContent"
+      :collectedBonuses="Array.from(state.collectedBonuses || [])"
       @cellClick="onCellClick"
       @goHome="goHome"
       @newGame="newGame"
@@ -517,6 +519,10 @@ const state = reactive({
   frozenClicksLeft: 0,  // how many clicks left to break ice (starts at 8)
   powerUsed: false,     // whether freeze power has been used this round
   showSnowstorm: false, // whether to show snowstorm animation
+  // Grille enrichie avec bonus et pièges (générée par gridGenerator.js)
+  gridContent: null,    // grid[r][c] = { type, value?, gold?, essence? }
+  // Bonus collectés (cases cliquées après validation du chemin adjacent)
+  collectedBonuses: new Set(), // 'r-c'
 });
 
 // Flip wave animation control (top -> bottom)
@@ -1313,6 +1319,24 @@ function applyEnrichedGrid(floorNumber = 1, runCounters = { gem: 0, potion: 0 })
   // Générer la grille enrichie basée sur gridContent.json
   const { grid, runCounters: newCounters } = generateEnrichedGrid(state.path, floorNumber, runCounters);
   
+  // Stocker la grille enrichie dans le state pour affichage visuel
+  state.gridContent = grid;
+  
+  // Debug: vérifier que la grille contient des bonus
+  console.log('[applyEnrichedGrid] Étage:', floorNumber);
+  console.log('[applyEnrichedGrid] Grille générée:', grid);
+  let bonusCount = { gold: 0, gem: 0, essence: 0, potion: 0 };
+  for (let r = 0; r < grid.length; r++) {
+    for (let c = 0; c < grid[r].length; c++) {
+      const cell = grid[r][c];
+      if (cell.type === 'gold' || (cell.type === 'path' && cell.gold)) bonusCount.gold++;
+      if (cell.type === 'gem') bonusCount.gem++;
+      if (cell.type === 'essence' || (cell.type === 'path' && cell.essence)) bonusCount.essence++;
+      if (cell.type === 'potion') bonusCount.potion++;
+    }
+  }
+  console.log('[applyEnrichedGrid] Bonus trouvés:', bonusCount);
+  
   // Réinitialiser les sets existants
   state.rollback.clear();
   state.stun.clear();
@@ -1334,13 +1358,8 @@ function applyEnrichedGrid(floorNumber = 1, runCounters = { gem: 0, potion: 0 })
         state.stun.add(key);
       }
       
-      // Les bonus (or, gemme, essence, potion) sont gérés visuellement
-      // mais ne nécessitent pas de modification du state actuel
-      // car le système existant ne les affiche pas encore
-      
-      // Note: Pour afficher les bonus, il faudrait étendre le state
-      // avec une structure comme state.gridContent = grid
-      // et modifier BoardView pour afficher les icônes de bonus
+      // Les bonus (or, gemme, essence, potion) sont maintenant stockés
+      // dans state.gridContent et seront affichés par BoardView
     }
   }
   
@@ -1412,6 +1431,7 @@ function startMode(mode) {
   state.nextIndex = 0;
   state.correctSet.clear();
   state.wrongSet.clear();
+  state.collectedBonuses.clear();
   if (mode === 'solo' || mode === 'daily') {
     // Show champion selector and start after selection or timeout
     // For daily we don't show champion selector; keep normal flow
@@ -1500,6 +1520,46 @@ function onCellClick(r, c) {
   if (!state.inPlay) return;
   if (clickBlocked.value) return; // Block clicks during shake animation
   const keyAlready = `${r}-${c}`;
+  
+  // Check if this is a bonus cell - treat as valid path cell (violet)
+  if (state.gridContent && state.gridContent[r] && state.gridContent[r][c]) {
+    const cell = state.gridContent[r][c];
+    const isBonusCell = (cell.type === 'gold' || cell.type === 'gem' || cell.type === 'essence' || cell.type === 'potion');
+    
+    if (isBonusCell && !state.collectedBonuses.has(keyAlready)) {
+      // Vérifier que le bonus est sur la même ligne que la prochaine case attendue
+      const expect = state.path[state.nextIndex];
+      if (expect && expect.r === r) {
+        // Bonus sur la bonne ligne - traiter comme case valide
+        state.correctSet.add(keyAlready);
+        state.collectedBonuses.add(keyAlready);
+        state.nextIndex++; // Avancer à la ligne suivante
+        console.log(`[Bonus collecté] ${cell.type} à (${r},${c}) - Progression: ${state.nextIndex}/${state.path.length}`);
+        
+        // TODO: Ajouter les effets (or, gemme, essence, potion)
+        
+        // Vérifier si c'est la fin du chemin
+        if (state.nextIndex === state.path.length) {
+          state.statusText = t('status.bravo');
+          state.inPlay = false;
+          stopChrono();
+          state.revealed = true;
+          const FLIP_BACK_STEP = 70;
+          const FLIP_BACK_DUR = 420;
+          const backTotal = ROWS * FLIP_BACK_STEP + FLIP_BACK_DUR;
+          flipBackActive.value = true;
+          setTimeout(() => {
+            flipBackActive.value = false;
+            faceDownActive.value = false;
+            winActive.value = true;
+          }, backTotal);
+        }
+        
+        return; // Treated as correct cell
+      }
+    }
+  }
+  
   // Ignore repeated clicks on cells already validated as correct or marked as wrong
   if (state.correctSet.has(keyAlready)) return;
   if (state.wrongSet.has(keyAlready)) return;
@@ -1799,7 +1859,9 @@ function onCellClick(r, c) {
         }
       })();
     } else {
-      // Daily/Solo modes: if cell is a rollback cell, move back 2 steps instead of losing a heart
+      // Daily/Solo modes: check type of cell clicked
+      
+      // 1. Rollback cell (trap_back2): move back 2 steps, no life loss
       if (state.rollback.has(key)) {
         const prevIndex = state.nextIndex;
         const newIndex = Math.max(0, prevIndex - 2);
@@ -1811,7 +1873,21 @@ function onCellClick(r, c) {
         state.nextIndex = newIndex;
         return; // no life loss
       }
-      // Otherwise: lose a heart
+      
+      // 2. Neutral cell: stay in place, no life loss, no effect
+      const isNeutralCell = state.gridContent && 
+                           state.gridContent[r] && 
+                           state.gridContent[r][c] && 
+                           state.gridContent[r][c].type === 'neutral';
+      
+      if (isNeutralCell) {
+        // Just mark as wrong, but stay at current position (no life loss, no reset)
+        state.statusText = t('status.miss');
+        return; // no life loss, no position change
+      }
+      
+      // 3. Life loss cell (trap_life): lose a heart
+      // Otherwise: lose a heart (trap or wrong path cell)
       if (state.mode === 'daily') {
         try {
           const attempts = markDailyAttempt();
@@ -2233,6 +2309,7 @@ function newGame() {
   state.nextIndex = 0;
   state.correctSet.clear();
   state.wrongSet.clear();
+  state.collectedBonuses.clear();
   faceDownActive.value = false;
   stopChrono();
   // ensure timeText resets immediately
