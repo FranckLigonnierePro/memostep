@@ -83,8 +83,8 @@
                 </div>
               </div>
             </div>
-            <!-- Player avatar overlay for solo/daily modes -->
-            <div v-if="(mode === 'solo' || mode === 'daily') && selectedAvatar" class="solo-player-overlay">
+            <!-- Player avatar overlay for solo mode -->
+            <div v-if="(mode === 'solo') && selectedAvatar" class="solo-player-overlay">
               <div
                 class="player-bubble solo-avatar"
                 :style="soloPlayerPosition()"
@@ -151,9 +151,9 @@
           <button class="icon-btn" :aria-label="$t('board.home')" @click="emit('goHome')">
             <Home :size="28" aria-hidden="true" />
           </button>
-          <!-- Lives hearts under Home button (daily, solo & versus) -->
+          <!-- Lives hearts under Home button (solo & versus) -->
           <div
-            v-if="mode === 'daily' || mode === 'solo' || mode === 'versus'"
+            v-if="mode === 'solo' || mode === 'versus'"
             class="hearts"
             aria-label="Vies restantes"
             role="group"
@@ -383,6 +383,28 @@ function soloPlayerPosition() {
   if (actualIndex >= 0 && actualIndex < props.path.length) {
     const cell = props.path[actualIndex];
     if (cell) {
+      // If a bonus was collected on this last validated row, place avatar on the bonus cell instead of the path cell
+      try {
+        const collected = Array.isArray(props.collectedBonuses) ? props.collectedBonuses : [];
+        // Find a collected bonus that matches this row
+        const matchKey = collected.find(key => {
+          // key format: "r-c"
+          const [kr, kc] = String(key).split('-').map(n => Number(n));
+          return Number.isFinite(kr) && Number.isFinite(kc) && kr === cell.r;
+        });
+        if (matchKey) {
+          const [br, bc] = String(matchKey).split('-').map(n => Number(n));
+          return {
+            gridRow: String((br + 1)),
+            gridColumn: String((bc + 1)),
+            justifySelf: 'center',
+            alignSelf: 'center',
+          };
+        }
+      } catch (_) {
+        // fall back to path cell
+      }
+      // Default to path cell for this index
       return {
         gridRow: String((cell.r + 1)),
         gridColumn: String((cell.c + 1)),

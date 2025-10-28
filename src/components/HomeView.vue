@@ -1,18 +1,55 @@
 <template>
   <div class="home">
-      <div class="flex flex-col mt-4 w-full grow justify-center">
-        <button class="menu-btn daily-btn" @click="emit('daily')">
-          <span>{{ $t('home.daily') }}</span>
-          <input type="checkbox" class="daily-check" :checked="!!dailyDone" disabled :aria-label="$t('home.doneToday')" />
-          <span class="daily-checkmark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </span>
-        </button>
-        <button class="menu-btn" @click="emit('solo')">{{ $t('home.solo') }}</button>
-        <button class="menu-btn" @click="emit('versus')">{{ $t('home.versus') }}</button>
-        <button class="menu-btn" disabled aria-disabled="true" :title="$t('home.soon')">{{ $t('home.battle') }}</button>
+      <div class="flex flex-col mt-4 w-full grow justify-center items-center">
+        <div class="header">
+          <button class="profile-card" @click="emit('openProfile')" :aria-label="$t('home.settings')" :title="displayName">
+            <img class="profile-avatar" :src="(selectedAvatar && selectedAvatar.img) || fallbackAvatar" alt="avatar" width="48" height="48" />
+            <div class="profile-meta">
+              <div class="profile-name">{{ displayName }}</div>
+              <div class="profile-res">
+                <span class="res-pill gold">🪙 {{ playerGold }}</span>
+                <span class="res-pill essence">✨ {{ playerEssence }}</span>
+                <span class="res-pill gem">💎 {{ playerGems }}</span>
+              </div>
+            </div>
+          </button>
+          
+          <!-- XP Progress Bar -->
+          <div class="xp-progress-container">
+            <div class="xp-level-badge">{{ playerLevel }}</div>
+            <div class="xp-progress-wrapper">
+              <div class="xp-progress-bar">
+                <div class="xp-progress-fill" :style="{ width: `${playerLevelProgress * 100}%` }"></div>
+              </div>
+              <div class="xp-text">Level {{ playerLevel }}</div>
+            </div>
+          </div>
+          
+          <div class="gear-wrap">
+            <button class="gear-btn" @click="toggleGearMenu" :aria-label="$t('home.settings')" :title="$t('home.settings')">
+              <Settings :size="20" />
+            </button>
+            <div v-if="showGearMenu" class="gear-menu" @mouseleave="closeGearMenu">
+              <button class="gear-item" @click="emit('settings'); closeGearMenu()">{{ $t('home.settings') }}</button>
+              <button class="gear-item" @click="emit('help'); closeGearMenu()">{{ $t('home.help') }}</button>
+              <button class="gear-item" @click="emit('toggleAudio'); closeGearMenu()">{{ audioMuted ? $t('home.audioOn') : $t('home.audioOff') }}</button>
+              <button class="gear-item" @click="emit('openLang'); closeGearMenu()">{{ $t('home.lang') }}</button>
+            </div>
+          </div>
+        </div>
+        <div
+          v-if="selectedAvatar && selectedAvatar.img"
+          class="avatar-card"
+          @mousemove="onCardMove"
+          @mouseleave="onCardLeave"
+          :style="avatarCardStyle"
+        >
+          <img class="avatar-img" :src="selectedAvatar.img" :alt="selectedAvatar.name || 'Avatar'" />
+        </div>
+        <div class="mode-buttons">
+          <button class="mode-btn" @click="emit('solo')">{{ $t('home.solo') }}</button>
+          <button class="mode-btn" @click="emit('versus')">{{ $t('home.versus') }}</button>
+        </div>
         <button class="menu-btn" @click="emit('stats')">{{ $t('home.stats') }}</button>
         <a
           class="menu-btn donate-btn"
@@ -45,15 +82,63 @@
 </template>
 
 <script setup>
+import { ref, computed } from 'vue';
 import { HelpCircle, Settings, Heart, VolumeX, Volume2 } from 'lucide-vue-next';
 
 const props = defineProps({
   logoSrc: { type: String, default: '' },
-  dailyDone: { type: Boolean, default: false },
+  selectedAvatar: { type: Object, default: null },
+  displayName: { type: String, default: 'Player' },
+  playerGold: { type: [Number, String], default: 0 },
+  playerEssence: { type: [Number, String], default: 0 },
+  playerGems: { type: [Number, String], default: 0 },
+  playerLevel: { type: Number, default: 1 },
+  playerLevelProgress: { type: Number, default: 0 },
   currentFlag: { type: String, default: '@/assets/fr.png' },
   audioMuted: { type: Boolean, default: true },
 });
-const emit = defineEmits(['start', 'daily', 'solo', 'versus', 'battle', 'openLang', 'help', 'settings', 'stats', 'toggleAudio']);
+const emit = defineEmits(['start', 'solo', 'versus', 'openLang', 'help', 'settings', 'stats', 'toggleAudio', 'openProfile']);
+
+// 3D tilt state for avatar card
+const rx = ref(0); // rotateX
+const ry = ref(0); // rotateY
+const isHovering = ref(false);
+
+// Gear menu state
+const showGearMenu = ref(false);
+function toggleGearMenu() { showGearMenu.value = !showGearMenu.value; }
+function closeGearMenu() { showGearMenu.value = false; }
+
+function onCardMove(e) {
+  const el = e.currentTarget;
+  const rect = el.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const dx = (e.clientX - cx) / (rect.width / 2);   // -1 .. 1
+  const dy = (e.clientY - cy) / (rect.height / 2);  // -1 .. 1
+  // Opposite corner approaches: rotate toward opposite of pointer
+  ry.value = -dx * 14; // tilt horizontally
+  rx.value = dy * 14;  // tilt vertically
+  isHovering.value = true;
+}
+
+function onCardLeave() {
+  rx.value = 0;
+  ry.value = 0;
+  isHovering.value = false;
+}
+
+const avatarCardStyle = computed(() => {
+  const base = `perspective(700px) rotateX(${rx.value.toFixed(2)}deg) rotateY(${ry.value.toFixed(2)}deg) scale(${isHovering.value ? 1.03 : 1.0})`;
+  const shadow = isHovering.value
+    ? '0 14px 24px rgba(0,0,0,0.45), 0 0 24px rgba(123,44,255,0.25)'
+    : '0 10px 20px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.04)';
+  return {
+    transform: base,
+    boxShadow: shadow,
+    filter: isHovering.value ? 'saturate(1.06)' : 'none',
+  };
+});
 </script>
 
 <style scoped>
@@ -109,56 +194,7 @@ const emit = defineEmits(['start', 'daily', 'solo', 'versus', 'battle', 'openLan
 /* Normalize flag text rendering */
 .lang-wrap .menu-btn.w-11.h-11 { font-size: 18px; }
 
-/* Daily button layout with checkbox */
-.daily-btn {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center; /* keep label centered */
-}
-.daily-check {
-  position: absolute;
-  right: 12px;
-  width: 24px;
-  height: 24px;
-  pointer-events: none;
-  /* Cartoon purple styling */
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  border-radius: 6px;
-  border: 2px solid #7b2cff; /* purple border */
-  background: #2a1f4d; /* deep purple */
-  box-shadow: 0 2px 0 #1a1c30, inset 0 -2px 0 rgba(0,0,0,0.25);
-  transition: transform .08s ease, box-shadow .08s ease, background .12s ease, border-color .12s ease;
-}
-
-.daily-check:hover { transform: translateY(1px); box-shadow: 0 1px 0 #1a1c30, inset 0 -1px 0 rgba(0,0,0,0.25); }
-.daily-check:focus { outline: 2px solid rgba(123,44,255,0.5); outline-offset: 2px; }
-
-/* Checked state: brighten purple */
-.daily-check:checked {
-  background: #7b2cff; /* accent purple */
-  border-color: #9b6cff;
-}
-
-/* SVG checkmark visibility and placement */
-.daily-checkmark {
-  position: absolute;
-  right: 12px;
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-  opacity: 0;
-  transform: scale(0.9);
-  transition: opacity .12s ease, transform .12s ease;
-}
-.daily-check:checked + .daily-checkmark {
-  opacity: 1;
-  transform: scale(1);
-}
+/* Removed Daily button styles */
 
 /* Disabled state */
 .menu-btn:disabled {
@@ -182,5 +218,178 @@ const emit = defineEmits(['start', 'daily', 'solo', 'versus', 'battle', 'openLan
 .donate-btn:hover { background: #22183f; }
 
 .lang-item:hover { background: #1f2238; }
+
+/* Center avatar card */
+.avatar-card {
+  position: relative;
+  width: 180px;
+  height: 240px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(123,44,255,0.35), rgba(34,197,94,0.25));
+  border: 1px solid #2a2e52;
+  margin-bottom: 12px;
+  transform: translateZ(0);
+  transition: transform .14s ease, box-shadow .14s ease, filter .14s ease;
+}
+.avatar-card::before {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  background: conic-gradient(from 0deg, rgba(255,255,255,0.0), rgba(255,255,255,0.25), rgba(255,255,255,0.0) 60%);
+  animation: shine 2.8s linear infinite;
+  pointer-events: none;
+}
+.avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+@keyframes shine {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Header profile card */
+.header { width: 100%; display:flex; align-items:center; justify-content:center; margin-bottom: 10px; }
+.header { gap: 10px; }
+.gear-wrap { position: relative; }
+.gear-btn {
+  display:inline-flex; align-items:center; justify-content:center;
+  width: 44px; height: 44px; border-radius: 10px;
+  background:#1a1c30; border:1px solid #2a2e52; color:#aeb3ff;
+}
+.gear-btn:hover { background:#202340; }
+.gear-menu {
+  position:absolute; top: 52px; right: 0;
+  background:#0f1124; border:1px solid #2a2e52; border-radius:12px;
+  box-shadow: 0 10px 20px rgba(0,0,0,.35);
+  display:flex; flex-direction:column; min-width: 180px; padding:6px;
+  z-index: 20;
+}
+.gear-item {
+  display:block; text-align:left; padding:10px 12px; border-radius:8px;
+  background:transparent; border:none; color: var(--text); cursor:pointer;
+}
+.gear-item:hover { background:#1a1c30; }
+.profile-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid #2a2e52;
+  background: #1a1c30;
+  box-shadow: 0 2px 0 #1a1c30;
+  color: var(--text);
+  cursor: pointer;
+}
+.profile-avatar { border-radius: 12px; display:block; }
+.profile-meta { display:flex; flex-direction:column; align-items:flex-start; gap:6px; }
+.profile-name { font-weight: 900; font-size: 16px; line-height: 1; }
+.profile-res { display:flex; gap:8px; }
+.res-pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; background:#101226; border:1px solid #2a2e52; }
+.res-pill.gold { color:#ffd166; }
+.res-pill.essence { color:#a78bfa; }
+.res-pill.gem { color:#76e4f7; }
+
+/* Mode buttons: yellow 3D cartoon */
+.mode-buttons { display:flex; gap:12px; margin: 10px 0 6px; }
+.mode-btn {
+  appearance: none;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 14px 18px;
+  min-width: 120px;
+  border-radius: 14px;
+  font-size: 18px;
+  font-weight: 900;
+  color: #1a1c30;
+  background: linear-gradient(180deg, #ffe066 0%, #ffd43b 60%, #fcc419 100%);
+  box-shadow:
+    0 6px 0 #b88911,
+    0 10px 18px rgba(0,0,0,0.25),
+    inset 0 2px 0 rgba(255,255,255,0.6);
+  transition: transform .08s ease, box-shadow .08s ease, filter .12s ease;
+}
+.mode-btn:hover { filter: brightness(1.05) saturate(1.1); }
+.mode-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #b88911, 0 6px 12px rgba(0,0,0,0.2), inset 0 2px 0 rgba(255,255,255,0.6); }
+.mode-btn:focus-visible { box-shadow: 0 6px 0 #b88911, 0 0 0 3px #4c6ef5, 0 10px 18px rgba(0,0,0,0.25), inset 0 2px 0 rgba(255,255,255,0.6); }
+
+/* XP Progress Bar */
+.xp-progress-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #1a1c30;
+  border: 1px solid #2a2e52;
+  box-shadow: 0 2px 0 #1a1c30;
+  min-width: 200px;
+}
+
+.xp-level-badge {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  color: #1a1c30;
+  font-weight: 900;
+  font-size: 16px;
+  border-radius: 10px;
+  border: 2px solid #2a2e52;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.5);
+}
+
+.xp-progress-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.xp-progress-bar {
+  height: 8px;
+  background: #101226;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #2a2e52;
+  position: relative;
+}
+
+.xp-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7b2cff 0%, #a78bfa 50%, #c4b5fd 100%);
+  border-radius: 4px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 8px rgba(123, 44, 255, 0.5);
+  position: relative;
+}
+
+.xp-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 100%);
+  border-radius: 4px 4px 0 0;
+}
+
+.xp-text {
+  font-size: 11px;
+  font-weight: 700;
+  color: #a0a5c8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
 
 </style>

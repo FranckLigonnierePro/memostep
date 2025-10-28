@@ -38,6 +38,37 @@ function isAdjacentToPath(r, c, pathSet) {
 }
 
 /**
+ * Vérifie si un bonus peut permettre de rejoindre le chemin de la ligne suivante
+ * RÈGLE: |colBonus - colNextPath| <= 1
+ * 
+ * @param {number} r - Ligne du bonus
+ * @param {number} c - Colonne du bonus
+ * @param {Array} path - Chemin complet [{r, c}, ...]
+ * @returns {boolean} true si le bonus est jouable, false sinon
+ */
+function canReachNextPathFromBonus(r, c, path) {
+  // Si c'est la dernière ligne, pas de contrainte (pas de ligne suivante)
+  if (r >= ROWS - 1) {
+    return true;
+  }
+  
+  // Trouver la colonne du chemin sur la ligne suivante (r + 1)
+  const nextPathCell = path.find(p => p.r === r + 1);
+  
+  // Si pas de chemin sur la ligne suivante (ne devrait pas arriver), accepter
+  if (!nextPathCell) {
+    return true;
+  }
+  
+  const colNextPath = nextPathCell.c;
+  
+  // Vérifier la contrainte: |colBonus - colNextPath| <= 1
+  const distance = Math.abs(c - colNextPath);
+  
+  return distance <= 1;
+}
+
+/**
  * Génère une grille enrichie avec pièges et bonus selon gridContent.json
  * 
  * RÈGLES STRICTES :
@@ -167,9 +198,13 @@ export function generateEnrichedGrid(path, floorNumber = 1, runCounters = { gem:
           floorNumber
         );
         if (Math.random() < chanceGem) {
-          grid[r][c] = { type: bonusGem.type };
-          runCounters.gem++;
-          continue;
+          // ✅ VÉRIFICATION JOUABILITÉ: le bonus doit permettre de rejoindre la ligne suivante
+          if (canReachNextPathFromBonus(r, c, path)) {
+            grid[r][c] = { type: bonusGem.type };
+            runCounters.gem++;
+            continue;
+          }
+          // Sinon, on ignore ce bonus (la case reste disponible ou deviendra neutre)
         }
       }
       
@@ -183,9 +218,13 @@ export function generateEnrichedGrid(path, floorNumber = 1, runCounters = { gem:
           floorNumber
         );
         if (Math.random() < chancePotion) {
-          grid[r][c] = { type: bonusPotion.type };
-          runCounters.potion++;
-          continue;
+          // ✅ VÉRIFICATION JOUABILITÉ: le bonus doit permettre de rejoindre la ligne suivante
+          if (canReachNextPathFromBonus(r, c, path)) {
+            grid[r][c] = { type: bonusPotion.type };
+            runCounters.potion++;
+            continue;
+          }
+          // Sinon, on ignore ce bonus (la case reste disponible ou deviendra neutre)
         }
       }
       
@@ -200,10 +239,14 @@ export function generateEnrichedGrid(path, floorNumber = 1, runCounters = { gem:
           floorNumber
         );
         if (Math.random() < chanceGold) {
-          const value = randomInt(bonusGold.valueMin, bonusGold.valueMax);
-          grid[r][c] = { type: bonusGold.type, value };
-          floorCounters.goldAdjacent++;
-          continue;
+          // ✅ VÉRIFICATION JOUABILITÉ: le bonus doit permettre de rejoindre la ligne suivante
+          if (canReachNextPathFromBonus(r, c, path)) {
+            const value = randomInt(bonusGold.valueMin, bonusGold.valueMax);
+            grid[r][c] = { type: bonusGold.type, value };
+            floorCounters.goldAdjacent++;
+            continue;
+          }
+          // Sinon, on ignore ce bonus (la case reste disponible ou deviendra neutre)
         }
       }
       
@@ -218,9 +261,13 @@ export function generateEnrichedGrid(path, floorNumber = 1, runCounters = { gem:
           floorNumber
         );
         if (Math.random() < chanceEssence) {
-          grid[r][c] = { type: bonusEssence.type };
-          floorCounters.essenceAdjacent++;
-          continue;
+          // ✅ VÉRIFICATION JOUABILITÉ: le bonus doit permettre de rejoindre la ligne suivante
+          if (canReachNextPathFromBonus(r, c, path)) {
+            grid[r][c] = { type: bonusEssence.type };
+            floorCounters.essenceAdjacent++;
+            continue;
+          }
+          // Sinon, on ignore ce bonus (la case reste disponible ou deviendra neutre)
         }
       }
     }

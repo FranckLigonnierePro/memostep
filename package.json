@@ -9,10 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "lucide-vue-next": "^0.544.0",
     "@supabase/supabase-js": "^2.45.4",
+    "lucide-vue-next": "^0.544.0",
     "vue": "^3.4.29",
-    "vue-i18n": "^9.14.0"
+    "vue-i18n": "^9.14.0",
+    "vue-router": "^4.6.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.13",

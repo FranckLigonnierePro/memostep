@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test - Jouabilité des Bonus</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      margin: 0;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 {
+      color: #667eea;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    .test-section {
+      margin-bottom: 40px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 12px;
+    }
+    .test-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 80px);
+      gap: 8px;
+      margin: 20px 0;
+      justify-content: center;
+    }
+    .cell {
+      width: 80px;
+      height: 80px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: bold;
+      position: relative;
+      border: 2px solid #ddd;
+    }
+    .cell-label {
+      position: absolute;
+      top: 2px;
+      left: 4px;
+      font-size: 10px;
+      color: #666;
+    }
+    .path {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-color: #667eea;
+    }
+    .neutral {
+      background: #e9ecef;
+      color: #adb5bd;
+    }
+    .bonus {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+      border-color: #f5576c;
+    }
+    .bonus.valid {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      border-color: #00f2fe;
+    }
+    .bonus.invalid {
+      background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+      border-color: #fa709a;
+      animation: shake 0.5s;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+    .info {
+      background: #e7f3ff;
+      border-left: 4px solid #2196F3;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 4px;
+    }
+    .info strong {
+      color: #2196F3;
+    }
+    .legend {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .legend-box {
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      border: 2px solid #ddd;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+    .stat-card {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      border: 2px solid #e9ecef;
+    }
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #667eea;
+    }
+    .stat-label {
+      font-size: 14px;
+      color: #666;
+      margin-top: 5px;
+    }
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      display: block;
+      margin: 20px auto;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: scale(1.05);
+    }
+    button:active {
+      transform: scale(0.95);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎮 Test de Jouabilité des Bonus</h1>
+    <p class="subtitle">Vérification de la règle : |colBonus - colNextPath| ≤ 1</p>
+
+    <div class="info">
+      <strong>Règle de jouabilité :</strong> Un bonus ne peut être placé que si, en cliquant dessus, 
+      le joueur peut toujours rejoindre le chemin de la ligne suivante. 
+      La distance horizontale entre le bonus et le chemin suivant doit être ≤ 1.
+    </div>
+
+    <div class="test-section">
+      <div class="test-title">
+        <span>📊</span>
+        <span>Exemple 1 : Bonus INVALIDE (bloque la route)</span>
+      </div>
+      <div class="info">
+        Ligne 2 : Bonus en colonne 0, chemin en colonne 1<br>
+        Ligne 3 : Chemin en colonne 3<br>
+        <strong style="color: #f5576c;">❌ Distance = |0 - 3| = 3 > 1 → INVALIDE</strong><br>
+        Le joueur ne peut pas rejoindre le chemin même en cliquant le bonus !
+      </div>
+      <div class="grid" id="grid1"></div>
+    </div>
+
+    <div class="test-section">
+      <div class="test-title">
+        <span>✅</span>
+        <span>Exemple 2 : Bonus VALIDE (jouable)</span>
+      </div>
+      <div class="info">
+        Ligne 2 : Bonus en colonne 1, chemin en colonne 2<br>
+        Ligne 3 : Chemin en colonne 2<br>
+        <strong style="color: #00f2fe;">✅ Distance = |1 - 2| = 1 ≤ 1 → VALIDE</strong><br>
+        Le joueur peut cliquer le bonus et rejoindre le chemin !
+      </div>
+      <div class="grid" id="grid2"></div>
+    </div>
+
+    <div class="test-section">
+      <div class="test-title">
+        <span>🎯</span>
+        <span>Exemple 3 : Bonus sur dernière ligne (toujours valide)</span>
+      </div>
+      <div class="info">
+        Ligne 9 : Bonus en colonne 0, chemin en colonne 3<br>
+        <strong style="color: #00f2fe;">✅ Dernière ligne → Pas de contrainte → VALIDE</strong><br>
+        Pas de ligne suivante, donc le bonus est toujours acceptable.
+      </div>
+      <div class="grid" id="grid3"></div>
+    </div>
+
+    <button onclick="runTest()">🔄 Générer de nouveaux tests</button>
+
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-box path"></div>
+        <span>Chemin</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-box bonus valid"></div>
+        <span>Bonus Valide</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-box bonus invalid"></div>
+        <span>Bonus Invalide</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-box neutral"></div>
+        <span>Case Neutre</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ROWS = 10;
+    const COLS = 4;
+
+    // Fonction de test de jouabilité
+    function canReachNextPathFromBonus(r, c, path) {
+      if (r >= ROWS - 1) return true;
+      const nextPathCell = path.find(p => p.r === r + 1);
+      if (!nextPathCell) return true;
+      const distance = Math.abs(c - nextPathCell.c);
+      return distance <= 1;
+    }
+
+    // Créer une grille de test
+    function createTestGrid(gridId, testCase) {
+      const container = document.getElementById(gridId);
+      container.innerHTML = '';
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell neutral';
+          
+          const label = document.createElement('div');
+          label.className = 'cell-label';
+          label.textContent = `${r},${c}`;
+          cell.appendChild(label);
+
+          // Vérifier si c'est une case spéciale
+          const pathCell = testCase.path.find(p => p.r === r && p.c === c);
+          const bonusCell = testCase.bonuses.find(b => b.r === r && b.c === c);
+
+          if (pathCell) {
+            cell.className = 'cell path';
+            cell.innerHTML += '🎯';
+          } else if (bonusCell) {
+            const isValid = canReachNextPathFromBonus(bonusCell.r, bonusCell.c, testCase.path);
+            cell.className = `cell bonus ${isValid ? 'valid' : 'invalid'}`;
+            cell.innerHTML += bonusCell.icon;
+            
+            // Ajouter info de distance
+            const nextPath = testCase.path.find(p => p.r === bonusCell.r + 1);
+            if (nextPath) {
+              const dist = Math.abs(bonusCell.c - nextPath.c);
+              const info = document.createElement('div');
+              info.style.fontSize = '10px';
+              info.style.marginTop = '4px';
+              info.textContent = `d=${dist}`;
+              cell.appendChild(info);
+            }
+          } else {
+            cell.textContent = '';
+          }
+
+          container.appendChild(cell);
+        }
+      }
+    }
+
+    // Cas de test 1 : Bonus invalide
+    const testCase1 = {
+      path: [
+        {r: 0, c: 1}, {r: 1, c: 1}, {r: 2, c: 1}, {r: 3, c: 3},
+        {r: 4, c: 3}, {r: 5, c: 2}, {r: 6, c: 2}, {r: 7, c: 1},
+        {r: 8, c: 1}, {r: 9, c: 0}
+      ],
+      bonuses: [
+        {r: 2, c: 0, icon: '💎'} // Distance = |0 - 3| = 3 > 1 → INVALIDE
+      ]
+    };
+
+    // Cas de test 2 : Bonus valide
+    const testCase2 = {
+      path: [
+        {r: 0, c: 2}, {r: 1, c: 2}, {r: 2, c: 2}, {r: 3, c: 2},
+        {r: 4, c: 1}, {r: 5, c: 1}, {r: 6, c: 2}, {r: 7, c: 3},
+        {r: 8, c: 3}, {r: 9, c: 2}
+      ],
+      bonuses: [
+        {r: 2, c: 1, icon: '💰'} // Distance = |1 - 2| = 1 ≤ 1 → VALIDE
+      ]
+    };
+
+    // Cas de test 3 : Dernière ligne
+    const testCase3 = {
+      path: [
+        {r: 0, c: 3}, {r: 1, c: 2}, {r: 2, c: 1}, {r: 3, c: 1},
+        {r: 4, c: 2}, {r: 5, c: 3}, {r: 6, c: 3}, {r: 7, c: 3},
+        {r: 8, c: 3}, {r: 9, c: 3}
+      ],
+      bonuses: [
+        {r: 9, c: 0, icon: '🧪'} // Dernière ligne → TOUJOURS VALIDE
+      ]
+    };
+
+    function runTest() {
+      createTestGrid('grid1', testCase1);
+      createTestGrid('grid2', testCase2);
+      createTestGrid('grid3', testCase3);
+    }
+
+    // Lancer le test au chargement
+    runTest();
+  </script>
+</body>
+</html>

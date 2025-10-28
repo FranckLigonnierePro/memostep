@@ -1,40 +1,61 @@
 <template>
   <div class="app-frame">
     <div class="content left-view" :style="{ transform: `scale(${rootScale})`}">
-       <div :class="'header' + (!state.showHome ? ' small' : '')">
-      <div class="logo-container">
-        <img :src="logoSrc" alt="Logo" class="logo" :width="state.showHome ? 200 : 125" :height="state.showHome ? 200 : 100">
+       <div v-if="route.name === 'Game'" :class="'header small'">
+        <button class="profile-card" @click="openProfile" :aria-label="$t('home.settings')" :title="displayName">
+          <img class="profile-avatar" :src="(selectedAvatar && selectedAvatar.img) || imgMage" alt="avatar" width="36" height="36" />
+          <div class="profile-level-badge">{{ playerLevel }}</div>
+          <div class="profile-meta">
+            <div class="profile-name">{{ displayName }}</div>
+            <div class="profile-res">
+              <span class="res-pill gold">🪙 {{ playerGold }}</span>
+              <span class="res-pill essence">✨ {{ playerEssence }}</span>
+              <span class="res-pill gem">💎 {{ playerGems }}</span>
+            </div>
+          </div>
+        </button>
+        <div class="gear-wrap">
+          <button class="gear-btn" @click="toggleGearMenuLeft" :aria-label="$t('home.settings')" :title="$t('home.settings')">
+            <Settings :size="18" />
+          </button>
+          <div v-if="showGearMenuLeft" class="gear-menu" @mouseleave="closeGearMenuLeft">
+            <button class="gear-item" @click="openSettings(); closeGearMenuLeft()">{{ $t('home.settings') }}</button>
+            <button class="gear-item" @click="openHelp(); closeGearMenuLeft()">{{ $t('home.help') }}</button>
+            <button class="gear-item" @click="toggleAudio(); closeGearMenuLeft()">{{ audioMuted ? $t('home.audioOn') : $t('home.audioOff') }}</button>
+            <button class="gear-item" @click="openLang(); closeGearMenuLeft()">{{ $t('home.lang') }}</button>
+          </div>
+        </div>
       </div>
-      <button
-      v-if="state.showHome"
-        class="menu-btn h-11 px-3"
-        @click="openProfile"
-        :aria-label="$t('home.settings')"
-        :title="displayName"
-      >
-        {{ displayName }}
-      </button>
-    </div>
       <KoFiDonors src="/api/supporters.csv" />
     </div>
     <div class="content" :style="{ transform: `scale(${rootScale})`}">
-    <div :class="'header' + (!state.showHome ? ' small' : '')">
-      <div class="logo-container">
-        <img :src="logoSrc" alt="Logo" class="logo" :width="state.showHome ? 200 : 125" :height="state.showHome ? 200 : 100">
-      </div>
-      <button
-      v-if="state.showHome"
-        class="menu-btn h-11 px-3"
-        @click="openProfile"
-        :aria-label="$t('home.settings')"
-        :title="displayName"
-      >
-        {{ displayName }}
+    <div v-if="route.name === 'Game'" :class="'header small'">
+      <button class="profile-card" @click="openProfile" :aria-label="$t('home.settings')" :title="displayName">
+        <img class="profile-avatar" :src="(selectedAvatar && selectedAvatar.img) || imgMage" alt="avatar" width="36" height="36" />
+        <div class="profile-meta">
+          <div class="profile-name">{{ displayName }}</div>
+          <div class="profile-res">
+            <span class="res-pill gold">🪙 {{ playerGold }}</span>
+            <span class="res-pill essence">✨ {{ playerEssence }}</span>
+            <span class="res-pill gem">💎 {{ playerGems }}</span>
+          </div>
+        </div>
       </button>
+      <div class="gear-wrap">
+        <button class="gear-btn" @click="toggleGearMenuMain" :aria-label="$t('home.settings')" :title="$t('home.settings')">
+          <Settings :size="18" />
+        </button>
+        <div v-if="showGearMenuMain" class="gear-menu" @mouseleave="closeGearMenuMain">
+          <button class="gear-item" @click="openSettings(); closeGearMenuMain()">{{ $t('home.settings') }}</button>
+          <button class="gear-item" @click="openHelp(); closeGearMenuMain()">{{ $t('home.help') }}</button>
+          <button class="gear-item" @click="toggleAudio(); closeGearMenuMain()">{{ audioMuted ? $t('home.audioOn') : $t('home.audioOff') }}</button>
+          <button class="gear-item" @click="openLang(); closeGearMenuMain()">{{ $t('home.lang') }}</button>
+        </div>
+      </div>
     </div>
     
     <UsernameModal
-      v-if="state.showHome && showNameModal && !showProfileView && !showVersusView"
+      v-if="route.name === 'Home' && showNameModal"
       :name="nameModalInput"
       :error="nameError"
       @update:name="(v) => nameModalInput = v"
@@ -42,89 +63,28 @@
       @openProfile="openProfileFromNameModal"
     />
 
-    <HomeView
-      v-else-if="state.showHome && !showProfileView"
-      :logoSrc="logoSrc"
-      :dailyDone="dailyDone"
-      :currentFlag="currentFlag"
-      :audioMuted="audioMuted"
-      @start="newGame"
-      @daily="() => startMode('daily')"
-      @solo="() => startMode('solo')"
-      @versus="openVersusView"
-      @battle="() => startMode('battle')"
-      @help="openHelp"
-      @settings="openSettings"
-      @stats="openStats"
-      @openLang="openLang"
-      @toggleAudio="toggleAudio"
-    />
-
-    <ProfileView
-      v-else-if="showProfileView"
-      @close="handleCloseProfileView"
-      @select="handleProfileSelect"
-    />
-
-    <VersusView
-      v-else-if="showVersusView"
-      :code="versusCode"
-      :selectedAvatar="selectedAvatar"
-      :pauseMainMusic="pauseMainMusic"
-      :resumeMainMusic="resumeMainMusic"
-      @close="handleCloseVersusView"
-      @begin="handleBeginVersusFromLobby"
-    />
-
-    <BoardView
-      v-else
-      :cells="cells"
-      :boardStyle="boardStyle"
-      :cellClass="cellClass"
-      :revealSecondsText="revealSecondsText"
-      :revealProgress="revealProgress"
-      :flipActive="flipActive"
-      :flipBackActive="flipBackActive"
-      :rowsCount="ROWS"
-      :colsCount="COLS"
-      :faceDownActive="faceDownActive"
-      :faceColors="faceColors"
-      :revealComplete="revealComplete"
-      :timeText="chronoText"
-      :score="soloLevel"
-      :mode="state.mode"
-      :versusWins="versusWins"
-      :versusProgress="versusProgress"
-      :versusPlayers="versusPlayers"
-      :livesUsed="livesUsed"
-      :justLost="justLost"
-      :lastExtinguishedIndex="lastExtinguishedIndex"
-      :frozenGrid="state.frozenGrid"
-      :frozenClicksLeft="state.frozenClicksLeft"
-      :showSnowstorm="state.showSnowstorm"
-      :powerAvailable="!state.powerUsed"
-      :path="state.path"
-      :versusPathsByPlayer="versusPathsByPlayer"
-      :revealed="state.revealed"
-      :heartCell="state.heartCell"
-      :shakeActive="shakeActive"
-      :wrongCrackTexture="crackTexture"
-      :selfId="playerId"
-      :selectedAvatar="selectedAvatar"
-      :playerProgress="state.nextIndex"
-      :rollbackKeys="Array.from(state.rollback || [])"
-      :lifeLossKeys="Array.from(state.lifeLoss || [])"
-      :stunKeys="Array.from(state.stun || [])"
-      :stunActive="stunActive"
-      :gridContent="state.gridContent"
-      :collectedBonuses="Array.from(state.collectedBonuses || [])"
-      :playerGold="playerGold"
-      :playerEssence="playerEssence"
-      :playerGems="playerGems"
-      @cellClick="onCellClick"
-      @goHome="goHome"
-      @newGame="newGame"
-    />
+    <!-- Router View: renders the current route component with dynamic props -->
+    <router-view v-slot="{ Component }">
+      <component
+        :is="Component"
+        v-bind="routeProps"
+        @start="newGame"
+        @solo="() => startMode('solo')"
+        @versus="openVersusView"
+        @help="openHelp"
+        @settings="openSettings"
+        @stats="openStats"
+        @openLang="openLang"
+        @toggleAudio="toggleAudio"
+        @openProfile="openProfile"
+        @close="handleCloseView"
+        @select="handleProfileSelect"
+        @begin="handleBeginVersusFromLobby"
+        @cellClick="onCellClick"
+        @goHome="goHome"
+        @newGame="newGame"
+      />
+    </router-view>
 
    
     </div>
@@ -148,20 +108,30 @@
       </div>
     </div>
     <div class="content right-view" :style="{ transform: `scale(${rootScale})`}">
-       <div :class="'header' + (!state.showHome ? ' small' : '')">
-      <div class="logo-container">
-        <img :src="logoSrc" alt="Logo" class="logo" :width="state.showHome ? 200 : 125" :height="state.showHome ? 200 : 100">
+       <div v-if="route.name === 'Game'" :class="'header small'">
+        <button class="profile-card" @click="openProfile" :aria-label="$t('home.settings')" :title="displayName">
+          <img class="profile-avatar" :src="(selectedAvatar && selectedAvatar.img) || imgMage" alt="avatar" width="36" height="36" />
+          <div class="profile-meta">
+            <div class="profile-name">{{ displayName }}</div>
+            <div class="profile-res">
+              <span class="res-pill gold">🪙 {{ playerGold }}</span>
+              <span class="res-pill essence">✨ {{ playerEssence }}</span>
+              <span class="res-pill gem">💎 {{ playerGems }}</span>
+            </div>
+          </div>
+        </button>
+        <div class="gear-wrap">
+          <button class="gear-btn" @click="toggleGearMenuRight" :aria-label="$t('home.settings')" :title="$t('home.settings')">
+            <Settings :size="18" />
+          </button>
+          <div v-if="showGearMenuRight" class="gear-menu" @mouseleave="closeGearMenuRight">
+            <button class="gear-item" @click="openSettings(); closeGearMenuRight()">{{ $t('home.settings') }}</button>
+            <button class="gear-item" @click="openHelp(); closeGearMenuRight()">{{ $t('home.help') }}</button>
+            <button class="gear-item" @click="toggleAudio(); closeGearMenuRight()">{{ audioMuted ? $t('home.audioOn') : $t('home.audioOff') }}</button>
+            <button class="gear-item" @click="openLang(); closeGearMenuRight()">{{ $t('home.lang') }}</button>
+          </div>
+        </div>
       </div>
-      <button
-      v-if="state.showHome"
-        class="menu-btn h-11 px-3"
-        @click="openProfile"
-        :aria-label="$t('home.settings')"
-        :title="displayName"
-      >
-        {{ displayName }}
-      </button>
-    </div>
     
     <Leaderboard :ranking="versusRanking" :roomCode="versusCode" :soloRanking="[]" />
     </div>
@@ -186,7 +156,7 @@
           >{{ $t('modals.replay') }}</button>
           <!-- Non-versus replay keeps existing logic/limits -->
           <button
-            v-if="state.mode !== 'versus' && !((state.mode === 'daily' && dailyAttempts >= 3) || (state.mode === 'solo' && soloLivesUsed >= 3))"
+            v-if="state.mode !== 'versus' && !(state.mode === 'solo' && soloLivesUsed >= 3)"
             class="modal-btn"
             @click="handleReplay"
           >{{ $t('modals.replay') }}</button>
@@ -314,11 +284,35 @@
       @close="closePowerWheel"
     /> -->
     
+    <!-- Level Up Modal -->
+    <LevelUpModal
+      :visible="showLevelUpModal"
+      :newLevel="levelUpData.newLevel"
+      :rewards="levelUpData.rewards"
+      @close="closeLevelUpModal"
+    />
+    
+    <!-- XP Toast Notifications -->
+    <XpToast :notifications="xpNotifications" />
+    
+    <!-- End Path Modal for Solo Mode -->
+    <EndPathModal
+      :visible="showEndPathModal"
+      :status="endPathData.status"
+      :stage="endPathData.stage"
+      :timeSeconds="endPathData.timeSeconds"
+      :livesLeft="endPathData.livesLeft"
+      :xpBreakdown="endPathData.xpBreakdown"
+      @continue="handleEndPathContinue"
+      @abandon="handleEndPathAbandon"
+    />
+    
   </template>
 
 <script setup>
 import { onMounted, onBeforeUnmount, reactive, ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRouter, useRoute } from 'vue-router';
 import HomeView from './components/HomeView.vue';
 import BoardView from './components/BoardView.vue';
 import KoFiDonors from './components/KoFiDonors.vue';
@@ -328,12 +322,15 @@ import ProfileView from './components/ProfileView.vue';
 import ChampionSelector from './components/ChampionSelector.vue';
 import Leaderboard from './components/Leaderboard.vue';
 import UsernameModal from './components/UsernameModal.vue';
+import LevelUpModal from './components/LevelUpModal.vue';
+import XpToast from './components/XpToast.vue';
+import EndPathModal from './components/EndPathModal.vue';
 // Import flag assets so Vite resolves URLs correctly
 import frFlag from './assets/fr.png';
 import enFlag from './assets/en.png';
 import esFlag from './assets/es.png';
 import deFlag from './assets/de.png';
-import { User } from 'lucide-vue-next';
+import { User, Settings } from 'lucide-vue-next';
 import themeUrl from './assets/memosteptheme.mp3';
 import crackTexture from './assets/crack.png';
 // Avatar assets for champion selection
@@ -355,16 +352,13 @@ import imgHack from './assets/profils/hack.png';
 import imgArchie from './assets/profils/archie.png';
 import {
   ensurePlayerId,
-  setCurrentDay,
-  isDailyDoneToday as storageIsDailyDoneToday,
-  recordDailyWin,
-  markDailyAttempt,
   getState,
   getAudioMuted,
   setAudioMuted,
 } from './lib/storage.js';
 import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult, reportLifeLoss, setPlayerProgress, resetRoom, usePower, leaveRoom } from './lib/realtime_v2.js';
 import { generateEnrichedGrid } from './lib/gridGenerator.js';
+import { getMatchXP, getMultiplayerXP, calculateLevel, addXP, calculateSoloXP } from './lib/xpSystem.js';
 
 // Get supabase instance for direct updates
 let supabase = null;
@@ -486,6 +480,10 @@ const footerRef = ref(null);
 // i18n
 const { t, locale } = useI18n();
 
+// Router
+const router = useRouter();
+const route = useRoute();
+
 // Etat
 const state = reactive({
   path: [],            // [{r,c}, ...]
@@ -502,7 +500,6 @@ const state = reactive({
   revealEndAt: 0,
   revealDuration: REVEAL_MS, // Dynamic reveal duration based on path length
   nowMs: Date.now(),
-  showHome: true,
   mode: 'solo',
   // Persist current solo path across retries until success
   soloPath: [],
@@ -531,7 +528,7 @@ const state = reactive({
 // Flip wave animation control (top -> bottom)
 const flipActive = ref(false);
 const flipBackActive = ref(false);
-// Stun visual indicator for solo/daily
+// Stun visual indicator for solo
 const stunActive = ref(false);
 
 // Face-down colors control
@@ -554,12 +551,14 @@ const showHelp = ref(false);
 const showSettings = ref(false);
 const showStats = ref(false);
 const showLang = ref(false);
-// Profile view (takes the place of Home)
-const showProfileView = ref(false);
+// Gear menu states for headers
+const showGearMenuLeft = ref(false);
+const showGearMenuMain = ref(false);
+const showGearMenuRight = ref(false);
+// Selected avatar
 const selectedAvatar = ref(null); // { id, name, emoji } or similar
 // Versus UI state
 const showVersus = ref(false); // legacy modal (unused now)
-const showVersusView = ref(false); // new dedicated screen
 const showPowerWheel = ref(false); // power wheel overlay for versus mode
 const selectedPower = ref(null); // currently selected power
 const versusCode = ref('');
@@ -728,13 +727,13 @@ function openNameModalIfNeeded() {
   try {
     const raw = localStorage.getItem('memostep_username');
     const saved = (raw == null ? '' : String(raw)).trim();
-    if (!saved && state.showHome && !showProfileView.value && !showVersusView.value) {
+    if (!saved && route.name === 'Home') {
       nameModalInput.value = '';
       nameError.value = '';
       showNameModal.value = true;
     }
   } catch (_) {
-    if (state.showHome && !showProfileView.value && !showVersusView.value) {
+    if (route.name === 'Home') {
       nameModalInput.value = '';
       nameError.value = '';
       showNameModal.value = true;
@@ -771,14 +770,101 @@ function continueAsGuest() {
 
 function openProfileFromNameModal() {
   showNameModal.value = false;
-  showProfileView.value = true;
-  state.showHome = false;
+  router.push('/profile');
 }
 
 // Language state
 const currentLang = ref('fr');
 const flags = { fr: frFlag, en: enFlag, es: esFlag, de: deFlag };
 const currentFlag = computed(() => flags[currentLang.value] || frFlag);
+
+// Router props: pass appropriate props to each view based on current route
+const routeProps = computed(() => {
+  const routeName = route.name;
+  
+  // Common props for all views
+  const common = {
+    logoSrc: logoSrc.value,
+    selectedAvatar: selectedAvatar.value,
+    displayName: displayName.value,
+    currentFlag: currentFlag.value,
+    audioMuted: audioMuted.value,
+  };
+  
+  // HomeView props
+  if (routeName === 'Home') {
+    return {
+      ...common,
+      playerGold: playerGold.value,
+      playerEssence: playerEssence.value,
+      playerGems: playerGems.value,
+      playerLevel: playerLevel.value,
+      playerLevelProgress: playerLevelProgress.value,
+    };
+  }
+  
+  // VersusView props
+  if (routeName === 'Versus') {
+    return {
+      code: versusCode.value,
+      selectedAvatar: selectedAvatar.value,
+      pauseMainMusic,
+      resumeMainMusic,
+    };
+  }
+  
+  // BoardView props
+  if (routeName === 'Game') {
+    return {
+      cells: cells.value,
+      boardStyle: boardStyle.value,
+      cellClass,
+      revealSecondsText: revealSecondsText.value,
+      revealProgress: revealProgress.value,
+      flipActive: flipActive.value,
+      flipBackActive: flipBackActive.value,
+      rowsCount: ROWS,
+      colsCount: COLS,
+      faceDownActive: faceDownActive.value,
+      faceColors: faceColors.value,
+      revealComplete: revealComplete.value,
+      timeText: chronoText.value,
+      score: soloLevel.value,
+      mode: state.mode,
+      versusWins: versusWins.value,
+      versusProgress: versusProgress.value,
+      versusPlayers: versusPlayers.value,
+      livesUsed: livesUsed.value,
+      justLost: justLost.value,
+      lastExtinguishedIndex: lastExtinguishedIndex.value,
+      frozenGrid: state.frozenGrid,
+      frozenClicksLeft: state.frozenClicksLeft,
+      showSnowstorm: state.showSnowstorm,
+      powerAvailable: !state.powerUsed,
+      path: state.path,
+      versusPathsByPlayer: versusPathsByPlayer.value,
+      revealed: state.revealed,
+      heartCell: state.heartCell,
+      shakeActive: shakeActive.value,
+      wrongCrackTexture: crackTexture,
+      selfId: playerId.value,
+      selectedAvatar: selectedAvatar.value,
+      playerProgress: state.nextIndex,
+      rollbackKeys: Array.from(state.rollback || []),
+      lifeLossKeys: Array.from(state.lifeLoss || []),
+      stunKeys: Array.from(state.stun || []),
+      stunActive: stunActive.value,
+      gridContent: state.gridContent,
+      collectedBonuses: Array.from(state.collectedBonuses || []),
+      playerGold: playerGold.value,
+      playerEssence: playerEssence.value,
+      playerGems: playerGems.value,
+    };
+  }
+  
+  // ProfileView has no props
+  return {};
+});
 
 // Stats data for modal
 const stats = reactive({
@@ -791,24 +877,7 @@ const stats = reactive({
   lastTimeText: '-:-',
 });
 
-// Track today's attempts (failed tries so far before a win) to enforce daily limit
-const dailyAttempts = ref(0);
-try {
-  const s = getState();
-  dailyAttempts.value = s.currentDaily?.attemptsBeforeWin || 0;
-} catch (_) {
-  dailyAttempts.value = 0;
-}
-
-// Daily completion tracking (via storage)
-function isDailyDoneToday() {
-  try {
-    return storageIsDailyDoneToday();
-  } catch (_) {
-    return false;
-  }
-}
-const dailyDone = ref(isDailyDoneToday());
+// Daily mode removed
 
 // Background music
 const audioMuted = ref(true);
@@ -869,6 +938,22 @@ const runCounters = ref({ gem: 0, potion: 0 });
 const playerGold = ref(0);
 const playerEssence = ref(0);
 const playerGems = ref(0);
+// XP and Level system
+const playerTotalXp = ref(0);
+const playerLevel = ref(1);
+const playerLevelProgress = ref(0); // 0-1 for progress bar
+const showLevelUpModal = ref(false);
+const levelUpData = ref({ newLevel: 1, rewards: [] });
+const xpNotifications = ref([]);
+// End Path Modal for solo mode
+const showEndPathModal = ref(false);
+const endPathData = ref({
+  status: 'completed', // 'completed', 'no_life_left', 'abandon'
+  stage: 1,
+  timeSeconds: 0,
+  livesLeft: 3,
+  xpBreakdown: { baseXp: 0, timeXp: 0, multiplier: 1.0, totalXp: 0 }
+});
 const versusLivesUsed = computed(() => {
   if (state.mode !== 'versus') return 0;
   const room = versusRoom.value;
@@ -1014,13 +1099,12 @@ const versusRanking = computed(() => {
     .sort((a, b) => b.score - a.score); // Sort by score descending
 });
 const livesUsed = computed(() => {
-  if (state.mode === 'daily') return Math.min(3, dailyAttempts.value);
   if (state.mode === 'solo') return Math.min(3, soloLivesUsed.value);
   if (state.mode === 'versus') return versusLivesUsed.value;
   return 0;
 });
 const lastExtinguishedIndex = computed(() => {
-  if (state.mode === 'daily' || state.mode === 'solo' || state.mode === 'versus') return Math.min(2, livesUsed.value - 1);
+  if (state.mode === 'solo' || state.mode === 'versus') return Math.min(2, livesUsed.value - 1);
   return -1;
 });
 
@@ -1253,8 +1337,8 @@ function generateSoloDecoys() {
 
 function generateRollbackCells() {
   state.rollback.clear();
-  // Only for solo and daily
-  if (state.mode !== 'solo' && state.mode !== 'daily') return;
+  // Only for solo
+  if (state.mode !== 'solo') return;
   const pathSet = new Set(state.path.map(p => `${p.r}-${p.c}`));
   const candidates = new Set();
   for (const p of state.path) {
@@ -1286,7 +1370,7 @@ function generateBorderHazards() {
   state.rollback.clear();
   state.stun.clear();
   state.lifeLoss.clear();
-  if (state.mode !== 'solo' && state.mode !== 'daily' && state.mode !== 'versus') return;
+  if (state.mode !== 'solo' && state.mode !== 'versus') return;
   const pathSet = new Set(state.path.map(p => `${p.r}-${p.c}`));
   const candidates = new Set();
   for (const p of state.path) {
@@ -1373,50 +1457,18 @@ function applyEnrichedGrid(floorNumber = 1, runCounters = { gem: 0, potion: 0 })
   return newCounters;
 }
 
-function dailySeed() {
-  const d = new Date();
-  // Use UTC date so the daily seed is identical worldwide (YYYYMMDD)
-  const key = d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
-  return key;
-}
+// Daily mode removed
 
 function startMode(mode) {
   state.mode = mode;
-  state.showHome = false;
-  if (mode === 'daily') {
-    // If today's daily is already done, jump directly to the win popup
-    if (isDailyDoneToday()) {
-      try {
-        const s = getState();
-        // Display the stored time in the win modal
-        chronoMs.value = s.currentDaily.timeMs ?? 0;
-      } catch (_) {}
-      dailyDone.value = true;
-      // Show the win modal after recording a successful daily
-      winActive.value = true;
-      return; // Do not start a new game sequence
-    }
-    // set current day in storage for daily mode session
-    try { setCurrentDay(); } catch (_) {}
-    // If already reached the daily attempt limit, show lose modal immediately
-    try {
-      const s = getState();
-      const attempts = s.currentDaily?.attemptsBeforeWin || 0;
-      dailyAttempts.value = attempts;
-      if (attempts >= 3) {
-        loseActive.value = true;
-        return;
-      }
-    } catch (_) {}
-    // start normal daily
-    const rng = seededRng(dailySeed());
-    state.path = randomPathWithRng(rng);
+  router.push('/game');
+  if (mode === 'solo') {
+    // Solo: start with a fresh random path
+    state.path = randomPath();
+    // For solo runs, we keep the same path across retries until win
+    state.soloPath = state.path.slice();
+    // Generate hazards for borders
     generateBorderHazards();
-  } else if (mode === 'solo') {
-    // reset solo lives at the start of a solo session
-    soloLivesUsed.value = 0;
-    // reset solo level at the start of a solo session
-    soloLevel.value = 0;
     // Réinitialiser les compteurs globaux pour une nouvelle session
     runCounters.value = { gem: 0, potion: 0 };
     // starting solo from home should create a new path
@@ -1428,7 +1480,7 @@ function startMode(mode) {
     // Utiliser le nouveau système de génération basé sur gridContent.json
     // L'étage commence à 1
     runCounters.value = applyEnrichedGrid(1, runCounters.value);
-  } else if (mode === 'versus' || mode === 'battle') {
+  } else if (mode === 'versus') {
     // Placeholder: start like solo for now
     state.path = randomPath();
     // You can extend with networking/matchmaking later
@@ -1439,14 +1491,9 @@ function startMode(mode) {
   state.correctSet.clear();
   state.wrongSet.clear();
   state.collectedBonuses.clear();
-  if (mode === 'solo' || mode === 'daily') {
+  if (mode === 'solo') {
     // Show champion selector and start after selection or timeout
-    // For daily we don't show champion selector; keep normal flow
-    if (mode === 'solo') {
-      startChampionSelection({ mode: 'solo', delayStart: true });
-    } else {
-      showPath();
-    }
+    startChampionSelection({ mode: 'solo', delayStart: true });
   } else {
     showPath();
   }
@@ -1574,7 +1621,7 @@ function onCellClick(r, c) {
           setTimeout(() => {
             flipBackActive.value = false;
             faceDownActive.value = false;
-            winActive.value = true;
+            handleMatchWin();
           }, backTotal);
         }
         
@@ -1647,15 +1694,7 @@ function onCellClick(r, c) {
       setTimeout(async () => {
         flipBackActive.value = false;
         faceDownActive.value = false; // show front faces (remove random colors)
-        // Record daily win in storage
-        if (state.mode === 'daily') {
-          try {
-            recordDailyWin({ timeMs: chronoMs.value });
-          } catch (_) {}
-          dailyDone.value = true;
-          // Show the win modal after recording a successful daily
-          winActive.value = true;
-        } else if (state.mode === 'solo') {
+        if (state.mode === 'solo') {
           // Solo: increment level, prepare next path, auto-advance without win modal
           soloLevel.value = (soloLevel.value || 0) + 1;
           // Record/update global solo leaderboard
@@ -1702,9 +1741,9 @@ function onCellClick(r, c) {
             // If room finished (all finished or only one alive), show win/lose modal
             if (updated && updated.status === 'finished') {
               if (updated.winner_id === me) {
-                winActive.value = true;
+                handleMultiplayerWin();
               } else {
-                loseActive.value = true;
+                handleMultiplayerLose();
               }
             } else if (myScore >= 5) {
               // I finished my 5 rounds, but match continues for others
@@ -1734,9 +1773,9 @@ function onCellClick(r, c) {
               
               if (updated && updated.status === 'finished') {
                 if (updated.winner_id === me) {
-                  winActive.value = true;
+                  handleMultiplayerWin();
                 } else {
-                  loseActive.value = true;
+                  handleMultiplayerLose();
                 }
               } else if (myScore >= 5) {
                 // I finished, wait for others
@@ -1745,24 +1784,19 @@ function onCellClick(r, c) {
                 stopProgressAutoPublish();
               } else {
                 // Do NOT locally reseed. Wait for server-driven beginVersus using room.seed + current_round.
-                versusLastProgress.value = 0;
-                state.inPlay = false;
-                stopChrono();
-                stopProgressAutoPublish();
               }
-            } catch (__){
+            } catch (__) {
               // Final fallback: show modal
-              winActive.value = true;
+              handleMatchWin();
             }
           }
         } else {
           // Other modes: show win modal
-          winActive.value = true;
+          handleMatchWin();
         }
       }, backTotal);
     }
-  } else {
-    // Wrong cell clicked - mark it with X and lose a heart, but continue playing
+    // Otherwise, continue playing with the wrong cell marked
     const key = `${r}-${c}`;
     
     // Solo decoy handling: clicking a decoy does not cost a life but penalizes progress (-3 steps)
@@ -1785,7 +1819,7 @@ function onCellClick(r, c) {
     state.wrongSet.add(key);
     state.statusText = t('status.miss');
 
-    // If this is a stun cell (solo/daily), handle stun effect and skip shake/heart animations
+    // If this is a stun cell (solo), handle stun effect and skip shake/heart animations
     const isStunCell = state.stun.has(key);
     if (isStunCell && state.mode !== 'versus') {
       clickBlocked.value = true;
@@ -1860,9 +1894,9 @@ function onCellClick(r, c) {
             stopChrono();
             const winnerId = updated.winner_id;
             if (winnerId === me) {
-              winActive.value = true;
+              handleMultiplayerWin();
             } else {
-              loseActive.value = true;
+              handleMultiplayerLose();
             }
           } else {
             // Check if I still have lives
@@ -1909,22 +1943,9 @@ function onCellClick(r, c) {
         return; // no life loss, no position change
       }
       
-      // 3. Life loss cell (trap_life): lose a heart
-      // Otherwise: lose a heart (trap or wrong path cell)
-      if (state.mode === 'daily') {
-        try {
-          const attempts = markDailyAttempt();
-          dailyAttempts.value = attempts;
-        } catch (_) {}
-      } else if (state.mode === 'solo') {
-        soloLivesUsed.value = Math.min(3, (soloLivesUsed.value || 0) + 1);
-      }
-      
       // Check if out of hearts - if so, end game
       let outOfHearts = false;
-      if (state.mode === 'daily' && (dailyAttempts.value || 0) >= 3) {
-        outOfHearts = true;
-      } else if (state.mode === 'solo' && (soloLivesUsed.value || 0) >= 3) {
+      if (state.mode === 'solo' && (soloLivesUsed.value || 0) >= 3) {
         outOfHearts = true;
       }
       
@@ -1989,8 +2010,7 @@ async function handleVersusReplay() {
     }
   } catch (_) {}
   // Show the Versus lobby view (keep current versusCode and subscription)
-  showVersusView.value = true;
-  state.showHome = false;
+  router.push('/versus');
 }
 
 function closeOverlays() {
@@ -2000,6 +2020,14 @@ function closeOverlays() {
   showLang.value = false;
 }
 
+// Gear menu handlers
+function toggleGearMenuLeft() { showGearMenuLeft.value = !showGearMenuLeft.value; }
+function closeGearMenuLeft() { showGearMenuLeft.value = false; }
+function toggleGearMenuMain() { showGearMenuMain.value = !showGearMenuMain.value; }
+function closeGearMenuMain() { showGearMenuMain.value = false; }
+function toggleGearMenuRight() { showGearMenuRight.value = !showGearMenuRight.value; }
+function closeGearMenuRight() { showGearMenuRight.value = false; }
+
 function openHelp() {
   showHelp.value = true;
 }
@@ -2007,17 +2035,19 @@ function openSettings() {
   showSettings.value = true;
 }
 function openProfile() {
-  showProfileView.value = true;
-  state.showHome = false;
+  router.push('/profile');
+}
+// Generic close handler for views (Profile, Versus)
+function handleCloseView() {
+  router.push('/');
 }
 function handleCloseProfileView() {
-  showProfileView.value = false;
-  state.showHome = true;
+  router.push('/');
 }
 function handleProfileSelect(card) {
   selectedAvatar.value = card;
   try { localStorage.setItem('selectedAvatar', JSON.stringify(card)); } catch(_){}
-  handleCloseProfileView();
+  router.push('/');
 }
 function openLang() {
   showLang.value = true;
@@ -2028,19 +2058,210 @@ function selectLang(code) {
   try { localStorage.setItem('locale', code); } catch (_) {}
   closeOverlays();
 }
-function loadStats() {
-  try {
-    const s = getState();
-    stats.totalWins = s.dailyStats.totalWins || 0;
-    stats.streak = s.dailyStats.streak || 0;
-    stats.bestTimeMs = s.dailyStats.bestTimeMs ?? null;
-    stats.bestTimeText = (stats.bestTimeMs == null) ? '-:-' : formatMs(stats.bestTimeMs);
-    stats.lastAttempts = s.currentDaily.attemptsBeforeWin ?? null;
-    stats.lastTimeMs = s.currentDaily.timeMs ?? null;
-    stats.lastTimeText = (stats.lastTimeMs == null) ? '-:-' : formatMs(stats.lastTimeMs);
-  } catch (_) {
-    // ignore
+// Match Win/Lose handlers with XP
+function handleMatchWin() {
+  // For solo mode, show EndPathModal instead of direct win modal
+  if (state.mode === 'solo') {
+    showEndPathModalForSolo('completed');
+  } else {
+    winActive.value = true;
+    
+    // Grant XP for win
+    const xpAmount = getMatchXP('win');
+    grantXP(xpAmount, 'Match Win');
   }
+  
+  // TODO: Check for perfect_run, time_record, all_bonus_collected bonuses
+}
+
+function handleMatchLose() {
+  // For solo mode, show EndPathModal instead of direct lose modal
+  if (state.mode === 'solo') {
+    showEndPathModalForSolo('no_life_left');
+  } else {
+    loseActive.value = true;
+    
+    // Grant XP for lose (consolation XP)
+    const xpAmount = getMatchXP('lose');
+    grantXP(xpAmount, 'Match Lose');
+  }
+}
+
+function handleMultiplayerWin() {
+  winActive.value = true;
+  
+  // Grant XP for multiplayer win (duel_win for now)
+  const xpAmount = getMultiplayerXP('duel_win');
+  grantXP(xpAmount, 'Multiplayer Win');
+}
+
+function handleMultiplayerLose() {
+  loseActive.value = true;
+  
+  // Grant XP for lose (same as match lose)
+  const xpAmount = getMatchXP('lose');
+  grantXP(xpAmount, 'Multiplayer Lose');
+}
+
+// XP System functions
+function loadPlayerXP() {
+  try {
+    const saved = localStorage.getItem('memostep_player_xp');
+    if (saved) {
+      const data = JSON.parse(saved);
+      playerTotalXp.value = Number(data.totalXp || 0);
+      updateLevelFromXP();
+    }
+  } catch (_) {
+    playerTotalXp.value = 0;
+    playerLevel.value = 1;
+    playerLevelProgress.value = 0;
+  }
+}
+
+function savePlayerXP() {
+  try {
+    localStorage.setItem('memostep_player_xp', JSON.stringify({
+      totalXp: playerTotalXp.value
+    }));
+  } catch (_) {}
+}
+
+function updateLevelFromXP() {
+  const levelInfo = calculateLevel(playerTotalXp.value);
+  playerLevel.value = levelInfo.level;
+  playerLevelProgress.value = levelInfo.progress;
+}
+
+function grantXP(amount, reason = '') {
+  if (amount <= 0) return;
+  
+  const result = addXP(playerTotalXp.value, amount);
+  playerTotalXp.value = result.newTotalXp;
+  updateLevelFromXP();
+  savePlayerXP();
+  
+  console.log(`[XP] +${amount} XP (${reason}). Total: ${result.newTotalXp}, Level: ${result.newLevel}`);
+  
+  // Show XP gain notification
+  showXpNotification(amount, reason, result.leveledUp);
+  
+  // Handle level up
+  if (result.leveledUp) {
+    handleLevelUp(result);
+  }
+}
+
+function handleLevelUp(levelUpResult) {
+  console.log(`[XP] LEVEL UP! ${levelUpResult.oldLevel} → ${levelUpResult.newLevel}`);
+  
+  // Process rewards
+  for (const rewardData of levelUpResult.rewards) {
+    const { level, reward } = rewardData;
+    console.log(`[XP] Level ${level} rewards:`, reward);
+    
+    // Grant rewards
+    if (reward.coins) {
+      playerGold.value += reward.coins;
+      saveResources();
+    }
+    if (reward.gemmes) {
+      playerGems.value += reward.gemmes;
+      saveResources();
+    }
+    // TODO: Handle other reward types (coffre, personnage, skin_exclusif)
+  }
+  
+  // Show level up modal
+  levelUpData.value = {
+    newLevel: levelUpResult.newLevel,
+    rewards: levelUpResult.rewards
+  };
+  showLevelUpModal.value = true;
+}
+
+function closeLevelUpModal() {
+  showLevelUpModal.value = false;
+}
+
+function showXpNotification(amount, reason, isLevelUp = false) {
+  const notification = {
+    xp: amount,
+    title: isLevelUp ? 'Level Up!' : 'XP Gained',
+    message: reason,
+    isLevelUp
+  };
+  
+  // Add to notifications array (XpToast will handle display and auto-remove)
+  xpNotifications.value = [...xpNotifications.value, notification];
+  
+  // Clear the array after a short delay to allow the toast component to process
+  setTimeout(() => {
+    xpNotifications.value = [];
+  }, 100);
+}
+
+// End Path Modal handlers for solo mode
+function showEndPathModalForSolo(status) {
+  const stage = soloLevel.value + 1; // Current stage (1-based)
+  const timeSeconds = Math.floor(chronoMs.value / 1000);
+  const livesLeft = 3 - soloLivesUsed.value;
+  
+  // Calculate XP breakdown
+  const xpBreakdown = calculateSoloXP(stage, timeSeconds, status);
+  
+  endPathData.value = {
+    status,
+    stage,
+    timeSeconds,
+    livesLeft,
+    xpBreakdown
+  };
+  
+  showEndPathModal.value = true;
+}
+
+function handleEndPathContinue() {
+  showEndPathModal.value = false;
+  
+  // Grant XP
+  const xpAmount = endPathData.value.xpBreakdown.totalXp;
+  grantXP(xpAmount, `Solo Stage ${endPathData.value.stage}`);
+  
+  if (endPathData.value.status === 'no_life_left') {
+    // Game over - go home
+    goHome();
+  } else {
+    // Continue to next stage
+    soloLevel.value++;
+    newGame();
+  }
+}
+
+function handleEndPathAbandon() {
+  showEndPathModal.value = false;
+  
+  // Calculate XP with abandon multiplier
+  const stage = endPathData.value.stage;
+  const timeSeconds = endPathData.value.timeSeconds;
+  const xpBreakdown = calculateSoloXP(stage, timeSeconds, 'abandon');
+  
+  // Grant XP
+  grantXP(xpBreakdown.totalXp, `Solo Stage ${stage} (Abandoned)`);
+  
+  // Go home
+  goHome();
+}
+
+function loadStats() {
+  // Daily stats removed; keep placeholders
+  stats.totalWins = 0;
+  stats.streak = 0;
+  stats.bestTimeMs = null;
+  stats.bestTimeText = '-:-';
+  stats.lastAttempts = null;
+  stats.lastTimeMs = null;
+  stats.lastTimeText = '-:-';
 }
 function openStats() {
   loadStats();
@@ -2049,8 +2270,7 @@ function openStats() {
 
 function openVersus() { /* legacy */ openVersusView(); }
 function openVersusView() {
-  showVersusView.value = true;
-  state.showHome = false;
+  router.push('/versus');
 }
 
 function closeVersus() { /* legacy */ handleCloseVersusView(); }
@@ -2061,8 +2281,7 @@ function handleCloseVersusView() {
   versusRoom.value = null;
   versusIsHost.value = false;
   versusCurrentRound.value = 0;
-  showVersusView.value = false;
-  state.showHome = true;
+  router.push('/');
 }
 
 function handleBeginVersusFromLobby(payload) {
@@ -2077,7 +2296,7 @@ function handleBeginVersusFromLobby(payload) {
       if (versusCode.value) { if (versusUnsub) { try { versusUnsub(); } catch (_) {} } subscribeToRoom(versusCode.value); }
     }
   } finally {
-    showVersusView.value = false;
+    router.push('/versus');
   }
 }
 
@@ -2136,8 +2355,7 @@ function subscribeToRoom(code) {
         versusCurrentRound.value = myRound;
         beginVersus(room.seed, room.start_at_ms, myRound);
         // Do not toggle back to home; just hide the VersusView so BoardView shows
-        showVersusView.value = false;
-        state.showHome = false;
+        router.push('/game');
       } else {
         console.log('[App] Round', myRound, 'déjà en cours, skip');
       }
@@ -2150,9 +2368,9 @@ function subscribeToRoom(code) {
       faceDownActive.value = false;
       const me = playerId.value || ensurePlayerId();
       if (room.winner_id === me) {
-        winActive.value = true;
+        handleMultiplayerWin();
       } else {
-        loseActive.value = true;
+        handleMultiplayerLose();
       }
       return;
     }
@@ -2218,7 +2436,6 @@ function beginVersus(baseSeed, startAtMs, currentRound = 1) {
   versusSeed.value = seed;
   versusStartAtMs.value = startAtMs;
   state.mode = 'versus';
-  state.showHome = false;
   // Reset local cached progress so the bubble starts on the first cell
   versusLastProgress.value = 0;
   
@@ -2281,9 +2498,7 @@ function closePowerWheel() {
 }
 
 async function handleShare() {
-  const modeTag = state.mode ? ` – Mode: ${state.mode}` : '';
-  const dailyTag = state.mode === 'daily' ? ' – #Daily' : '';
-  const text = `bravo ! Temps: ${chronoText.value}${modeTag}${dailyTag}`;
+  const text = `bravo ! Temps: ${chronoText.value}`;
   const url = typeof location !== 'undefined' ? location.href : '';
   try {
     await navigator.clipboard.writeText(`${text} ${url}`);
@@ -2294,28 +2509,11 @@ async function handleShare() {
 }
 
 function newGame() {
-  state.showHome = false;
-  if (state.mode === 'daily') {
-    // Block starting a new daily game if limit reached
-    try {
-      const s = getState();
-      const attempts = s.currentDaily?.attemptsBeforeWin || 0;
-      dailyAttempts.value = attempts;
-      if (attempts >= 3) {
-        stopChrono();
-        state.inPlay = false;
-        state.revealed = false;
-        faceDownActive.value = false;
-        loseActive.value = true;
-        return;
-      }
-    } catch (_) {}
-    const rng = seededRng(dailySeed());
-    state.path = randomPathWithRng(rng); // deterministic for the day
-    generateBorderHazards();
-  } else if (state.mode === 'solo') {
-    // In solo: keep the same path after a loss; use the prepared next path after a win
-    state.path = (state.soloPath && state.soloPath.length) ? state.soloPath : randomPath();
+  if (state.mode === 'solo') {
+    // Reset/prepare solo path if needed
+    if (!Array.isArray(state.soloPath) || state.soloPath.length === 0) {
+      state.soloPath = randomPath();
+    }
     // Activate prepared heart for this new path (if any), then clear preparation
     state.heartCell = state.preparedHeart || null;
     state.preparedHeart = null;
@@ -2323,7 +2521,7 @@ function newGame() {
     // L'étage est soloLevel + 1 (car on vient de l'incrémenter avant d'appeler newGame)
     const currentFloor = Math.max(1, (soloLevel.value || 0) + 1);
     runCounters.value = applyEnrichedGrid(currentFloor, runCounters.value);
-  } else if (state.mode === 'versus' || state.mode === 'battle') {
+  } else if (state.mode === 'versus') {
     // Placeholder: same as solo for now
     state.path = randomPath();
   } else {
@@ -2370,22 +2568,16 @@ async function goHome() {
   state.correctSet.clear();
   state.wrongSet.clear();
   state.statusText = t('status.newGame');
-  state.showHome = true;
   faceDownActive.value = false;
   stopChrono();
   chronoMs.value = 0;
   // reset modals
   winActive.value = false;
   loseActive.value = false;
-  // refresh daily completion flag
-  dailyDone.value = isDailyDoneToday();
-  // refresh attempts for the day
-  try {
-    const s = getState();
-    dailyAttempts.value = s.currentDaily?.attemptsBeforeWin || 0;
-  } catch (_) { dailyAttempts.value = 0; }
   // reset solo lives when returning home
   soloLivesUsed.value = 0;
+  // Navigate to home
+  router.push('/');
   // Prompt for username if missing when back on Home
   openNameModalIfNeeded();
 }
@@ -2513,6 +2705,13 @@ onMounted(() => {
       selectedAvatar.value = JSON.parse(savedAvatar);
     }
   } catch (_) {}
+  
+  // Load player XP and level
+  loadPlayerXP();
+  
+  // Load player resources
+  loadResources();
+  
   // If starting on Home, prompt for username if missing
   openNameModalIfNeeded();
 });
@@ -2776,4 +2975,42 @@ html, body, #app {
 
 /* Normalize icon rendering */
 .menu-btn.w-11.h-11 svg { display: block; }
+
+/* Profile card header */
+.profile-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid #2a2e52;
+  background: #1a1c30;
+  box-shadow: 0 2px 0 #1a1c30;
+  color: var(--text);
+  cursor: pointer;
+}
+.profile-avatar { border-radius: 10px; display:block; position: relative; }
+.profile-level-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  color: #1a1c30;
+  font-weight: 900;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 2px solid #1a1c30;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  line-height: 1;
+  min-width: 20px;
+  text-align: center;
+}
+.profile-meta { display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
+.profile-name { font-weight: 800; font-size: 14px; line-height: 1; }
+.profile-res { display:flex; gap:6px; }
+.res-pill { font-size: 12px; padding: 2px 6px; border-radius: 999px; background:#101226; border:1px solid #2a2e52; }
+.res-pill.gold { color:#ffd166; }
+.res-pill.essence { color:#a78bfa; }
+.res-pill.gem { color:#76e4f7; }
 </style>
