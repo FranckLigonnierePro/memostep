@@ -1,33 +1,5 @@
 <template>
   <div class="app-frame">
-    <div class="content left-view" :style="{ transform: `scale(${rootScale})`}">
-       <div v-if="route.name === 'Game'" :class="'header small'">
-        <button class="profile-card" @click="openProfile" :aria-label="$t('home.settings')" :title="displayName">
-          <img class="profile-avatar" :src="(selectedAvatar && selectedAvatar.img) || imgMage" alt="avatar" width="36" height="36" />
-          <div class="profile-level-badge">{{ playerLevel }}</div>
-          <div class="profile-meta">
-            <div class="profile-name">{{ displayName }}</div>
-            <div class="profile-res">
-              <span class="res-pill gold">🪙 {{ playerGold }}</span>
-              <span class="res-pill essence">✨ {{ playerEssence }}</span>
-              <span class="res-pill gem">💎 {{ playerGems }}</span>
-            </div>
-          </div>
-        </button>
-        <div class="gear-wrap">
-          <button class="gear-btn" @click="toggleGearMenuLeft" :aria-label="$t('home.settings')" :title="$t('home.settings')">
-            <Settings :size="18" />
-          </button>
-          <div v-if="showGearMenuLeft" class="gear-menu" @mouseleave="closeGearMenuLeft">
-            <button class="gear-item" @click="openSettings(); closeGearMenuLeft()">{{ $t('home.settings') }}</button>
-            <button class="gear-item" @click="openHelp(); closeGearMenuLeft()">{{ $t('home.help') }}</button>
-            <button class="gear-item" @click="toggleAudio(); closeGearMenuLeft()">{{ audioMuted ? $t('home.audioOn') : $t('home.audioOff') }}</button>
-            <button class="gear-item" @click="openLang(); closeGearMenuLeft()">{{ $t('home.lang') }}</button>
-          </div>
-        </div>
-      </div>
-      <KoFiDonors src="/api/supporters.csv" />
-    </div>
     <div class="content" :style="{ transform: `scale(${rootScale})`}">
     <div v-if="route.name === 'Game'" :class="'header small'">
       <button class="profile-card" @click="openProfile" :aria-label="$t('home.settings')" :title="displayName">
@@ -106,34 +78,6 @@
         <div class="countdown-number">{{ versusReadyCountdown }}</div>
         <div class="countdown-text">{{ $t('versus.starting') || 'Démarrage...' }}</div>
       </div>
-    </div>
-    <div class="content right-view" :style="{ transform: `scale(${rootScale})`}">
-       <div v-if="route.name === 'Game'" :class="'header small'">
-        <button class="profile-card" @click="openProfile" :aria-label="$t('home.settings')" :title="displayName">
-          <img class="profile-avatar" :src="(selectedAvatar && selectedAvatar.img) || imgMage" alt="avatar" width="36" height="36" />
-          <div class="profile-meta">
-            <div class="profile-name">{{ displayName }}</div>
-            <div class="profile-res">
-              <span class="res-pill gold">🪙 {{ playerGold }}</span>
-              <span class="res-pill essence">✨ {{ playerEssence }}</span>
-              <span class="res-pill gem">💎 {{ playerGems }}</span>
-            </div>
-          </div>
-        </button>
-        <div class="gear-wrap">
-          <button class="gear-btn" @click="toggleGearMenuRight" :aria-label="$t('home.settings')" :title="$t('home.settings')">
-            <Settings :size="18" />
-          </button>
-          <div v-if="showGearMenuRight" class="gear-menu" @mouseleave="closeGearMenuRight">
-            <button class="gear-item" @click="openSettings(); closeGearMenuRight()">{{ $t('home.settings') }}</button>
-            <button class="gear-item" @click="openHelp(); closeGearMenuRight()">{{ $t('home.help') }}</button>
-            <button class="gear-item" @click="toggleAudio(); closeGearMenuRight()">{{ audioMuted ? $t('home.audioOn') : $t('home.audioOff') }}</button>
-            <button class="gear-item" @click="openLang(); closeGearMenuRight()">{{ $t('home.lang') }}</button>
-          </div>
-        </div>
-      </div>
-    
-    <Leaderboard :ranking="versusRanking" :roomCode="versusCode" :soloRanking="[]" />
     </div>
   </div>
 
@@ -274,15 +218,6 @@
         </div>
       </div>
     </div>
-
-    
-
-    <!-- Power Wheel for Versus mode (DISABLED) -->
-    <!-- <PowerWheel
-      :visible="showPowerWheel"
-      @powerSelected="handlePowerSelected"
-      @close="closePowerWheel"
-    /> -->
     
     <!-- Level Up Modal -->
     <LevelUpModal
@@ -307,6 +242,15 @@
       @abandon="handleEndPathAbandon"
     />
     
+    <!-- Auth Modal -->
+    <AuthModal
+      v-if="showAuthModal"
+      :isLinking="isLinkingAccount"
+      @close="closeAuthModal"
+      @success="handleAuthSuccess"
+      @continueAsGuest="handleContinueAsGuest"
+    />
+    
   </template>
 
 <script setup>
@@ -325,6 +269,7 @@ import UsernameModal from './components/UsernameModal.vue';
 import LevelUpModal from './components/LevelUpModal.vue';
 import XpToast from './components/XpToast.vue';
 import EndPathModal from './components/EndPathModal.vue';
+import AuthModal from './components/AuthModal.vue';
 // Import flag assets so Vite resolves URLs correctly
 import frFlag from './assets/fr.png';
 import enFlag from './assets/en.png';
@@ -359,6 +304,14 @@ import {
 import { initRealtime, createRoom, joinRoom, subscribeRoom, startRoom, finishRoom, getRoom, reportRoundWin, reportRoundResult, reportLifeLoss, setPlayerProgress, resetRoom, usePower, leaveRoom } from './lib/realtime_v2.js';
 import { generateEnrichedGrid } from './lib/gridGenerator.js';
 import { getMatchXP, getMultiplayerXP, calculateLevel, addXP, calculateSoloXP } from './lib/xpSystem.js';
+import { 
+  onAuthStateChange, 
+  isAuthenticated, 
+  isGuest as checkIsGuest,
+  getCurrentUser,
+  getProfile,
+  signOut
+} from './lib/auth.js';
 
 // Get supabase instance for direct updates
 let supabase = null;
@@ -770,7 +723,111 @@ function continueAsGuest() {
 
 function openProfileFromNameModal() {
   showNameModal.value = false;
-  router.push('/profile');
+  router.push('/login');
+}
+
+// ============================================
+// FONCTIONS D'AUTHENTIFICATION
+// ============================================
+
+/**
+ * Ouvre le modal d'authentification
+ */
+function openAuthModal(linking = false) {
+  isLinkingAccount.value = linking;
+  showAuthModal.value = true;
+}
+
+/**
+ * Ferme le modal d'authentification
+ */
+function closeAuthModal() {
+  showAuthModal.value = false;
+  isLinkingAccount.value = false;
+}
+
+/**
+ * Gère le succès de l'authentification
+ */
+async function handleAuthSuccess() {
+  console.log('[App] Auth success');
+  closeAuthModal();
+  
+  // Recharger le profil
+  await loadUserProfile();
+}
+
+/**
+ * Gère le clic sur "Continuer en guest"
+ */
+function handleContinueAsGuest() {
+  closeAuthModal();
+  continueAsGuest();
+}
+
+/**
+ * Charge le profil utilisateur depuis Supabase
+ */
+async function loadUserProfile() {
+  try {
+    const authenticated = await isAuthenticated();
+    
+    if (authenticated) {
+      const user = await getCurrentUser();
+      currentUser.value = user;
+      
+      // Charger le profil complet
+      const profile = await getProfile(user.id);
+      currentProfile.value = profile;
+      
+      // Mettre à jour les stats depuis player_stats
+      if (profile.player_stats) {
+        playerLevel.value = profile.player_stats.current_level || 1;
+        playerGold.value = profile.player_stats.gold || 0;
+        playerEssence.value = profile.player_stats.essence || 0;
+        playerGems.value = profile.player_stats.gems || 0;
+        playerTotalXp.value = profile.player_stats.total_xp || 0;
+      }
+      
+      isGuestUser.value = false;
+      console.log('[App] Profile loaded:', profile);
+    } else {
+      // Pas authentifié, charger depuis localStorage
+      loadLocalStats();
+      isGuestUser.value = checkIsGuest();
+    }
+  } catch (error) {
+    console.error('[App] Error loading profile:', error);
+    // Fallback sur localStorage
+    loadLocalStats();
+    isGuestUser.value = true;
+  }
+}
+
+/**
+ * Charge les stats depuis localStorage (fallback)
+ */
+function loadLocalStats() {
+  try {
+    // Charger XP
+    const xpData = localStorage.getItem('memostep_player_xp');
+    if (xpData) {
+      const parsed = JSON.parse(xpData);
+      playerTotalXp.value = parsed.totalXp || 0;
+      updateLevelFromXP();
+    }
+    
+    // Charger ressources
+    const resources = localStorage.getItem('memostep_resources');
+    if (resources) {
+      const parsed = JSON.parse(resources);
+      playerGold.value = parsed.gold || 0;
+      playerEssence.value = parsed.essence || 0;
+      playerGems.value = parsed.gems || 0;
+    }
+  } catch (error) {
+    console.error('[App] Error loading local stats:', error);
+  }
 }
 
 // Language state
@@ -954,6 +1011,12 @@ const endPathData = ref({
   livesLeft: 3,
   xpBreakdown: { baseXp: 0, timeXp: 0, multiplier: 1.0, totalXp: 0 }
 });
+// Auth Modal state
+const showAuthModal = ref(false);
+const isLinkingAccount = ref(false);
+const currentUser = ref(null);
+const currentProfile = ref(null);
+const isGuestUser = ref(true);
 const versusLivesUsed = computed(() => {
   if (state.mode !== 'versus') return 0;
   const room = versusRoom.value;
@@ -2712,6 +2775,26 @@ onMounted(() => {
   // Load player resources
   loadResources();
   
+  // Load user profile (auth or guest)
+  loadUserProfile();
+  
+  // Listen to auth state changes
+  const authSubscription = onAuthStateChange(async (event, session) => {
+    console.log('[App] Auth event:', event, session?.user?.id);
+    
+    if (event === 'SIGNED_IN') {
+      await loadUserProfile();
+    } else if (event === 'SIGNED_OUT') {
+      currentUser.value = null;
+      currentProfile.value = null;
+      isGuestUser.value = true;
+      loadLocalStats();
+    }
+  });
+  
+  // Store subscription for cleanup
+  window._authSubscription = authSubscription;
+  
   // If starting on Home, prompt for username if missing
   openNameModalIfNeeded();
 });
@@ -2719,6 +2802,12 @@ onMounted(() => {
 onBeforeUnmount(() => {
   cleanupSub();
   stopWaitingMusic();
+  
+  // Cleanup auth subscription
+  if (window._authSubscription) {
+    window._authSubscription.unsubscribe();
+  }
+  
   window.removeEventListener('resize', fitBoard);
   window.removeEventListener('orientationchange', fitBoard);
   window.removeEventListener('resize', fitRootScale);

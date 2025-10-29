@@ -2,29 +2,32 @@
   <div class="home">
       <div class="flex flex-col mt-4 w-full grow justify-center items-center">
         <div class="header">
-          <button class="profile-card" @click="emit('openProfile')" :aria-label="$t('home.settings')" :title="displayName">
-            <img class="profile-avatar" :src="(selectedAvatar && selectedAvatar.img) || fallbackAvatar" alt="avatar" width="48" height="48" />
-            <div class="profile-meta">
-              <div class="profile-name">{{ displayName }}</div>
-              <div class="profile-res">
-                <span class="res-pill gold">🪙 {{ playerGold }}</span>
-                <span class="res-pill essence">✨ {{ playerEssence }}</span>
-                <span class="res-pill gem">💎 {{ playerGems }}</span>
-              </div>
+          <!-- Compact profile chip: avatar + level badge + progress pill -->
+          <div class="profile-chip" role="button" tabindex="0" @click="emit('openProfile')" :aria-label="displayName" :title="displayName">
+            <div class="chip-avatar-wrap">
+              <img class="chip-avatar" :src="(selectedAvatar && selectedAvatar.img) || fallbackAvatar" alt="avatar" width="44" height="44" />
+              <div class="chip-level-badge">{{ playerLevel }}</div>
             </div>
-          </button>
-          
-          <!-- XP Progress Bar -->
-          <div class="xp-progress-container">
-            <div class="xp-level-badge">{{ playerLevel }}</div>
-            <div class="xp-progress-wrapper">
-              <div class="xp-progress-bar">
-                <div class="xp-progress-fill" :style="{ width: `${playerLevelProgress * 100}%` }"></div>
-              </div>
-              <div class="xp-text">Level {{ playerLevel }}</div>
+            <div class="progress-pill">
+              <div class="progress-fill" :style="{ width: `${Math.round((playerLevelProgress || 0) * 100)}%` }"></div>
+              <div class="progress-text">{{ Math.round((playerLevelProgress || 0) * 100) }}%</div>
             </div>
           </div>
-          
+
+          <!-- Resources bar (gold + gems) -->
+          <div class="resources-bar">
+            <div class="resource-chip">
+              <button class="plus-btn" @click="emit('openShop', 'gold')" aria-label="Acheter or">＋</button>
+              <span class="res-value">{{ formattedGold }}</span>
+              <span class="res-icon gold">🪙</span>
+            </div>
+            <div class="resource-chip">
+              <button class="plus-btn" @click="emit('openShop', 'gems')" aria-label="Acheter gemmes">＋</button>
+              <span class="res-value">{{ playerGems }}</span>
+              <span class="res-icon gem">💎</span>
+            </div>
+          </div>
+
           <div class="gear-wrap">
             <button class="gear-btn" @click="toggleGearMenu" :aria-label="$t('home.settings')" :title="$t('home.settings')">
               <Settings :size="20" />
@@ -47,8 +50,14 @@
           <img class="avatar-img" :src="selectedAvatar.img" :alt="selectedAvatar.name || 'Avatar'" />
         </div>
         <div class="mode-buttons">
-          <button class="mode-btn" @click="emit('solo')">{{ $t('home.solo') }}</button>
-          <button class="mode-btn" @click="emit('versus')">{{ $t('home.versus') }}</button>
+          <button class="pill-btn pvp-btn" @click="emit('versus')">
+            <span class="pill-icon">⚔️</span>
+            <span class="pill-text">PVP</span>
+          </button>
+          <button class="pill-btn solo-btn" @click="emit('solo')">
+            <span class="pill-icon">🎯</span>
+            <span class="pill-text">{{ $t('home.solo') }}</span>
+          </button>
         </div>
         <button class="menu-btn" @click="emit('stats')">{{ $t('home.stats') }}</button>
         <a
@@ -97,7 +106,13 @@ const props = defineProps({
   currentFlag: { type: String, default: '@/assets/fr.png' },
   audioMuted: { type: Boolean, default: true },
 });
-const emit = defineEmits(['start', 'solo', 'versus', 'openLang', 'help', 'settings', 'stats', 'toggleAudio', 'openProfile']);
+const emit = defineEmits(['start', 'solo', 'versus', 'openLang', 'help', 'settings', 'stats', 'toggleAudio', 'openProfile', 'openShop']);
+
+// Formatters
+const formattedGold = computed(() => {
+  const n = Number(props.playerGold || 0);
+  return new Intl.NumberFormat('fr-FR').format(n);
+});
 
 // 3D tilt state for avatar card
 const rx = ref(0); // rotateX
@@ -252,9 +267,78 @@ const avatarCardStyle = computed(() => {
   100% { transform: rotate(360deg); }
 }
 
-/* Header profile card */
-.header { width: 100%; display:flex; align-items:center; justify-content:center; margin-bottom: 10px; }
-.header { gap: 10px; }
+/* Header layout */
+.header { width: 100%; display:flex; align-items:center; justify-content: space-between; margin-bottom: 10px; gap: 10px; }
+
+/* Compact profile chip */
+.profile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0; /* no space between avatar and progress */
+  padding: 0; /* remove inner padding */
+  border: none; /* no card border */
+  background: transparent; /* no card background */
+  box-shadow: none; /* remove shadow */
+  color: var(--text);
+  cursor: pointer;
+}
+.profile-chip:focus-visible { outline: 2px solid #4c6ef5; outline-offset: 2px; }
+
+.chip-avatar-wrap { position: relative; width: 36px; height: 36px; flex-shrink: 0; }
+.chip-avatar { width: 36px; height: 36px; border-radius: 12px; display:block; }
+.chip-level-badge {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display:flex; align-items:center; justify-content:center;
+  font-size: 12px; font-weight: 900;
+  color: #fff;
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+  border: 2px solid #0f1124;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+
+.progress-pill {
+  position: relative;
+  width: 50px; /* smaller width */
+  height: 16px; /* smaller height */
+  border-radius: 5px;
+  background: linear-gradient(180deg, #1f2a44 0%, #19233b 100%);
+  overflow: hidden;
+  border: 1px solid #2a2e52;
+  border-left: none; /* attach to avatar without seam */
+  margin-left: -2px; /* overlap slightly to look attached */
+}
+.progress-fill {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 0%;
+  background: linear-gradient(90deg, #2563eb 0%, #3b82f6 60%, #60a5fa 100%);
+  border-radius: 12px;
+  transition: width .35s ease;
+  box-shadow: inset 0 0 10px rgba(255,255,255,0.2);
+}
+.progress-text {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display:flex; align-items:center; justify-content:center;
+  font-weight: 900;
+  color: #e7eeff;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.35);
+  font-size: 12px; /* smaller text */
+}
+.progress-trophy {
+  position: absolute;
+  right: -6px; /* tighter */
+  bottom: -6px;
+  transform: rotate(-10deg);
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.35));
+  font-size: 14px; /* smaller */
+}
 .gear-wrap { position: relative; }
 .gear-btn {
   display:inline-flex; align-items:center; justify-content:center;
@@ -295,29 +379,89 @@ const avatarCardStyle = computed(() => {
 .res-pill.essence { color:#a78bfa; }
 .res-pill.gem { color:#76e4f7; }
 
+/* Resources bar */
+.resources-bar { display:flex; align-items:center; gap: 10px; }
+.resource-chip {
+  display:inline-flex; align-items:center; gap:8px;
+  background: #0a0e1a;
+  border: 1px solid #2a2e52;
+  border-radius: 12px;
+  height: 28px;
+  padding: 0 10px 0 4px;
+  box-shadow: 0 2px 0 #0b0e18, inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.plus-btn {
+  width: 22px; height: 22px;
+  display:flex; align-items:center; justify-content:center;
+  border-radius: 6px;
+  border: 1px solid #b45309;
+  background: linear-gradient(180deg, #fb923c 0%, #f97316 100%);
+  color: #fff; font-weight: 900; line-height: 1;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.35);
+  cursor: pointer;
+}
+.plus-btn:active { transform: translateY(1px); }
+.res-value { color:#ffffff; font-weight: 900; text-shadow: 0 1px 0 rgba(0,0,0,0.35); font-size: 14px; }
+.res-icon { font-size: 16px; line-height: 1; }
+.res-icon.gold { color: #ffd166; }
+.res-icon.gem { color: #76e4f7; }
+
 /* Mode buttons: yellow 3D cartoon */
 .mode-buttons { display:flex; gap:12px; margin: 10px 0 6px; }
-.mode-btn {
+
+/* New pill buttons */
+.pill-btn {
   appearance: none;
   border: none;
   outline: none;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   padding: 14px 18px;
   min-width: 120px;
-  border-radius: 14px;
+  border-radius: 16px;
   font-size: 18px;
   font-weight: 900;
-  color: #1a1c30;
-  background: linear-gradient(180deg, #ffe066 0%, #ffd43b 60%, #fcc419 100%);
+  color: #ffffff;
   box-shadow:
-    0 6px 0 #b88911,
-    0 10px 18px rgba(0,0,0,0.25),
-    inset 0 2px 0 rgba(255,255,255,0.6);
+    0 6px 0 rgba(0,0,0,0.25),
+    0 12px 20px rgba(0,0,0,0.25),
+    inset 0 2px 0 rgba(255,255,255,0.25);
   transition: transform .08s ease, box-shadow .08s ease, filter .12s ease;
 }
-.mode-btn:hover { filter: brightness(1.05) saturate(1.1); }
-.mode-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #b88911, 0 6px 12px rgba(0,0,0,0.2), inset 0 2px 0 rgba(255,255,255,0.6); }
-.mode-btn:focus-visible { box-shadow: 0 6px 0 #b88911, 0 0 0 3px #4c6ef5, 0 10px 18px rgba(0,0,0,0.25), inset 0 2px 0 rgba(255,255,255,0.6); }
+.pill-btn:hover { filter: brightness(1.06) saturate(1.08); }
+.pill-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,0.3), 0 6px 12px rgba(0,0,0,0.2), inset 0 2px 0 rgba(255,255,255,0.25); }
+.pill-btn:focus-visible { box-shadow: 0 0 0 3px rgba(76,110,245,0.6), 0 12px 20px rgba(0,0,0,0.25), inset 0 2px 0 rgba(255,255,255,0.25); }
+
+.pill-icon { font-size: 20px; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.3)); }
+.pill-text { text-shadow: 0 2px 0 rgba(0,0,0,0.35); }
+
+/* Blue Solo */
+.solo-btn {
+  background: linear-gradient(180deg, #4c6ef5 0%, #3b82f6 60%, #2563eb 100%);
+}
+.solo-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: radial-gradient(120% 120% at 80% 0%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 60%);
+  pointer-events: none;
+}
+
+/* Red PVP */
+.pvp-btn {
+  background: linear-gradient(180deg, #ef4444 0%, #f43f5e 60%, #e11d48 100%);
+}
+.pvp-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: radial-gradient(120% 120% at 80% 0%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 60%);
+  pointer-events: none;
+}
 
 /* XP Progress Bar */
 .xp-progress-container {
