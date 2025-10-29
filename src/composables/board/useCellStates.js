@@ -120,6 +120,25 @@ export function nextPlayableRow(path, playerProgress) {
 }
 
 /**
+ * Vérifie que la prochaine ligne jouable contient au moins une case du chemin
+ * qui n'a pas encore été validée (index >= nextIndex)
+ */
+export function rowHasPlayablePathCell(path, playerProgress, row) {
+  try {
+    const pathArray = Array.isArray(path) ? path : [];
+    const nextIndex = Math.max(0, Math.min(Number(playerProgress) || 0, pathArray.length));
+    for (let i = nextIndex; i < pathArray.length; i++) {
+      const cell = pathArray[i];
+      if (cell && Number(cell.r) === Number(row)) return true;
+      // Optimisation: dès que l'on dépasse la ligne, on peut s'arrêter si les lignes sont strictement croissantes
+    }
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
  * Autorise le clic uniquement sur les cellules de la prochaine ligne jouable
  */
 export function canClickCell(revealComplete, path, playerProgress, r, c) {
@@ -127,5 +146,7 @@ export function canClickCell(revealComplete, path, playerProgress, r, c) {
   if (!revealComplete) return false;
   const row = nextPlayableRow(path, playerProgress);
   if (row == null) return false;
-  return Number(r) === Number(row);
+  // La ligne doit correspondre ET contenir au moins une case correcte restante
+  if (Number(r) !== Number(row)) return false;
+  return rowHasPlayablePathCell(path, playerProgress, row);
 }

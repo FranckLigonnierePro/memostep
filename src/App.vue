@@ -641,6 +641,9 @@ function newGame() {
     if (!Array.isArray(state.soloPath) || state.soloPath.length === 0) {
       state.soloPath = randomPath();
     }
+    // Copier le chemin préparé dans state.path pour l'utiliser dans le jeu
+    state.path = state.soloPath.slice();
+    
     state.heartCell = state.preparedHeart || null;
     state.preparedHeart = null;
     
@@ -708,6 +711,12 @@ async function updatePlayerAvatarUrl(url) {
 }
 
 function handleEndPathContinue() {
+  try {
+    if (endPathData?.value && endPathData.value.status === 'completed') {
+      // Préparer le prochain chemin solo avant de lancer newGame
+      prepareNextSoloLevel(state, soloLevel, soloLivesUsed, runCounters);
+    }
+  } catch (_) {}
   endPathContinue(newGame);
 }
 

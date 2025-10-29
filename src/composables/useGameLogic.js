@@ -124,13 +124,25 @@ export function useGameLogic() {
 
     const expect = state.path[state.nextIndex];
 
-    // Auto-detect mirroring
-    if (expect && expect.r === r && expect.c !== c && expect.c === (COLS - 1 - c) && !mirrorColumns.value) {
-      mirrorColumns.value = true;
-    }
+    // DEBUG: Log pour diagnostiquer les erreurs de ligne
+    console.log('[DEBUG Click]', {
+      clicked: { r, c, effectiveC },
+      expect,
+      nextIndex: state.nextIndex,
+      pathLength: state.path.length,
+      mirrorColumns: mirrorColumns.value,
+      pathOnThisRow: state.path.filter(cell => cell.r === r).map(cell => ({ r: cell.r, c: cell.c }))
+    });
+
+    // DÉSACTIVÉ: Auto-detect mirroring (causait des faux positifs)
+    // if (expect && expect.r === r && expect.c !== c && expect.c === (COLS - 1 - c) && !mirrorColumns.value) {
+    //   mirrorColumns.value = true;
+    //   console.log('[DEBUG] Mirroring auto-detected');
+    // }
 
     // Correct cell
     if (expect && expect.r === r && expect.c === effectiveC) {
+      console.log('[DEBUG] ✓ Correct cell');
       state.correctSet.add(`${r}-${c}`);
       state.nextIndex++;
 
