@@ -26,7 +26,6 @@
       <div v-else class="auth-methods">
         <!-- Google -->
         <button class="auth-btn google-btn" @click="handleGoogleAuth">
-          <img src="../assets/google-icon.svg" alt="Google" width="20" height="20" v-if="false" />
           <span class="auth-icon">🔍</span>
           <span>{{ isLinking ? 'Lier avec Google' : 'Continuer avec Google' }}</span>
         </button>
