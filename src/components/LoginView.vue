@@ -156,21 +156,14 @@ function goHome() { router.push('/'); }
 
 <style scoped>
 .login-page {
-  min-height: 100vh;
+  margin-bottom: .5rem;
+  justify-content: space-between;
   display: flex;
+  flex-grow: 1;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #1a1c30 0%, #0f1020 100%);
-  padding: 24px;
 }
 .login-card {
-  width: 100%;
-  max-width: 520px;
-  background: rgba(26, 28, 48, 0.95);
-  border: 2px solid rgba(155, 188, 255, 0.2);
-  border-radius: 24px;
-  padding: 32px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.35);
 }
 .title { color: #fff; margin: 0 0 6px 0; font-size: 28px; font-weight: 800; }
 .subtitle { color: #9bbcff; margin: 0 0 18px 0; font-size: 14px; }

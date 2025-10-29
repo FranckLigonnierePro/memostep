@@ -320,20 +320,6 @@ const avatarByKey = computed(() => {
   return mapping;
 });
 
-function cellStyle(row, col) {
-  const STEP = 70; // ms per diagonal delay
-  // Diagonal index for bottom-left -> top-right wave across anti-diagonals
-  // bottom-left (row=rows-1, col=0) => 0, then increases toward top-right
-  const diag = (props.rowsCount - 1 - row) + col;
-  return { '--delay': `${Math.max(0, diag) * STEP}ms` };
-}
-
-function faceColorClass(r, c) {
-  const key = `${r}-${c}`;
-  const v = props.faceColors && props.faceColors[key];
-  if (!v) return null;
-  return `face-${v}`;
-}
 
 // Generate random snowflake animation styles
 function snowflakeStyle(index) {
@@ -553,25 +539,11 @@ function isRollbackCell(r, c) {
   } catch (_) { return false; }
 }
 
-function isNonPathCell(r, c) {
-  // Non-path means not currently part of path or correct cells
-  const onPath = isPathCell(r, c) || isCorrectCell(r, c);
-  return !onPath;
-}
-
 function isStunCell(r, c) {
   try {
     const key = `${r}-${c}`;
     return Array.isArray(props.stunKeys) && props.stunKeys.includes(key);
   } catch (_) { return false; }
-}
-
-function hasDecor(r, c) {
-  const classes = props.cellClass(r, c) || [];
-  if (Array.isArray(classes)) {
-    return classes.includes('path') || classes.includes('start') || classes.includes('end') || classes.includes('correct') || classes.includes('wrong');
-  }
-  return false;
 }
 
 function isPathCell(r, c) {
@@ -628,12 +600,7 @@ function brokenCrackStyle(crackIndex) {
 
 // Get cell content from gridContent
 function getCellContent(r, c) {
-  if (!props.gridContent || !Array.isArray(props.gridContent)) {
-    if (r === 0 && c === 0) {
-      console.log('[getCellContent] gridContent non disponible:', props.gridContent);
-    }
-    return null;
-  }
+  if (!props.gridContent || !Array.isArray(props.gridContent)) return null;
   if (r < 0 || r >= props.gridContent.length) return null;
   if (c < 0 || !props.gridContent[r] || c >= props.gridContent[r].length) return null;
   return props.gridContent[r][c];
@@ -667,49 +634,6 @@ function getBonusIcon(r, c) {
   return icons[cell.type] || '?';
 }
 
-// Check if cell has gold bonus (on path or adjacent)
-function hasGoldBonus(r, c) {
-  if (isBonusCollected(r, c)) return false;
-  const cell = getCellContent(r, c);
-  if (!cell) return false;
-  // Gold on path
-  if (cell.type === 'path' && cell.gold) {
-    console.log(`[hasGoldBonus] Or trouvé sur chemin (${r},${c}):`, cell.gold);
-    return { value: cell.gold, onPath: true };
-  }
-  // Gold adjacent to path
-  if (cell.type === 'gold' && cell.value) {
-    console.log(`[hasGoldBonus] Or trouvé adjacent (${r},${c}):`, cell.value);
-    return { value: cell.value, onPath: false };
-  }
-  return false;
-}
-
-// Check if cell has gem bonus
-function hasGemBonus(r, c) {
-  if (isBonusCollected(r, c)) return false;
-  const cell = getCellContent(r, c);
-  return cell && cell.type === 'gem';
-}
-
-// Check if cell has essence bonus
-function hasEssenceBonus(r, c) {
-  if (isBonusCollected(r, c)) return false;
-  const cell = getCellContent(r, c);
-  if (!cell) return false;
-  // Essence on path
-  if (cell.type === 'path' && cell.essence) return { value: cell.essence, onPath: true };
-  // Essence adjacent to path
-  if (cell.type === 'essence') return { value: 1, onPath: false };
-  return false;
-}
-
-// Check if cell has potion bonus
-function hasPotionBonus(r, c) {
-  if (isBonusCollected(r, c)) return false;
-  const cell = getCellContent(r, c);
-  return cell && cell.type === 'potion';
-}
 </script>
 
 <style scoped>

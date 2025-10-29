@@ -492,6 +492,9 @@ const faceColors = ref({}); // { 'r-c': 'yellow' | 'green' | 'purple' | 'blue' }
 const shakeActive = ref(false);
 const clickBlocked = ref(false);
 
+// Detect and handle potential horizontal mirroring between visual grid and path indices
+const mirrorColumns = ref(false);
+
 // Reveal bar should remain filled once the memorize phase completes
 const revealComplete = ref(false);
 
@@ -1052,7 +1055,6 @@ const versusPlayers = computed(() => {
   const room = versusRoom.value;
   const me = playerId.value || ensurePlayerId();
   const roster = (room && Array.isArray(room.players)) ? room.players : [];
-  console.log('[versusPlayers] Room players:', roster.map(p => ({ id: p?.id?.slice(0,6), progress: p?.progress })));
   return roster.map(p => {
     const wins = Number(p && p.score != null ? p.score : 0);
     // Prefer live local progress for self, otherwise use stored progress
@@ -1066,7 +1068,6 @@ const versusPlayers = computed(() => {
     const color = (p && p.color) ? String(p.color) : '#ffffff';
     const frozenClicks = Number(p && p.frozen_clicks != null ? p.frozen_clicks : 0);
     const isFrozen = frozenClicks > 0;
-    console.log('[versusPlayers] Player:', { id: p?.id?.slice(0,6), name, progress, storedProg, isMe: p?.id === me, frozenClicks, isFrozen });
     // Include avatar_url so BoardView can render the correct image
     return { id: p.id, name, wins, progress, color, frozenClicks, isFrozen, avatar_url: p.avatar_url };
   });
@@ -1074,18 +1075,12 @@ const versusPlayers = computed(() => {
 
 // Map each player to a deterministic path and a fixed starting column (0..3)
 const versusPathsByPlayer = computed(() => {
-  console.log('[versusPathsByPlayer] CALLED - mode:', state.mode, 'seed:', versusSeed.value);
-  console.log('[versusPathsByPlayer] 🔵 CALLED - mode:', state.mode, 'seed:', versusSeed.value);
   if (state.mode !== 'versus') return {};
   const room = versusRoom.value;
   const roster = (room && Array.isArray(room.players)) ? room.players.slice(0, COLS) : [];
-  if (!versusSeed.value || !versusStartAtMs.value) {
-    console.log('[versusPathsByPlayer] ⚠️ Missing seed or startAtMs, returning empty');
-    return {};
-  }
+  if (!versusSeed.value || !versusStartAtMs.value) return {};
   const roundSeed = Number(versusSeed.value) || 0;
   const map = {};
-  console.log('[versusPathsByPlayer] Roster order:', roster.map((p, i) => ({ idx: i, id: p.id?.slice(0,6), name: p.name })));
   roster.forEach((p, idx) => {
     const startCol = idx % COLS; // fixed column assignment per join order
     // Derive a stable seed per player to vary paths while staying in sync across clients
@@ -1094,7 +1089,6 @@ const versusPathsByPlayer = computed(() => {
     const seed = roundSeed + (idx + 1) * 987654321 + idHash;
     const rng = seededRng(seed >>> 0);
     map[p.id] = randomPathWithRngAndStart(rng, startCol);
-    console.log('[versusPathsByPlayer] Player', idx, ':', p.name, 'col:', startCol, 'seed:', seed);
   });
   return map;
 });
@@ -1476,9 +1470,6 @@ function applyEnrichedGrid(floorNumber = 1, runCounters = { gem: 0, potion: 0 })
   // Stocker la grille enrichie dans le state pour affichage visuel
   state.gridContent = grid;
   
-  // Debug: vérifier que la grille contient des bonus
-  console.log('[applyEnrichedGrid] Étage:', floorNumber);
-  console.log('[applyEnrichedGrid] Grille générée:', grid);
   let bonusCount = { gold: 0, gem: 0, essence: 0, potion: 0 };
   for (let r = 0; r < grid.length; r++) {
     for (let c = 0; c < grid[r].length; c++) {
@@ -1489,7 +1480,6 @@ function applyEnrichedGrid(floorNumber = 1, runCounters = { gem: 0, potion: 0 })
       if (cell.type === 'potion') bonusCount.potion++;
     }
   }
-  console.log('[applyEnrichedGrid] Bonus trouvés:', bonusCount);
   
   // Réinitialiser les sets existants
   state.rollback.clear();
@@ -1637,6 +1627,8 @@ function onCellClick(r, c) {
   if (!state.inPlay) return;
   if (clickBlocked.value) return; // Block clicks during shake animation
   const keyAlready = `${r}-${c}`;
+  // Effective column used to compare with path; we keep visual marks on the clicked cell (r,c)
+  const effectiveC = mirrorColumns.value ? (COLS - 1 - c) : c;
   
   // Check if this is a bonus cell - treat as valid path cell (violet)
   if (state.gridContent && state.gridContent[r] && state.gridContent[r][c]) {
@@ -1656,20 +1648,14 @@ function onCellClick(r, c) {
         if (cell.type === 'gold') {
           const goldValue = cell.value || 5;
           playerGold.value += goldValue;
-          console.log(`[Bonus collecté] +${goldValue} 💰 Or - Total: ${playerGold.value}`);
         } else if (cell.type === 'gem') {
           playerGems.value += 1;
-          console.log(`[Bonus collecté] +1 💎 Gemme - Total: ${playerGems.value}`);
         } else if (cell.type === 'essence') {
           playerEssence.value += 1;
-          console.log(`[Bonus collecté] +1 ⚡ Essence - Total: ${playerEssence.value}`);
         } else if (cell.type === 'potion') {
           // Restaurer 1 vie
           soloLivesUsed.value = Math.max(0, soloLivesUsed.value - 1);
-          console.log(`[Bonus collecté] +1 🧪 Potion - Vies: ${3 - soloLivesUsed.value}/3`);
         }
-        
-        console.log(`[Progression] ${state.nextIndex}/${state.path.length}`)
         
         // Vérifier si c'est la fin du chemin
         if (state.nextIndex === state.path.length) {
@@ -1723,11 +1709,15 @@ function onCellClick(r, c) {
   }
   
   const expect = state.path[state.nextIndex];
-  if (expect && expect.r === r && expect.c === c) {
+  // Auto-detect mirroring on first mismatch: if row matches and mirrored column would match expected, enable mirroring
+  if (expect && expect.r === r && expect.c !== c && expect.c === (COLS - 1 - c) && !mirrorColumns.value) {
+    mirrorColumns.value = true;
+  }
+  if (expect && expect.r === r && expect.c === effectiveC) {
     state.correctSet.add(`${r}-${c}`);
     state.nextIndex++;
     // Heart pickup on correct click (solo mode only)
-    if (state.mode === 'solo' && state.heartCell && state.heartCell.r === r && state.heartCell.c === c) {
+    if (state.mode === 'solo' && state.heartCell && state.heartCell.r === r && state.heartCell.c === effectiveC) {
       // Grant back one life (down to a minimum of 0 used)
       soloLivesUsed.value = Math.max(0, (soloLivesUsed.value || 0) - 1);
       state.heartCell = null; // consume the heart
@@ -2664,10 +2654,6 @@ function cellClass(r, c) {
   const key = `${r}-${c}`;
 
   if (state.revealed) {
-    // Log the path being used (only once per reveal)
-    if (r === 0 && c === 0 && state.path.length > 0) {
-      console.log('[cellClass] 🎯 Current path first cell:', state.path[0], 'last cell:', state.path[state.path.length - 1]);
-    }
     const idx = state.path.findIndex(p => p.r === r && p.c === c);
     if (idx !== -1) {
       classes.push('path');
@@ -2685,14 +2671,6 @@ function cellClass(r, c) {
 // Handle spacebar for freeze power in versus mode
 function handleKeyDown(e) {
   if (e.code === 'Space') {
-    console.log('[handleKeyDown] Space pressed:', {
-      mode: state.mode,
-      inPlay: state.inPlay,
-      revealed: state.revealed,
-      powerUsed: state.powerUsed,
-      versusCode: !!versusCode.value
-    });
-    
     if (state.mode === 'versus' && state.inPlay && !state.revealed) {
       e.preventDefault();
       handleFreezePower();
@@ -2701,36 +2679,18 @@ function handleKeyDown(e) {
 }
 
 async function handleFreezePower() {
-  console.log('[handleFreezePower] Called with state:', {
-    inPlay: state.inPlay,
-    revealed: state.revealed,
-    powerUsed: state.powerUsed,
-    versusCode: versusCode.value
-  });
-  
   // Only allow power during active gameplay (not during memorization)
-  if (!state.inPlay || state.revealed) {
-    console.log('[handleFreezePower] ❌ Blocked: not in play or revealed');
-    return;
-  }
-  if (!versusCode.value) {
-    console.log('[handleFreezePower] ❌ Blocked: no versus code');
-    return;
-  }
-  if (state.powerUsed) {
-    console.log('[handleFreezePower] ❌ Blocked: power already used');
-    return;
-  }
+  if (!state.inPlay || state.revealed) return;
+  if (!versusCode.value) return;
+  if (state.powerUsed) return;
   
-  console.log('[handleFreezePower] ✅ Activating freeze power...');
   const me = playerId.value || ensurePlayerId();
   try {
     const updated = await usePower(versusCode.value, me, 'freeze');
     if (updated) versusRoom.value = updated;
     state.powerUsed = true; // Mark power as used
-    console.log('[handleFreezePower] ✅ Freeze power activated!');
   } catch (err) {
-    console.error('[handleFreezePower] ❌ Error:', err);
+    console.error('[handleFreezePower] Error:', err);
   }
 }
 
@@ -2780,8 +2740,6 @@ onMounted(() => {
   
   // Listen to auth state changes
   const authSubscription = onAuthStateChange(async (event, session) => {
-    console.log('[App] Auth event:', event, session?.user?.id);
-    
     if (event === 'SIGNED_IN') {
       await loadUserProfile();
     } else if (event === 'SIGNED_OUT') {
