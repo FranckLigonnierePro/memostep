@@ -2822,7 +2822,7 @@ html, body, #app {
 
 .content {
   width: 320px;
-  height: 548px;
+  height: 568px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
