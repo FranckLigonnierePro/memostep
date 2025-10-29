@@ -184,22 +184,20 @@
 </template>
 
 <script setup>
-import { watch } from 'vue';
-import { Home, Heart, Snowflake } from 'lucide-vue-next';
-
-// Assets
+import { computed, ref, watch } from 'vue';
+import { Home, RotateCcw, Heart, Snowflake } from 'lucide-vue-next';
 import bgFirst from '../assets/bg-first.png';
-
-// Composables
-import { usePlayerAvatars, useFreezeDetection } from '../composables/board/usePlayerAvatars';
-import { soloPlayerPosition as getSoloPosition, playerBubbleStyle as getPlayerBubbleStyle } from '../composables/board/usePlayerPositioning';
-import * as CellStates from '../composables/board/useCellStates';
-
-// Utilitaires
-import { snowflakeStyle as getSnowflakeStyle, crackStyle as getCrackStyle, pathRevealStyle as getPathRevealStyle } from '../utils/board/animationHelpers';
-
-// Configuration
-import BOARD_CONFIG from '../config/boardConfig';
+import stone from '../assets/stone.png';
+import stone2 from '../assets/stone2.png';
+import stone3 from '../assets/stone3.png';
+import stoneGood from '../assets/stone_good.png';
+import stoneGreen from '../assets/stone_green.png';
+import mageAvatar from '../assets/mage/content.png';
+import warriorAvatar from '../assets/guerriere/fcontent.png';
+import mageFrost from '../assets/mage/givré.png';
+import warriorFrost from '../assets/guerriere/fgivré.png';
+import genAvatar1 from '../assets/Generated Image October 22, 2025 - 12_20AM.png';
+import genAvatar2 from '../assets/Generated Image October 22, 2025 - 12_25AM.png';
 
 const props = defineProps({
   cells: { type: Array, required: true },
@@ -208,8 +206,8 @@ const props = defineProps({
   revealSecondsText: { type: String, default: '' },
   revealProgress: { type: Number, default: 0 },
   flipActive: { type: Boolean, default: false },
-  rowsCount: { type: Number, default: BOARD_CONFIG.DEFAULT_ROWS },
-  colsCount: { type: Number, default: BOARD_CONFIG.DEFAULT_COLS },
+  rowsCount: { type: Number, default: 12 },
+  colsCount: { type: Number, default: 4 },
   faceDownActive: { type: Boolean, default: false },
   faceColors: { type: Object, default: () => ({}) },
   revealComplete: { type: Boolean, default: false },
@@ -233,58 +231,408 @@ const props = defineProps({
   shakeActive: { type: Boolean, default: false },
   wrongCrackTexture: { type: String, default: '' },
   selfId: { type: [String, Object], default: '' },
-  heartCell: { type: Object, default: null },
-  selectedAvatar: { type: Object, default: null },
-  playerProgress: { type: Number, default: 0 },
-  rollbackKeys: { type: Array, default: () => [] },
-  lifeLossKeys: { type: Array, default: () => [] },
-  stunKeys: { type: Array, default: () => [] },
-  stunActive: { type: Boolean, default: false },
-  gridContent: { type: [Array, Object], default: null },
-  collectedBonuses: { type: Array, default: () => [] },
-  playerGold: { type: Number, default: 0 },
-  playerEssence: { type: Number, default: 0 },
-  playerGems: { type: Number, default: 0 },
+  heartCell: { type: Object, default: null }, // { r, c } when a heart is present on this path
+  selectedAvatar: { type: Object, default: null }, // Avatar selected by player
+  playerProgress: { type: Number, default: 0 }, // Current nextIndex for solo/daily player position
+  rollbackKeys: { type: Array, default: () => [] }, // ['r-c'] cells that cause rollback
+  lifeLossKeys: { type: Array, default: () => [] }, // ['r-c'] cells that cause life loss
+  stunKeys: { type: Array, default: () => [] }, // ['r-c'] cells that stun
+  stunActive: { type: Boolean, default: false }, // show loader on solo avatar when stunned
+  gridContent: { type: [Array, Object], default: null }, // grid[r][c] with bonus/trap info
+  collectedBonuses: { type: Array, default: () => [] }, // ['r-c'] collected bonus cells
+  playerGold: { type: Number, default: 0 }, // Or collecté
+  playerEssence: { type: Number, default: 0 }, // Essence collectée
+  playerGems: { type: Number, default: 0 }, // Gemmes collectées
 });
-
 const emit = defineEmits(['cellClick', 'goHome']);
 
-// ========================================
-// COMPOSABLES - Gestion des avatars et freeze
-// ========================================
-const { avatarByKey, playerIsFrozen, getAvatar } = usePlayerAvatars(props);
-const { isJustFrozen, updateFreezeState } = useFreezeDetection(props);
+const AVATARS = [mageAvatar, warriorAvatar, genAvatar1, genAvatar2];
 
-// Watcher pour détecter les transitions de freeze
+function playerKey(player) {
+  return String(player?.id || player?.name || '');
+}
+
+// Merge position with z-index so the local player's bubble renders above others when overlapping
+function playerBubbleStyle(player) {
+  const base = playerBubblePosition(player);
+  const isSelf = !!(player && String(player.id || '') === String(props.selfId || ''));
+  const z = isSelf ? 100 : 10;
+  return { ...base, zIndex: String(z) };
+}
+
+// Determines if the given player is currently frozen (includes local self freeze)
+function playerIsFrozen(player) {
+  const isSelf = !!(player && props && String(player.id || '') === String(props.selfId || ''));
+  const localFrozen = !!(isSelf && props && props.frozenGrid);
+  return !!(player && (player.isFrozen || (player.frozenClicks || player.frozen_clicks || 0) > 0 || localFrozen));
+}
+
+// Track players who just transitioned to frozen to trigger one-time animation
+const justFrozen = ref(new Set());
+const prevFrozenById = ref(new Map());
+
 watch(
-  () => props.versusPlayers || [],
-  (players) => updateFreezeState(players, playerIsFrozen),
-  { immediate: true }
+  () => (props.versusPlayers || []).map(p => ({ id: p?.id || p?.name || '', frozen: playerIsFrozen(p) })),
+  (now) => {
+    const prev = prevFrozenById.value;
+    const nextMap = new Map();
+    for (const entry of now) {
+      const was = prev.get(entry.id) || false;
+      nextMap.set(entry.id, entry.frozen);
+      if (entry.frozen && !was) {
+        // mark just-frozen and clear after short delay
+        justFrozen.value.add(entry.id);
+        setTimeout(() => {
+          const set = justFrozen.value; set.delete(entry.id);
+        }, 700);
+      }
+    }
+    prevFrozenById.value = nextMap;
+  },
+  { immediate: true, deep: false }
 );
 
-// ========================================
-// FONCTIONS WRAPPER - Utilisation des modules
-// ========================================
+function isJustFrozen(player) {
+  const id = String(player?.id || player?.name || '');
+  return justFrozen.value.has(id);
+}
 
-// Animations
-const snowflakeStyle = (index) => getSnowflakeStyle(index);
-const crackStyle = (index) => getCrackStyle(index);
-const pathRevealStyle = (r, c) => getPathRevealStyle(r, c, props.path, props.revealed, props.revealComplete);
+function hashString(s) {
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    hash = ((hash << 5) - hash) + s.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
+}
 
-// Positionnement
-const soloPlayerPosition = () => getSoloPosition(props.path, props.playerProgress, props.collectedBonuses);
-const playerBubbleStyle = (player) => getPlayerBubbleStyle(player, props.selfId, props.versusPathsByPlayer, props.path);
+// Build a stable avatar assignment without duplicates among current players
+const avatarByKey = computed(() => {
+  const players = (props.versusPlayers || []);
+  const keys = players.map(p => playerKey(p)).filter(Boolean);
+  const uniqueKeys = [...new Set(keys)];
+  const seed = uniqueKeys.join('|');
+  const base = Math.abs(hashString(seed)) % AVATARS.length;
+  const mapping = {};
+  uniqueKeys.forEach((k, i) => {
+    mapping[k] = AVATARS[(base + i) % AVATARS.length];
+  });
+  return mapping;
+});
 
-// États des cellules
-const isCellWrong = (r, c) => CellStates.isCellWrong(props.cellClass, r, c);
-const isRollbackCell = (r, c) => CellStates.isRollbackCell(props.rollbackKeys, r, c);
-const isStunCell = (r, c) => CellStates.isStunCell(props.stunKeys, r, c);
-const isPathCell = (r, c) => CellStates.isPathCell(props.cellClass, r, c);
-const isCorrectCell = (r, c) => CellStates.isCorrectCell(props.cellClass, r, c);
-const showHeart = (r, c) => CellStates.showHeart(props.heartCell, props.revealComplete, props.revealed, r, c);
-const canClickCell = (r, c) => CellStates.canClickCell(props.revealComplete, props.path, props.playerProgress, r, c);
-const isBonusCell = (r, c) => CellStates.isBonusCell(props.gridContent, props.collectedBonuses, r, c);
-const getBonusIcon = (r, c) => CellStates.getBonusIcon(props.gridContent, r, c);
+
+// Generate random snowflake animation styles
+function snowflakeStyle(index) {
+  const left = Math.random() * 100;
+  const animationDelay = Math.random() * 2;
+  const animationDuration = 2 + Math.random() * 3;
+  const size = 4 + Math.random() * 8;
+  return {
+    left: `${left}%`,
+    animationDelay: `${animationDelay}s`,
+    animationDuration: `${animationDuration}s`,
+    width: `${size}px`,
+    height: `${size}px`,
+  };
+}
+
+// Generate crack patterns
+function crackStyle(crackIndex) {
+  const patterns = [
+    { top: '20%', left: '10%', width: '80%', height: '2px', transform: 'rotate(45deg)' },
+    { top: '50%', left: '5%', width: '90%', height: '2px', transform: 'rotate(-30deg)' },
+    { top: '70%', left: '15%', width: '70%', height: '2px', transform: 'rotate(60deg)' },
+    { top: '30%', left: '20%', width: '60%', height: '2px', transform: 'rotate(-45deg)' },
+    { top: '60%', left: '30%', width: '50%', height: '2px', transform: 'rotate(20deg)' },
+    { top: '40%', left: '25%', width: '55%', height: '2px', transform: 'rotate(-60deg)' },
+    { top: '80%', left: '10%', width: '75%', height: '2px', transform: 'rotate(35deg)' },
+    { top: '15%', left: '35%', width: '45%', height: '2px', transform: 'rotate(-20deg)' },
+  ];
+  return patterns[(crackIndex - 1) % patterns.length];
+}
+
+function initial(name) {
+  const s = String(name || '').trim();
+  return s ? s[0].toUpperCase() : '?';
+}
+
+// Position solo/daily player avatar on the last validated cell
+function soloPlayerPosition() {
+  const pathLength = (props.path || []).length || 1;
+  const progress = Number(props.playerProgress) || 0;
+  
+  // Position on the last validated cell: nextIndex-1
+  // If nextIndex is 0, position on first cell (start)
+  const lastIndex = Math.max(0, progress - 1);
+  const actualIndex = Math.max(0, Math.min(lastIndex, pathLength - 1));
+  
+  if (actualIndex >= 0 && actualIndex < props.path.length) {
+    const cell = props.path[actualIndex];
+    if (cell) {
+      // If a bonus was collected on this last validated row, place avatar on the bonus cell instead of the path cell
+      try {
+        const collected = Array.isArray(props.collectedBonuses) ? props.collectedBonuses : [];
+        // Find a collected bonus that matches this row
+        const matchKey = collected.find(key => {
+          // key format: "r-c"
+          const [kr, kc] = String(key).split('-').map(n => Number(n));
+          return Number.isFinite(kr) && Number.isFinite(kc) && kr === cell.r;
+        });
+        if (matchKey) {
+          const [br, bc] = String(matchKey).split('-').map(n => Number(n));
+          return {
+            gridRow: String((br + 1)),
+            gridColumn: String((bc + 1)),
+            justifySelf: 'center',
+            alignSelf: 'center',
+          };
+        }
+      } catch (_) {
+        // fall back to path cell
+      }
+      // Default to path cell for this index
+      return {
+        gridRow: String((cell.r + 1)),
+        gridColumn: String((cell.c + 1)),
+        justifySelf: 'center',
+        alignSelf: 'center',
+      };
+    }
+  }
+  // Default to first cell if no valid position
+  if (props.path.length > 0) {
+    const firstCell = props.path[0];
+    return {
+      gridRow: String((firstCell.r + 1)),
+      gridColumn: String((firstCell.c + 1)),
+      justifySelf: 'center',
+      alignSelf: 'center',
+    };
+  }
+  return { gridRow: '1', gridColumn: '1', justifySelf: 'center', alignSelf: 'center' };
+}
+
+// Position player bubble based on their progress through their own path
+// Each player has a different path and progresses independently
+function playerBubblePosition(player) {
+  const prog = Math.max(0, Math.min(1, Number(player.progress) || 0));
+  const map = props.versusPathsByPlayer || {};
+  const fallback = props.path || [];
+  const playerPath = Array.isArray(map[player?.id]) && map[player.id].length ? map[player.id] : fallback;
+  const pathLength = playerPath.length || 1;
+  
+  // Calculate which cell the player is currently on based on their progress
+  // progress is nextIndex/pathLength, so nextIndex = progress * pathLength
+  // Position on the last validated cell: nextIndex - 1
+  const nextIndex = Math.round(prog * pathLength);
+  const lastIndex = Math.max(0, nextIndex - 1);
+  const actualIndex = Math.max(0, Math.min(lastIndex, pathLength - 1));
+  
+  if (actualIndex >= 0 && actualIndex < playerPath.length) {
+    const cell = playerPath[actualIndex];
+    if (cell) {
+      return {
+        gridRow: String((cell.r + 1)),
+        gridColumn: String((cell.c + 1)),
+        justifySelf: 'center',
+        alignSelf: 'center',
+      };
+    }
+  }
+  
+  // Default to first cell if no valid position
+  if (playerPath.length > 0) {
+    const firstCell = playerPath[0];
+    return {
+      gridRow: String((firstCell.r + 1)),
+      gridColumn: String((firstCell.c + 1)),
+      justifySelf: 'center',
+      alignSelf: 'center',
+    };
+  }
+  
+  return { gridRow: '1', gridColumn: '1', justifySelf: 'center', alignSelf: 'center' };
+}
+
+function bubbleTextColor(bg) {
+  const c = String(bg || '').replace('#', '');
+  if (c.length === 6) {
+    const r = parseInt(c.slice(0,2), 16);
+    const g = parseInt(c.slice(2,4), 16);
+    const b = parseInt(c.slice(4,6), 16);
+    const luminance = (0.299*r + 0.587*g + 0.114*b) / 255;
+    return luminance > 0.6 ? '#0f1020' : '#ffffff';
+  }
+  return '#0f1020';
+}
+
+// Get avatar for a player: prefer real avatar (self selectedAvatar or player.avatar_url),
+// then fallback to no-duplicate mapping. Apply frost variant only for built-in avatars.
+function getAvatar(player) {
+  const key = playerKey(player);
+  if (!key) return AVATARS[0];
+
+  // Determine frozen state
+  const isSelf = !!(player && props && String(player.id || '') === String(props.selfId || ''));
+  const localFrozen = !!(isSelf && props && props.frozenGrid);
+  const isFrozen = !!(player && (player.isFrozen || (player.frozenClicks || player.frozen_clicks || 0) > 0 || localFrozen));
+
+  // 1) Self-selected avatar takes priority
+  if (isSelf && props.selectedAvatar && props.selectedAvatar.img) {
+    const base = props.selectedAvatar.img;
+    // For custom avatars, keep the same image when frozen (visual effect comes from CSS)
+    return base;
+  }
+
+  // 2) Player-provided avatar from backend
+  if (player && player.avatar_url) {
+    const base = player.avatar_url;
+    return base;
+  }
+
+  // 3) Fallback to mapped built-in avatars without duplicates among current players
+  const mapped = avatarByKey.value[key];
+  if (mapped) {
+    if (isFrozen) {
+      if (mapped === warriorAvatar) return warriorFrost;
+      if (mapped === mageAvatar) return mageFrost;
+      return mapped; // keep generated/custom mapped image as-is
+    }
+    return mapped;
+  }
+
+  // 4) Last-resort: hash-based pick
+  const idx = Math.abs(hashString(key)) % AVATARS.length;
+  const base = AVATARS[idx];
+  if (isFrozen) {
+    if (base === warriorAvatar) return warriorFrost;
+    if (base === mageAvatar) return mageFrost;
+    return base;
+  }
+  return base;
+}
+
+// Style for progressive path reveal during memorization
+function pathRevealStyle(r, c) {
+  if (!props.revealed || props.revealComplete) return {};
+  
+  const pathIndex = props.path.findIndex(p => p.r === r && p.c === c);
+  if (pathIndex === -1) return {};
+  
+  // Delay each path cell by 200ms
+  const delay = pathIndex * 200;
+  return {
+    '--path-delay': `${delay}ms`,
+  };
+}
+
+// Check if a cell is marked as wrong
+function isCellWrong(r, c) {
+  const classes = props.cellClass(r, c);
+  return classes.includes('wrong');
+}
+
+function isRollbackCell(r, c) {
+  try {
+    const key = `${r}-${c}`;
+    return Array.isArray(props.rollbackKeys) && props.rollbackKeys.includes(key);
+  } catch (_) { return false; }
+}
+
+function isStunCell(r, c) {
+  try {
+    const key = `${r}-${c}`;
+    return Array.isArray(props.stunKeys) && props.stunKeys.includes(key);
+  } catch (_) { return false; }
+}
+
+function isPathCell(r, c) {
+  const classes = props.cellClass(r, c) || [];
+  return Array.isArray(classes) ? classes.includes('path') : String(classes || '').includes('path');
+}
+
+function isCorrectCell(r, c) {
+  const classes = props.cellClass(r, c) || [];
+  return Array.isArray(classes) ? classes.includes('correct') : String(classes || '').includes('correct');
+}
+
+// Show heart only during input phase (revealComplete true and not revealed), on the exact cell
+function showHeart(r, c) {
+  if (!props.heartCell) return false;
+  if (!props.revealComplete || props.revealed) return false;
+  return props.heartCell.r === r && props.heartCell.c === c;
+}
+
+// Compute the next playable row from the local player's path and nextIndex (playerProgress)
+function nextPlayableRow() {
+  try {
+    const path = Array.isArray(props.path) ? props.path : [];
+    const nextIndex = Math.max(0, Math.min(Number(props.playerProgress) || 0, path.length));
+    if (nextIndex >= path.length) return null; // no more moves
+    const nextCell = path[nextIndex];
+    return (nextCell && typeof nextCell.r === 'number') ? Number(nextCell.r) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Allow click only on cells that are on the next playable row
+function canClickCell(r, c) {
+  // Only during input phase (revealComplete true) — class/click already guard this, but be explicit
+  if (!props.revealComplete) return false;
+  const row = nextPlayableRow();
+  if (row == null) return false;
+  return Number(r) === Number(row);
+}
+
+// Generate broken crack patterns
+function brokenCrackStyle(crackIndex) {
+  const patterns = [
+    { top: '15%', left: '5%', width: '90%', height: '2px', transform: 'rotate(25deg)' },
+    { top: '40%', left: '10%', width: '80%', height: '2px', transform: 'rotate(-35deg)' },
+    { top: '65%', left: '8%', width: '85%', height: '2px', transform: 'rotate(45deg)' },
+    { top: '30%', left: '20%', width: '60%', height: '2px', transform: 'rotate(-60deg)' },
+    { top: '55%', left: '15%', width: '70%', height: '2px', transform: 'rotate(15deg)' },
+    { top: '80%', left: '12%', width: '75%', height: '2px', transform: 'rotate(-25deg)' },
+  ];
+  return patterns[(crackIndex - 1) % patterns.length];
+}
+
+// Get cell content from gridContent
+function getCellContent(r, c) {
+  if (!props.gridContent || !Array.isArray(props.gridContent)) return null;
+  if (r < 0 || r >= props.gridContent.length) return null;
+  if (c < 0 || !props.gridContent[r] || c >= props.gridContent[r].length) return null;
+  return props.gridContent[r][c];
+}
+
+// Check if bonus is already collected
+function isBonusCollected(r, c) {
+  const key = `${r}-${c}`;
+  return props.collectedBonuses && props.collectedBonuses.includes(key);
+}
+
+// Check if cell is a bonus cell (gold, gem, essence, potion)
+function isBonusCell(r, c) {
+  if (isBonusCollected(r, c)) return false;
+  const cell = getCellContent(r, c);
+  if (!cell) return false;
+  return cell.type === 'gold' || cell.type === 'gem' || 
+         cell.type === 'essence' || cell.type === 'potion';
+}
+
+// Get bonus icon for display
+function getBonusIcon(r, c) {
+  const cell = getCellContent(r, c);
+  if (!cell) return '?';
+  const icons = {
+    'gold': '💰',
+    'gem': '💎',
+    'essence': '⚡',
+    'potion': '🧪'
+  };
+  return icons[cell.type] || '?';
+}
 
 </script>
 

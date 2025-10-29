@@ -715,6 +715,24 @@ function handleEndPathAbandon() {
   endPathAbandon(goHome);
 }
 
+function handleBeginVersusFromLobby(payload) {
+  try {
+    if (payload && typeof payload === 'object') {
+      if (payload.code) versusCode.value = payload.code;
+      if (payload.room) versusRoom.value = payload.room;
+      if (payload.code) {
+        try { subscribeToRoom(payload.code); } catch (_) {}
+      }
+      if (typeof payload.seed === 'number' && typeof payload.startAtMs === 'number') {
+        router.push('/game');
+        return;
+      }
+    }
+  } finally {
+    router.push('/versus');
+  }
+}
+
 // Watch for all players ready in versus
 watch(versusRoom, (room) => {
   if (state.mode !== 'versus' || !showChampionSelector.value || versusReadyCountdown.value > 0) return;
