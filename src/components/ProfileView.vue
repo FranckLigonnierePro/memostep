@@ -15,6 +15,68 @@
           Lier un compte
         </button>
       </div>
+
+      <!-- XP Progress Roadmap -->
+      <div class="xp-roadmap-container">
+        <div class="xp-roadmap-header">
+          <div class="current-level-badge">
+            <div class="badge-inner">{{ playerLevel }}</div>
+          </div>
+          <div class="xp-info">
+            <div class="xp-text">Niveau {{ playerLevel }}</div>
+            <div class="xp-bar">
+              <div class="xp-bar-fill" :style="{ width: (playerLevelProgress * 100) + '%' }"></div>
+            </div>
+            <div class="xp-numbers">{{ currentLevelXp }} / {{ nextLevelXp }} XP</div>
+          </div>
+        </div>
+        
+        <div class="xp-roadmap-scroll">
+          <div class="xp-roadmap-track">
+            <div 
+              v-for="levelData in levelsList" 
+              :key="levelData.level"
+              class="level-milestone"
+              :class="{
+                'completed': levelData.level < playerLevel,
+                'current': levelData.level === playerLevel,
+                'locked': levelData.level > playerLevel
+              }"
+            >
+              <div class="milestone-connector" v-if="levelData.level > 1"></div>
+              <div class="milestone-node">
+                <div class="node-inner">{{ levelData.level }}</div>
+              </div>
+              <div class="milestone-rewards">
+                <div class="reward-title">Niveau {{ levelData.level }}</div>
+                <div class="reward-list" v-if="levelData.reward">
+                  <div v-if="levelData.reward.coins" class="reward-item">
+                    <span class="reward-icon">💰</span>
+                    <span>{{ levelData.reward.coins }} coins</span>
+                  </div>
+                  <div v-if="levelData.reward.gemmes" class="reward-item">
+                    <span class="reward-icon">💎</span>
+                    <span>{{ levelData.reward.gemmes }} gemmes</span>
+                  </div>
+                  <div v-if="levelData.reward.coffre" class="reward-item">
+                    <span class="reward-icon">📦</span>
+                    <span>Coffre {{ levelData.reward.coffre }}</span>
+                  </div>
+                  <div v-if="levelData.reward.personnage" class="reward-item special">
+                    <span class="reward-icon">⭐</span>
+                    <span>{{ levelData.reward.personnage }}</span>
+                  </div>
+                  <div v-if="levelData.reward.skin_exclusif" class="reward-item special">
+                    <span class="reward-icon">👑</span>
+                    <span>{{ levelData.reward.skin_exclusif }}</span>
+                  </div>
+                </div>
+                <div class="reward-xp">{{ levelData.xp_required }} XP</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="cards-grid">
         <button
           v-for="(card, idx) in cards"
@@ -42,6 +104,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import xpSystemData from '../lib/playerXpSystem.json';
+import { calculateLevel } from '../lib/xpSystem.js';
+
+const props = defineProps({
+  playerLevel: { type: Number, default: 1 },
+  playerTotalXp: { type: Number, default: 0 },
+  playerLevelProgress: { type: Number, default: 0 }
+});
 import imgCasseur from '../assets/profils/casseur.png';
 import imgDark from '../assets/profils/dark.png';
 import imgElectrik from '../assets/profils/electrik.png';
@@ -68,6 +138,18 @@ function saveName() {
   try { localStorage.setItem('memostep_username', v); } catch (_) {}
 }
 const isGuest = computed(() => /^Memoguest\d{4}$/.test(String(username.value || '').trim()));
+
+const levelsList = computed(() => xpSystemData.player_xp_system.levels);
+
+const currentLevelInfo = computed(() => calculateLevel(props.playerTotalXp));
+const currentLevelXp = computed(() => {
+  if (props.playerLevel >= 50) return props.playerTotalXp;
+  return currentLevelInfo.value.currentLevelXp || 0;
+});
+const nextLevelXp = computed(() => {
+  if (props.playerLevel >= 50) return 0;
+  return currentLevelInfo.value.xpForNextLevel || 0;
+});
 
 const cards = [
   { id: 'guerriere', name: 'Guerrière', img: imgGuerriere, color: '#ff5a8a', glow: 'rgba(255,90,138,0.45)' },
@@ -263,4 +345,276 @@ const cards = [
   text-align: center;
 }
 .footer { display:flex; justify-content:center; margin-top: 12px; }
+
+/* XP Roadmap Styles */
+.xp-roadmap-container {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto 20px;
+  background: rgba(23, 25, 44, 0.6);
+  border: 1px solid #2a2e52;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.xp-roadmap-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #2a2e52;
+}
+
+.current-level-badge {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.5), 0 4px 8px rgba(0, 0, 0, 0.3);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.current-level-badge::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  opacity: 0.3;
+  filter: blur(8px);
+  z-index: -1;
+}
+
+.badge-inner {
+  font-size: 28px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.xp-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.xp-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.xp-bar {
+  width: 100%;
+  height: 12px;
+  background: rgba(42, 46, 82, 0.6);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 4px;
+}
+
+.xp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6, #ec4899);
+  border-radius: 6px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.6);
+}
+
+.xp-bar-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.xp-numbers {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+}
+
+.xp-roadmap-scroll {
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #8b5cf6 rgba(42, 46, 82, 0.4);
+}
+
+.xp-roadmap-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.xp-roadmap-scroll::-webkit-scrollbar-track {
+  background: rgba(42, 46, 82, 0.4);
+  border-radius: 4px;
+}
+
+.xp-roadmap-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #8b5cf6, #ec4899);
+  border-radius: 4px;
+}
+
+.xp-roadmap-track {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+}
+
+.level-milestone {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  padding: 12px;
+  background: rgba(31, 34, 56, 0.4);
+  border: 1px solid #2a2e52;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.level-milestone.completed {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.level-milestone.current {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: #8b5cf6;
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+}
+
+.level-milestone.locked {
+  opacity: 0.5;
+}
+
+.milestone-connector {
+  position: absolute;
+  left: 30px;
+  top: -12px;
+  width: 2px;
+  height: 12px;
+  background: linear-gradient(180deg, transparent, #2a2e52);
+}
+
+.level-milestone.completed .milestone-connector {
+  background: linear-gradient(180deg, transparent, #8b5cf6);
+}
+
+.milestone-node {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #1f2238;
+  border: 2px solid #2a2e52;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 2;
+}
+
+.level-milestone.completed .milestone-node {
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  border-color: #8b5cf6;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
+}
+
+.level-milestone.current .milestone-node {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  border-color: #fbbf24;
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.8);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.node-inner {
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.milestone-rewards {
+  flex: 1;
+  min-width: 0;
+}
+
+.reward-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.reward-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.reward-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(42, 46, 82, 0.6);
+  border: 1px solid #2a2e52;
+  border-radius: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.reward-item:hover {
+  background: rgba(42, 46, 82, 0.9);
+  border-color: #8b5cf6;
+  transform: translateY(-2px);
+}
+
+.reward-item.special {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(236, 72, 153, 0.2));
+  border-color: #8b5cf6;
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+}
+
+.reward-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.reward-xp {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 600;
+}
+
+.level-milestone.completed .reward-xp {
+  color: rgba(139, 92, 246, 0.8);
+}
 </style>

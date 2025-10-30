@@ -405,6 +405,15 @@ const routeProps = computed(() => {
     };
   }
   
+  if (routeName === 'Profile') {
+    return {
+      ...common,
+      playerLevel: playerLevel.value,
+      playerTotalXp: playerTotalXp.value,
+      playerLevelProgress: playerLevelProgress.value,
+    };
+  }
+  
   if (routeName === 'Versus') {
     return {
       code: versusCode.value,

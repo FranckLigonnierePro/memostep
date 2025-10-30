@@ -1,5 +1,5 @@
 <template>
-  <div class="home">
+  <div class="home" style="border: 1px red solid;">
       <div class="flex flex-col mt-4 w-full grow justify-center items-center">
         <div class="header">
           <!-- Compact profile chip: avatar + level badge + progress pill -->
