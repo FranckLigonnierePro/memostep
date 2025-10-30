@@ -73,6 +73,71 @@
     "bravo": "Bravo!"
   },
   "versus": {
-    "title": "Versus Mode"
+    "title": "Versus Mode",
+    "starting": "Starting...",
+    "username": "Username",
+    "create": "Create game",
+    "join": "Join",
+    "joinCode": "Code",
+    "back": "Back",
+    "copyInvite": "Copy invite code",
+    "codeCopied": "Code copied",
+    "players": "Players",
+    "host": "Host",
+    "start": "Start",
+    "free": "Free",
+    "player": "Player",
+    "errors": {
+      "usernameRequired": "Username required",
+      "supabaseNotConfigured": "Supabase not configured",
+      "codeRequired": "Code required",
+      "cannotCopy": "Couldn't copy the code",
+      "onlyHost": "Only the host can start",
+      "unknownRoom": "Unknown room",
+      "minPlayers": "At least 2 players required"
+    }
+  },
+  "endpath": {
+    "stage": "Stage",
+    "time": "Time",
+    "lives": "Lives",
+    "xpEarned": "XP Earned",
+    "baseXp": "Base XP",
+    "timeBonus": "Time Bonus",
+    "multiplier": "Multiplier",
+    "total": "Total",
+    "stop": "Stop",
+    "backHome": "Back to Home",
+    "continue": "Continue",
+    "titles": {
+      "completed": "Stage Completed!",
+      "no_life_left": "Game Over",
+      "abandon": "Pause"
+    },
+    "subtitles": {
+      "completed": "Great job! Ready for the next challenge?",
+      "no_life_left": "No lives left. Better luck next time!",
+      "abandon": "Take a break or keep going?"
+    },
+    "multiplierLabels": {
+      "completed": "Completed",
+      "failed": "Failed",
+      "abandon": "Abandon"
+    }
+  },
+  "levelup": {
+    "title": "LEVEL UP!",
+    "reached": "You reached level",
+    "rewards": "Rewards",
+    "coins": "Coins",
+    "gems": "Gems",
+    "continue": "Continue",
+    "chest": {
+      "bronze": "Bronze Chest",
+      "argent": "Silver Chest",
+      "or": "Gold Chest",
+      "légendaire": "Legendary Chest",
+      "mythique": "Mythic Chest"
+    }
   }
 }

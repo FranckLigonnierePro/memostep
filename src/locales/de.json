@@ -73,6 +73,71 @@
     "bravo": "Bravo!"
   },
   "versus": {
-    "title": "Versus-Modus"
+    "title": "Versus-Modus",
+    "starting": "Startet...",
+    "username": "Benutzername",
+    "create": "Spiel erstellen",
+    "join": "Beitreten",
+    "joinCode": "Code",
+    "back": "Zurück",
+    "copyInvite": "Einladungscode kopieren",
+    "codeCopied": "Code kopiert",
+    "players": "Spieler",
+    "host": "Host",
+    "start": "Starten",
+    "free": "Frei",
+    "player": "Spieler",
+    "errors": {
+      "usernameRequired": "Benutzername erforderlich",
+      "supabaseNotConfigured": "Supabase nicht konfiguriert",
+      "codeRequired": "Code erforderlich",
+      "cannotCopy": "Code konnte nicht kopiert werden",
+      "onlyHost": "Nur der Host kann starten",
+      "unknownRoom": "Unbekannter Raum",
+      "minPlayers": "Mindestens 2 Spieler erforderlich"
+    }
+  },
+  "endpath": {
+    "stage": "Stufe",
+    "time": "Zeit",
+    "lives": "Leben",
+    "xpEarned": "Erhaltene XP",
+    "baseXp": "Basis-XP",
+    "timeBonus": "Zeitbonus",
+    "multiplier": "Multiplikator",
+    "total": "Gesamt",
+    "stop": "Stopp",
+    "backHome": "Zurück zum Start",
+    "continue": "Weiter",
+    "titles": {
+      "completed": "Stufe abgeschlossen!",
+      "no_life_left": "Spiel vorbei",
+      "abandon": "Pause"
+    },
+    "subtitles": {
+      "completed": "Gut gemacht! Bereit für die nächste Herausforderung?",
+      "no_life_left": "Keine Leben mehr. Viel Glück beim nächsten Mal!",
+      "abandon": "Pause machen oder weitermachen?"
+    },
+    "multiplierLabels": {
+      "completed": "Abgeschlossen",
+      "failed": "Fehlgeschlagen",
+      "abandon": "Abbrechen"
+    }
+  },
+  "levelup": {
+    "title": "LEVEL-UP!",
+    "reached": "Du hast Level erreicht",
+    "rewards": "Belohnungen",
+    "coins": "Münzen",
+    "gems": "Edelsteine",
+    "continue": "Weiter",
+    "chest": {
+      "bronze": "Bronzetruhe",
+      "argent": "Silbertruhe",
+      "or": "Goldtruhe",
+      "légendaire": "Legendäre Truhe",
+      "mythique": "Mythische Truhe"
+    }
   }
 }

@@ -73,6 +73,71 @@
     "bravo": "¡Bravo!"
   },
   "versus": {
-    "title": "Modo Versus"
+    "title": "Modo Versus",
+    "starting": "Iniciando...",
+    "username": "Usuario",
+    "create": "Crear partida",
+    "join": "Unirse",
+    "joinCode": "Código",
+    "back": "Volver",
+    "copyInvite": "Copiar código de invitación",
+    "codeCopied": "Código copiado",
+    "players": "Jugadores",
+    "host": "Anfitrión",
+    "start": "Empezar",
+    "free": "Libre",
+    "player": "Jugador",
+    "errors": {
+      "usernameRequired": "Usuario requerido",
+      "supabaseNotConfigured": "Supabase no configurado",
+      "codeRequired": "Código requerido",
+      "cannotCopy": "No se pudo copiar el código",
+      "onlyHost": "Solo el anfitrión puede empezar",
+      "unknownRoom": "Sala desconocida",
+      "minPlayers": "Se requieren al menos 2 jugadores"
+    }
+  },
+  "endpath": {
+    "stage": "Nivel",
+    "time": "Tiempo",
+    "lives": "Vidas",
+    "xpEarned": "XP ganada",
+    "baseXp": "XP base",
+    "timeBonus": "Bono de tiempo",
+    "multiplier": "Multiplicador",
+    "total": "Total",
+    "stop": "Detener",
+    "backHome": "Volver al inicio",
+    "continue": "Continuar",
+    "titles": {
+      "completed": "¡Nivel completado!",
+      "no_life_left": "Juego terminado",
+      "abandon": "Pausa"
+    },
+    "subtitles": {
+      "completed": "¡Buen trabajo! ¿Listo para el siguiente desafío?",
+      "no_life_left": "Sin vidas. ¡Ánimo para la próxima!",
+      "abandon": "¿Tomar un descanso o seguir?"
+    },
+    "multiplierLabels": {
+      "completed": "Completado",
+      "failed": "Fallido",
+      "abandon": "Abandonar"
+    }
+  },
+  "levelup": {
+    "title": "¡NIVEL SUPERIOR!",
+    "reached": "Has alcanzado el nivel",
+    "rewards": "Recompensas",
+    "coins": "Monedas",
+    "gems": "Gemas",
+    "continue": "Continuar",
+    "chest": {
+      "bronze": "Cofre de bronce",
+      "argent": "Cofre de plata",
+      "or": "Cofre de oro",
+      "légendaire": "Cofre legendario",
+      "mythique": "Cofre mítico"
+    }
   }
 }

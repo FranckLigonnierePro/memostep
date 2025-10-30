@@ -64,7 +64,7 @@
             <span class="btn-label-primary">PvP</span>
           </div>
         </div>
-        <button class="menu-btn" @click="emit('stats')">{{ $t('home.stats') }}</button>
+        <!-- <button class="menu-btn" @click="emit('stats')">{{ $t('home.stats') }}</button>
         <a
           class="menu-btn donate-btn"
           href="https://ko-fi.com/memostep"
@@ -74,7 +74,7 @@
         >
           <Heart :size="18" />
           <span>{{ $t('home.support') }}</span>
-        </a>
+        </a> -->
       </div>
   </div>
 </template>

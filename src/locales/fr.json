@@ -73,6 +73,50 @@
     "bravo": "Bravo !"
   },
   "versus": {
-    "title": "Mode Versus"
+    "title": "Mode Versus",
+    "starting": "Démarrage..."
+  },
+  "endpath": {
+    "stage": "Niveau",
+    "time": "Temps",
+    "lives": "Vies",
+    "xpEarned": "XP gagnée",
+    "baseXp": "XP de base",
+    "timeBonus": "Bonus de temps",
+    "multiplier": "Multiplicateur",
+    "total": "Total",
+    "stop": "Arrêter",
+    "backHome": "Retour à l'accueil",
+    "continue": "Continuer",
+    "titles": {
+      "completed": "Niveau terminé !",
+      "no_life_left": "Partie terminée",
+      "abandon": "Pause"
+    },
+    "subtitles": {
+      "completed": "Bravo ! Prêt pour la suite ?",
+      "no_life_left": "Plus de vies. Ce sera pour la prochaine !",
+      "abandon": "Pause ou on continue ?"
+    },
+    "multiplierLabels": {
+      "completed": "Terminé",
+      "failed": "Échec",
+      "abandon": "Abandon"
+    }
+  },
+  "levelup": {
+    "title": "NIVEAU SUPÉRIEUR !",
+    "reached": "Vous avez atteint le niveau",
+    "rewards": "Récompenses",
+    "coins": "Pièces",
+    "gems": "Gemmes",
+    "continue": "Continuer",
+    "chest": {
+      "bronze": "Coffre de bronze",
+      "argent": "Coffre d’argent",
+      "or": "Coffre d’or",
+      "légendaire": "Coffre légendaire",
+      "mythique": "Coffre mythique"
+    }
   }
 }
