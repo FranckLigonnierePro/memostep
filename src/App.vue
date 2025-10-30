@@ -1080,4 +1080,9 @@ html, body, #app {
 .res-pill.gold { color:#ffd166; }
 .res-pill.essence { color:#a78bfa; }
 .res-pill.gem { color:#76e4f7; }
+svg, img {
+  shape-rendering: geometricPrecision;
+  text-rendering: geometricPrecision;
+  image-rendering: optimizeQuality;
+}
 </style>
