@@ -49,15 +49,20 @@
         >
           <img class="avatar-img" :src="selectedAvatar.img" :alt="selectedAvatar.name || 'Avatar'" />
         </div>
+        <div class="actions">
+          
+        </div>
         <div class="mode-buttons">
-          <button class="pill-btn pvp-btn" @click="emit('versus')">
-            <span class="pill-icon">⚔️</span>
-            <span class="pill-text">PVP</span>
-          </button>
-          <button class="pill-btn solo-btn" @click="emit('solo')">
-            <span class="pill-icon">🎯</span>
-            <span class="pill-text">{{ $t('home.solo') }}</span>
-          </button>
+          <div class="btn-wrap" role="button" tabindex="0" aria-label="Jouer maintenant" @click="emit('solo')"
+          @keydown.enter="emit('solo')" @keydown.space="emit('solo')">
+            <img class="svg-btn" :src="primaryBtn" alt="" width="213" height="93" />
+            <span class="btn-label-primary">Solo</span>
+          </div>
+          <div class="btn-wrap" role="button" tabindex="0" aria-label="Se connecter / Créer un compte"
+          @click="emit('versus')" @keydown.enter="emit('versus')" @keydown.space="emit('versus')">
+            <img class="svg-btn" :src="primaryBtn" alt="" width="213" height="65" />
+            <span class="btn-label-primary">PvP</span>
+          </div>
         </div>
         <button class="menu-btn" @click="emit('stats')">{{ $t('home.stats') }}</button>
         <a
@@ -70,22 +75,6 @@
           <Heart :size="18" />
           <span>{{ $t('home.support') }}</span>
         </a>
-        <div class="w-full h-12 mt-4 flex justify-center align-center relative">
-          <button class="menu-btn mr-2 w-11 h-11" @click="emit('help')" :aria-label="$t('home.help')" :title="$t('home.help')">
-            <HelpCircle :size="20" />
-          </button>
-          <button class="menu-btn mr-2 w-11 h-11" @click="emit('settings')" :aria-label="$t('home.settings')" :title="$t('home.settings')">
-            <Settings :size="20" />
-          </button>
-          <button class="menu-btn mr-2 w-11 h-11" @click="emit('toggleAudio')" :aria-label="audioMuted ? $t('home.audioOn') : $t('home.audioOff')" :title="audioMuted ? $t('home.audioOn') : $t('home.audioOff')">
-            <VolumeX v-if="audioMuted" :size="20" />
-            <Volume2 v-else :size="20" />
-          </button>
-          <!-- Language button opens modal in parent -->
-          <button class="menu-btn w-11 h-11" @click="emit('openLang')" :aria-label="$t('home.lang')" :title="$t('home.lang')">
-            <img :src="currentFlag" alt="flag" width="20" height="20" />
-          </button>
-        </div>
       </div>
   </div>
 </template>
@@ -93,6 +82,8 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { HelpCircle, Settings, Heart, VolumeX, Volume2 } from 'lucide-vue-next';
+import primaryBtn from '../assets/buttons/primary_btn.svg';
+import secondaryBtn from '../assets/buttons/secondary_btn.svg';
 
 const props = defineProps({
   logoSrc: { type: String, default: '' },
@@ -535,5 +526,41 @@ const avatarCardStyle = computed(() => {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+.btn-wrap {
+  position: relative;
+}
 
+.svg-btn {
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
+  display: block;
+  margin: 0 auto;
+}
+
+.btn-wrap:hover {
+  cursor: pointer;
+  transform: scale(.95);
+  transition: 0.05s ease-in-out;
+}
+
+.btn-label-primary {
+  z-index: 2;
+  font-size: 36px;
+  position: absolute;
+  top: 35%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-shadow: 0 3px 0px black, 0 4px 0px rgba(0, 0, 0, 0.2);
+  /* Bordure (contour) du texte */
+  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.9);
+  text-stroke: 2px rgba(0, 0, 0, 0.9);
+  paint-order: stroke fill;
+  color: white;
+}
+
+.btn-wrap:active {
+  transform: scale(0.95);
+  transition: 0.05s;
+}
 </style>
