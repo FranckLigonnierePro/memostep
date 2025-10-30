@@ -1,18 +1,28 @@
 <template>
   <div class="welcome-page">
     <div class="welcome-card">
-      <p class="subtitle">Jouez en invité ou créez un compte pour sauvegarder votre progression.</p>
-
+      
       <div class="actions">
-        <button class="btn primary" @click="playNow">Jouer maintenant</button>
-        <div class="divider"><span>ou</span></div>
-        <button class="btn secondary" @click="goLogin">Se connecter / Créer un compte</button>
+        <div class="btn-wrap" role="button" tabindex="0" aria-label="Jouer maintenant" @click="playNow"
+        @keydown.enter="playNow" @keydown.space="playNow">
+        <img class="svg-btn" :src="primaryBtn" alt="" width="213" height="93" />
+        <span class="btn-label-primary">Jouer</span>
+        <span class="btn-label-secondary">Maintenant</span>
       </div>
+      <div class="btn-wrap" role="button" tabindex="0" aria-label="Se connecter / Créer un compte"
+      @click="goLogin" @keydown.enter="goLogin" @keydown.space="goLogin">
+      <img class="svg-btn" :src="secondaryBtn" alt="" width="213" height="65" />
+      <span class="btn-label-tertiary">Connexion /<br> Créer un compte</span>
+    </div>
+  </div>
+  <!-- <p class="subtitle">Jouez en invité ou créez un compte pour sauvegarder votre progression.</p> -->
     </div>
   </div>
 </template>
 
 <script setup>
+import primaryBtn from '../assets/buttons/primary_btn.svg';
+import secondaryBtn from '../assets/buttons/secondary_btn.svg';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
@@ -28,7 +38,7 @@ function playNow() {
     if (!existing) {
       localStorage.setItem('memostep_username', generateGuestName());
     }
-  } catch (_) {}
+  } catch (_) { }
   router.push('/');
 }
 
@@ -40,23 +50,87 @@ function goLogin() {
 <style scoped>
 .welcome-page {
   margin-bottom: .5rem;
-  justify-content: space-between;
+  justify-content: end;
   display: flex;
   flex-grow: 1;
   flex-direction: column;
   align-items: center;
 }
 
-.welcome-card {
+.btn-wrap {
+  position: relative;
 }
-.title { color:#fff; margin:0 0 8px 0; font-size:28px; font-weight:800; }
-.subtitle { color:#9bbcff; margin:0 0 18px 0; font-size:14px; }
-.actions { display:flex; flex-direction:column; gap:12px; }
-.btn { padding: 14px 20px; border-radius: 12px; font-weight: 800; border: 2px solid transparent; cursor: pointer; }
-.primary { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color:#fff; }
-.primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(59,130,246,0.35); }
-.secondary { background: rgba(59,130,246,.12); color:#9bbcff; border-color: rgba(59,130,246,.35); }
-.secondary:hover { background: rgba(59,130,246,.18); }
-.divider { display:flex; align-items:center; gap:16px; color:#6b7280; font-size:14px; margin:6px 0; justify-content:center; }
-.divider::before,.divider::after { content:''; width:120px; height:1px; background:rgba(155,188,255,0.2); }
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.svg-btn {
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
+  display: block;
+  margin: 0 auto;
+}
+
+.btn-wrap:hover {
+  cursor: pointer;
+  transform: scale(.95);
+  transition: 0.05s ease-in-out;
+}
+
+.btn-label-primary {
+  z-index: 2;
+  font-size: 36px;
+  position: absolute;
+  top: 23%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-shadow: 0 3px 0px black, 0 4px 0px rgba(0, 0, 0, 0.2);
+  /* Bordure (contour) du texte */
+  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.9);
+  text-stroke: 2px rgba(0, 0, 0, 0.9);
+  paint-order: stroke fill;
+  color: white;
+}
+
+.btn-label-secondary {
+  z-index: 2;
+  font-size: 32px;
+  position: absolute;
+  top: 53%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-shadow: 0 3px 0px black, 0 4px 0px rgba(0, 0, 0, 0.2);
+  /* Bordure (contour) du texte */
+  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.9);
+  text-stroke: 2px rgba(0, 0, 0, 0.9);
+  paint-order: stroke fill;
+  color: white;
+}
+
+.btn-label-tertiary {
+  z-index: 2;
+  font-size: 20px;
+  position: absolute;
+  line-height: 1;
+  top: 36%;
+  left: 50%;
+  width: 100%;
+  transform: translate(-50%, -50%);
+  text-shadow: 0 2px 0px black, 0 3px 0px rgba(0, 0, 0, 0.2);
+  /* Bordure (contour) du texte */
+  -webkit-text-stroke: 1.5px rgba(0, 0, 0, 0.9);
+  text-stroke: 1.5px rgba(0, 0, 0, 0.9);
+  paint-order: stroke fill;
+  color: white;
+}
+
+.btn-wrap:active {
+  transform: scale(0.95);
+  transition: 0.05s;
+}
 </style>

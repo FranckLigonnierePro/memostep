@@ -814,7 +814,7 @@ onBeforeUnmount(() => {
 }
 
 html, body, #app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Changa One', 'Open Sans', Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
@@ -827,7 +827,7 @@ html, body, #app {
   background-color: var(--bg);
   display: flex;
   flex-direction: column;
-  font-weight: 700;
+  font-weight: 400;
   --tw-text-opacity: 1;
   color: rgb(255 255 255 / var(--tw-text-opacity));
 }
