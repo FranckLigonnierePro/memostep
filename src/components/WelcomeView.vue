@@ -73,6 +73,7 @@ function goLogin() {
   user-select: none;
   pointer-events: none;
   display: block;
+
   margin: 0 auto;
 }
 
@@ -86,7 +87,7 @@ function goLogin() {
   z-index: 2;
   font-size: 36px;
   position: absolute;
-  top: 23%;
+  top: 26%;
   left: 50%;
   transform: translate(-50%, -50%);
   text-shadow: 0 3px 0px black, 0 4px 0px rgba(0, 0, 0, 0.2);
@@ -101,7 +102,7 @@ function goLogin() {
   z-index: 2;
   font-size: 32px;
   position: absolute;
-  top: 53%;
+  top: 58%;
   left: 50%;
   transform: translate(-50%, -50%);
   text-shadow: 0 3px 0px black, 0 4px 0px rgba(0, 0, 0, 0.2);
@@ -117,7 +118,7 @@ function goLogin() {
   font-size: 20px;
   position: absolute;
   line-height: 1;
-  top: 36%;
+  top: 41%;
   left: 50%;
   width: 100%;
   transform: translate(-50%, -50%);

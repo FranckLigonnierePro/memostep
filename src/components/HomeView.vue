@@ -548,7 +548,7 @@ const avatarCardStyle = computed(() => {
   z-index: 2;
   font-size: 36px;
   position: absolute;
-  top: 35%;
+  top: 41%;
   left: 50%;
   transform: translate(-50%, -50%);
   text-shadow: 0 3px 0px black, 0 4px 0px rgba(0, 0, 0, 0.2);

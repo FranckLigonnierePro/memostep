@@ -12,48 +12,33 @@
       </div>
 
       <div v-else class="methods">
-        <button class="auth-btn google" @click="handleGoogleAuth">
-          <span class="icon">🔍</span> {{ isLinking ? 'Lier avec Google' : 'Continuer avec Google' }}
-        </button>
+          <div class="actions">
+      <div class="btn-wrap" role="button" tabindex="0" aria-label="Jouer maintenant" @click="handleGoogleAuth"
+          @keydown.enter="handleGoogleAuth" @keydown.space="handleGoogleAuth">
+          <img class="svg-btn" :src="googleBtn" />
+        </div>
+      <div class="btn-wrap" role="button" tabindex="0" aria-label="Jouer maintenant" @click="handleAppleAuth"
+        @keydown.enter="handleAppleAuth" @keydown.space="handleAppleAuth">
+        <img class="svg-btn" :src="appleBtn" />
+      </div>
 
-        <button class="auth-btn apple" @click="handleAppleAuth">
-          <span class="icon">🍎</span> {{ isLinking ? 'Lier avec Apple' : 'Continuer avec Apple' }}
-        </button>
-
-        <div class="divider"><span>ou</span></div>
+</div>
+        <span>ou</span>
 
         <div class="email-section">
-          <div class="tabs">
-            <button :class="['tab', emailMode==='magic' && 'active']" @click="emailMode='magic'">Lien magique</button>
-            <button :class="['tab', emailMode==='password' && 'active']" @click="emailMode='password'">Mot de passe</button>
-          </div>
-
           <div class="form">
-            <label>Email</label>
             <input type="email" v-model="email" placeholder="vous@exemple.com" />
           </div>
 
-          <div v-if="emailMode==='magic'">
-            <button class="auth-btn email" :disabled="!isEmailValid || loading" @click="handleEmailMagic">
-              Envoyer le lien magique
-            </button>
+                <div class="btn-wrap" role="button" tabindex="0" aria-label="Jouer maintenant" :disabled="!isEmailValid || loading" @click="handleEmailMagic"
+        @keydown.enter="handleEmailMagic" @keydown.space="handleEmailMagic">
+        <img class="svg-btn" :src="primaryBtn" height="85" width="213" />
+        <span class="btn-label-primary">Recevoir un </span>
+        <span class="btn-label-secondary">lien magique</span>
+      </div>
+          
             <p class="hint" v-if="magicLinkSent">✅ Lien envoyé à {{ email }}. Vérifiez votre boîte mail.</p>
-          </div>
-
-          <div v-else>
-            <div class="form">
-              <label>Mot de passe</label>
-              <input type="password" v-model="password" placeholder="••••••••" />
-            </div>
-            <div class="actions">
-              <button class="auth-btn email" :disabled="!isEmailValid || !password || loading" @click="handlePasswordAuth">
-                {{ isSignUp ? 'Créer un compte' : 'Se connecter' }}
-              </button>
-              <button class="link" @click="isSignUp=!isSignUp">
-                {{ isSignUp ? 'Déjà un compte ? Se connecter' : 'Pas de compte ? S\'inscrire' }}
-              </button>
-            </div>
-          </div>
+          
         </div>
 
         <button class="link small" @click="goHome">← Retour</button>
@@ -65,6 +50,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import primaryBtn from '../assets/buttons/primary_btn.svg';
+import secondaryBtn from '../assets/buttons/secondary_btn.svg';
+import googleBtn from '../assets/buttons/google_btn.svg';
+import appleBtn from '../assets/buttons/apple_btn.svg';
 import { 
   signInWithGoogle,
   signInWithApple,
@@ -157,13 +146,72 @@ function goHome() { router.push('/'); }
 <style scoped>
 .login-page {
   margin-bottom: .5rem;
-  justify-content: space-between;
+  justify-content: end;
   display: flex;
   flex-grow: 1;
   flex-direction: column;
   align-items: center;
 }
-.login-card {
+
+.btn-wrap {
+  position: relative;
+}
+
+.actions {
+  display: flex;
+  flex-direction: row;
+  gap: 32px;
+  margin-bottom: 30px;
+}
+
+.svg-btn {
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
+  display: block;
+  margin: 0 auto;
+}
+
+.btn-wrap:hover {
+  cursor: pointer;
+  transform: scale(.95);
+  transition: 0.05s ease-in-out;
+}
+
+.btn-label-primary {
+  z-index: 2;
+  font-size: 36px;
+  position: absolute;
+  top: 26%;
+  left: 50%;
+  width:100%;
+  transform: translate(-50%, -50%);
+  text-shadow: 0 3px 0px black, 0 4px 0px rgba(0, 0, 0, 0.2);
+  /* Bordure (contour) du texte */
+  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.9);
+  text-stroke: 2px rgba(0, 0, 0, 0.9);
+  paint-order: stroke fill;
+  color: white;
+}
+.btn-label-secondary {
+  z-index: 2;
+  font-size: 32px;
+  position: absolute;
+  top: 60%;
+  left: 50%;
+  width:100%;
+  transform: translate(-50%, -50%);
+  text-shadow: 0 3px 0px black, 0 4px 0px rgba(0, 0, 0, 0.2);
+  /* Bordure (contour) du texte */
+  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.9);
+  text-stroke: 2px rgba(0, 0, 0, 0.9);
+  paint-order: stroke fill;
+  color: white;
+}
+
+.btn-wrap:active {
+  transform: scale(0.95);
+  transition: 0.05s;
 }
 .title { color: #fff; margin: 0 0 6px 0; font-size: 28px; font-weight: 800; }
 .subtitle { color: #9bbcff; margin: 0 0 18px 0; font-size: 14px; }
@@ -171,7 +219,7 @@ function goHome() { router.push('/'); }
 .loading { display:flex; flex-direction:column; gap:12px; align-items:center; color:#9bbcff; }
 .spinner { width:40px; height:40px; border:4px solid rgba(155,188,255,0.2); border-top-color:#3b82f6; border-radius:999px; animation:spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.methods { display:flex; flex-direction:column; gap:12px; }
+.methods { display:flex; flex-direction:column; gap:15px; justify-content: center; align-items: center; }
 .auth-btn { display:flex; align-items:center; justify-content:center; gap:10px; border-radius:12px; padding:12px 16px; font-weight:700; border:2px solid transparent; cursor:pointer; transition:all .2s; }
 .auth-btn.google { background:#fff; color:#111827; border-color:#e5e7eb; }
 .auth-btn.google:hover { background:#f3f4f6; }
@@ -189,7 +237,7 @@ function goHome() { router.push('/'); }
 .form label { color:#9bbcff; font-size:13px; font-weight:700; }
 .form input { padding:12px 14px; border-radius:10px; background: rgba(26,28,48,.85); border:2px solid rgba(155,188,255,0.2); color:#fff; }
 .hint { color:#9bbcff; font-size:13px; }
-.actions { display:flex; flex-direction:column; gap:8px; }
+.email-actions { display:flex; flex-direction:column; gap:8px; }
 .link { background:none; border:none; color:#3b82f6; cursor:pointer; font-weight:600; }
 .link.small { align-self:center; margin-top:4px; }
 .link:hover { text-decoration: underline; color:#60a5fa; }
