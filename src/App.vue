@@ -252,6 +252,22 @@
       @continueAsGuest="handleContinueAsGuest"
     />
     
+    <!-- Champion Evolution Modal -->
+    <ChampionEvolutionModal
+      :show="showChampionEvolutionModal"
+      :championData="evolutionModalChampionData"
+      :currentLevel="evolutionModalCurrentLevel"
+      :nextLevel="evolutionModalNextLevel"
+      :currentStats="evolutionModalCurrentStats"
+      :nextStats="evolutionModalNextStats"
+      :cost="evolutionModalCost"
+      :playerGold="playerGold"
+      :playerEssence="playerEssence"
+      :newAbilities="evolutionModalNewAbilities"
+      @close="closeChampionEvolutionModal"
+      @evolve="confirmChampionEvolution"
+    />
+    
   </template>
 
 <script setup>
@@ -270,6 +286,7 @@ import LevelUpModal from './components/LevelUpModal.vue';
 import XpToast from './components/XpToast.vue';
 import EndPathModal from './components/EndPathModal.vue';
 import AuthModal from './components/AuthModal.vue';
+import ChampionEvolutionModal from './components/ChampionEvolutionModal.vue';
 import { Settings } from 'lucide-vue-next';
 
 // Assets
@@ -292,6 +309,9 @@ import { useChampionSelection } from './composables/useChampionSelection.js';
 import { useVersusMode } from './composables/useVersusMode.js';
 import { useGameLogic } from './composables/useGameLogic.js';
 import { useChampions } from './composables/useChampions.js';
+
+// Champion System
+import { getChampionStats, evolveChampion } from './lib/championSystem.js';
 
 // Handlers
 import { createGameHandlers } from './handlers/gameHandlers.js';
@@ -350,6 +370,16 @@ const winActive = ref(false);
 const loseActive = ref(false);
 const justLost = ref(false);
 const showNameModal = ref(false);
+
+// Champion Evolution Modal State
+const showChampionEvolutionModal = ref(false);
+const evolutionModalChampionData = ref({});
+const evolutionModalCurrentLevel = ref(1);
+const evolutionModalNextLevel = ref(2);
+const evolutionModalCurrentStats = ref({});
+const evolutionModalNextStats = ref({});
+const evolutionModalCost = ref({ gold: 0, essence: 0 });
+const evolutionModalNewAbilities = ref([]);
 const nameModalInput = ref('');
 const nameError = ref('');
 const usernameInput = ref('');
@@ -407,6 +437,7 @@ const routeProps = computed(() => {
       playerGems: playerGems.value,
       playerLevel: playerLevel.value,
       playerLevelProgress: playerLevelProgress.value,
+      championsState: championsState.value,
     };
   }
   
@@ -727,6 +758,68 @@ function onProfileSelect(card) {
 }
 
 function handleEvolveChampion(championId) {
+  const champion = championsState.value[championId];
+  if (!champion || champion.level >= 10) return;
+  
+  // Get champion data from avatarCards
+  const championCard = avatarCards.find(c => c.id === championId);
+  if (!championCard) return;
+  
+  // Get stats for current and next level
+  const currentStats = getChampionStats(championId, champion.level);
+  const nextStats = getChampionStats(championId, champion.level + 1);
+  
+  if (!currentStats || !nextStats) return;
+  
+  // Calculate evolution cost
+  const nextLevel = champion.level + 1;
+  const cost = {
+    gold: nextLevel * 50,
+    essence: Math.floor(nextLevel / 2)
+  };
+  
+  // Get new abilities unlocked at next level
+  const newAbilities = [];
+  
+  // Check if new ability level unlocks something special
+  if (nextStats.ability && nextStats.ability.charges > currentStats.ability.charges) {
+    newAbilities.push({
+      icon: '🛡️',
+      name: currentStats.info.abilityNameSolo,
+      description: `Charges: ${nextStats.ability.charges} (+${nextStats.ability.charges - currentStats.ability.charges})`
+    });
+  }
+  
+  if (nextStats.passive && nextStats.passive.bonusChance > currentStats.passive.bonusChance) {
+    newAbilities.push({
+      icon: '✨',
+      name: currentStats.info.passiveName,
+      description: `Bonus: ${(nextStats.passive.bonusChance * 100).toFixed(0)}% (+${((nextStats.passive.bonusChance - currentStats.passive.bonusChance) * 100).toFixed(0)}%)`
+    });
+  }
+  
+  // Prepare modal data
+  evolutionModalChampionData.value = championCard;
+  evolutionModalCurrentLevel.value = champion.level;
+  evolutionModalNextLevel.value = nextLevel;
+  evolutionModalCurrentStats.value = {
+    shieldCharges: currentStats.ability?.charges || 0,
+    bonusChance: `${(currentStats.passive?.bonusChance * 100 || 0).toFixed(0)}%`,
+    essenceGain: currentStats.ability?.essenceGain || 0
+  };
+  evolutionModalNextStats.value = {
+    shieldCharges: nextStats.ability?.charges || 0,
+    bonusChance: `${(nextStats.passive?.bonusChance * 100 || 0).toFixed(0)}%`,
+    essenceGain: nextStats.ability?.essenceGain || 0
+  };
+  evolutionModalCost.value = cost;
+  evolutionModalNewAbilities.value = newAbilities;
+  
+  // Open modal
+  showChampionEvolutionModal.value = true;
+}
+
+function confirmChampionEvolution(championId) {
   const result = evolveChampion(championId, playerGold.value, playerEssence.value);
   
   if (result.success) {
@@ -739,11 +832,13 @@ function handleEvolveChampion(championId) {
     saveChampions();
     
     console.log(`[Champion] ${championId} evolved to level ${result.newLevel}!`);
-    
-    // TODO: Show evolution modal/animation
   } else {
     console.warn(`[Champion] Evolution failed: ${result.error}`);
   }
+}
+
+function closeChampionEvolutionModal() {
+  showChampionEvolutionModal.value = false;
 }
 
 async function updatePlayerAvatarUrl(url) {

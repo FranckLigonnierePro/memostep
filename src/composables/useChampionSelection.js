@@ -125,7 +125,18 @@ export function useChampionSelection() {
     try {
       const saved = localStorage.getItem('selectedAvatar');
       if (saved) {
-        selectedAvatar.value = JSON.parse(saved);
+        const avatar = JSON.parse(saved);
+        
+        // Migration: ancien ID 'mage' vers nouveau 'mage_lumineux'
+        if (avatar.id === 'mage') {
+          avatar.id = 'mage_lumineux';
+          avatar.name = 'Mage Lumineux';
+          // Sauvegarder la version migrée
+          localStorage.setItem('selectedAvatar', JSON.stringify(avatar));
+          console.log('[Migration] Avatar ID migré de "mage" vers "mage_lumineux"');
+        }
+        
+        selectedAvatar.value = avatar;
       }
     } catch (_) {}
   }

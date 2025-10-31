@@ -48,6 +48,34 @@
           :style="avatarCardStyle"
         >
           <img class="avatar-img" :src="selectedAvatar.img" :alt="selectedAvatar.name || 'Avatar'" />
+          
+          <!-- Champion Info Overlay -->
+          <div class="champion-info" v-if="getChampionInfo()">
+            <div class="champion-level">Niv. {{ getChampionInfo().level }}</div>
+            <div class="champion-xp-bar">
+              <div class="champion-xp-fill" :style="{ width: getChampionXpProgress() + '%' }"></div>
+            </div>
+            <div class="champion-xp-text">{{ getChampionInfo().xp }} / {{ getChampionNextLevelXp() }} XP</div>
+          </div>
+          
+          <!-- Evolution Button -->
+          <div 
+            v-if="getChampionInfo()"
+            class="evolve-btn"
+            :class="{ disabled: !hasEnoughResources() }"
+            role="button"
+            tabindex="0"
+            @click.stop="hasEnoughResources() && handleEvolve()"
+            @keydown.enter.stop="hasEnoughResources() && handleEvolve()"
+            @keydown.space.prevent.stop="hasEnoughResources() && handleEvolve()"
+          >
+            <span class="evolve-icon">⬆️</span>
+            <span class="evolve-text">Évoluer</span>
+            <div class="evolve-cost">
+              <span class="cost-item">💰{{ getEvolutionCost().gold }}</span>
+              <span class="cost-item">✨{{ getEvolutionCost().essence }}</span>
+            </div>
+          </div>
         </div>
         <div class="actions">
           
@@ -96,8 +124,9 @@ const props = defineProps({
   playerLevelProgress: { type: Number, default: 0 },
   currentFlag: { type: String, default: '@/assets/fr.png' },
   audioMuted: { type: Boolean, default: true },
+  championsState: { type: Object, default: () => ({}) },
 });
-const emit = defineEmits(['start', 'solo', 'versus', 'openLang', 'help', 'settings', 'stats', 'toggleAudio', 'openProfile', 'openShop']);
+const emit = defineEmits(['start', 'solo', 'versus', 'openLang', 'help', 'settings', 'stats', 'toggleAudio', 'openProfile', 'openShop', 'evolveChampion']);
 
 // Formatters
 const formattedGold = computed(() => {
@@ -145,6 +174,60 @@ const avatarCardStyle = computed(() => {
     filter: isHovering.value ? 'saturate(1.06)' : 'none',
   };
 });
+
+// Champion info helpers
+function getChampionInfo() {
+  if (!props.selectedAvatar?.id || !props.championsState) return null;
+  console.log('[HomeView] Looking for champion:', props.selectedAvatar.id);
+  console.log('[HomeView] Champions state:', props.championsState);
+  const championInfo = props.championsState[props.selectedAvatar.id];
+  console.log('[HomeView] Champion info found:', championInfo);
+  return championInfo;
+}
+
+function getChampionXpProgress() {
+  const info = getChampionInfo();
+  if (!info) return 0;
+  const nextLevelXp = getChampionNextLevelXp();
+  if (!nextLevelXp) return 100;
+  return Math.min(100, (info.xp / nextLevelXp) * 100);
+}
+
+function getChampionNextLevelXp() {
+  const info = getChampionInfo();
+  if (!info || info.level >= 10) return null;
+  // XP required increases with level: level * 100
+  return (info.level + 1) * 100;
+}
+
+function canEvolve() {
+  const info = getChampionInfo();
+  if (!info || info.level >= 10) return false;
+  const nextLevelXp = getChampionNextLevelXp();
+  return info.xp >= nextLevelXp;
+}
+
+function hasEnoughResources() {
+  const info = getChampionInfo();
+  if (!info) return false;
+  const cost = getEvolutionCost();
+  return props.playerGold >= cost.gold && props.playerEssence >= cost.essence;
+}
+
+function getEvolutionCost() {
+  const info = getChampionInfo();
+  if (!info) return { gold: 0, essence: 0 };
+  const nextLevel = info.level + 1;
+  return {
+    gold: nextLevel * 50,
+    essence: Math.floor(nextLevel / 2)
+  };
+}
+
+function handleEvolve() {
+  if (!props.selectedAvatar?.id) return;
+  emit('evolveChampion', props.selectedAvatar.id);
+}
 </script>
 
 <style scoped>
@@ -554,7 +637,6 @@ const avatarCardStyle = computed(() => {
   text-shadow: 0 3px 0px black, 0 4px 0px rgba(0, 0, 0, 0.2);
   /* Bordure (contour) du texte */
   -webkit-text-stroke: 2px rgba(0, 0, 0, 0.9);
-  text-stroke: 2px rgba(0, 0, 0, 0.9);
   paint-order: stroke fill;
   color: white;
 }
@@ -562,5 +644,115 @@ const avatarCardStyle = computed(() => {
 .btn-wrap:active {
   transform: scale(0.95);
   transition: 0.05s;
+}
+
+/* Champion Info Overlay on Avatar Card */
+.avatar-card .champion-info {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2;
+}
+
+.avatar-card .champion-level {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fbbf24;
+  text-align: center;
+}
+
+.avatar-card .champion-xp-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.avatar-card .champion-xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6, #ec4899);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.6);
+}
+
+.avatar-card .champion-xp-text {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+}
+
+/* Evolution Button on Avatar Card */
+.avatar-card .evolve-btn {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  border: 2px solid #fbbf24;
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 2;
+  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
+}
+
+.avatar-card .evolve-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(251, 191, 36, 0.6);
+}
+
+.avatar-card .evolve-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+  border-color: #6b7280;
+  box-shadow: none;
+}
+
+.avatar-card .evolve-btn.disabled:hover {
+  transform: none;
+}
+
+.avatar-card .evolve-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.avatar-card .evolve-text {
+  font-size: 11px;
+  font-weight: 700;
+  color: #000;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.avatar-card .evolve-cost {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #000;
+}
+
+.avatar-card .cost-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 </style>

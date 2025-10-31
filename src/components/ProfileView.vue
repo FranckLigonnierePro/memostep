@@ -99,10 +99,14 @@
           </div>
           
           <!-- Evolution Button -->
-          <button 
-            :disabled="!hasEnoughResources(card.id) || !canEvolve(card.id)"
+          <div 
             class="evolve-btn"
-            @click.stop="handleEvolve(card.id)"
+            :class="{ disabled: !hasEnoughResources(card.id) }"
+            role="button"
+            tabindex="0"
+            @click.stop="hasEnoughResources(card.id) && handleEvolve(card.id)"
+            @keydown.enter.stop="hasEnoughResources(card.id) && handleEvolve(card.id)"
+            @keydown.space.prevent.stop="hasEnoughResources(card.id) && handleEvolve(card.id)"
           >
             <span class="evolve-icon">⬆️</span>
             <span class="evolve-text">Évoluer</span>
@@ -110,7 +114,7 @@
               <span class="cost-item">💰{{ getEvolutionCost(card.id).gold }}</span>
               <span class="cost-item">✨{{ getEvolutionCost(card.id).essence }}</span>
             </div>
-          </button>
+          </div>
           
           <div class="card-label">{{ card.name }}</div>
           <div class="sparkles" aria-hidden="true">
