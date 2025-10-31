@@ -52,6 +52,8 @@
         @close="handleCloseView"
         @select="onProfileSelect"
         @evolveChampion="handleEvolveChampion"
+        @renamePlayer="handleRenamePlayer"
+        @linkAccount="handleLinkAccount"
         @begin="handleBeginVersusFromLobby"
         @cellClick="onCellClick"
         @goHome="goHome"
@@ -385,6 +387,10 @@ const nameError = ref('');
 const usernameInput = ref('');
 const currentLang = ref('fr');
 
+// Account management state
+const hasRenamedOnce = ref(false);
+const isGuest = ref(true);
+
 // Computed
 const displayName = computed(() => {
   const direct = String(usernameInput.value || '').trim();
@@ -438,6 +444,8 @@ const routeProps = computed(() => {
       playerLevel: playerLevel.value,
       playerLevelProgress: playerLevelProgress.value,
       championsState: championsState.value,
+      isGuest: isGuest.value,
+      hasRenamedOnce: hasRenamedOnce.value,
     };
   }
   
@@ -583,6 +591,13 @@ function closeAuthModal() {
 
 async function handleAuthSuccess() {
   console.log('[App] Auth success');
+  
+  // If this was a linking operation, update isGuest
+  if (isLinkingAccount.value) {
+    isGuest.value = false;
+    console.log('[Account] Account linked successfully - no longer a guest');
+  }
+  
   closeAuthModal();
   await loadUserProfile();
 }
@@ -841,6 +856,50 @@ function closeChampionEvolutionModal() {
   showChampionEvolutionModal.value = false;
 }
 
+// Account management handlers
+function handleRenamePlayer(newName) {
+  // Check if it's the first rename (free)
+  if (!hasRenamedOnce.value) {
+    // First rename is free
+    usernameInput.value = newName;
+    localStorage.setItem('memostep_username', newName);
+    hasRenamedOnce.value = true;
+    localStorage.setItem('memostep_hasRenamedOnce', 'true');
+    console.log('[Account] First rename (free):', newName);
+  } else {
+    // Subsequent renames cost 100 gems
+    if (playerGems.value >= 100) {
+      playerGems.value -= 100;
+      usernameInput.value = newName;
+      localStorage.setItem('memostep_username', newName);
+      saveResources();
+      console.log('[Account] Paid rename (100 gems):', newName);
+    } else {
+      console.warn('[Account] Not enough gems for rename');
+    }
+  }
+}
+
+function handleLinkAccount() {
+  // Open the auth modal to link account
+  showAuthModal.value = true;
+  isLinkingAccount.value = true;
+  console.log('[Account] Opening auth modal to link account');
+}
+
+function loadAccountSettings() {
+  try {
+    const renamed = localStorage.getItem('memostep_hasRenamedOnce');
+    hasRenamedOnce.value = renamed === 'true';
+    
+    // Check if user is guest (no auth session)
+    // This will be updated by the auth state change listener
+    isGuest.value = !currentUser.value;
+  } catch (e) {
+    console.error('[Account] Error loading account settings:', e);
+  }
+}
+
 async function updatePlayerAvatarUrl(url) {
   if (state.mode !== 'versus' || !versusCode.value) return;
   const me = playerId.value || ensurePlayerId();
@@ -956,14 +1015,17 @@ onMounted(() => {
   loadResources();
   loadChampions();
   loadUserProfile();
+  loadAccountSettings();
   
   const authSubscription = onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN') {
       await loadUserProfile();
+      isGuest.value = false;
     } else if (event === 'SIGNED_OUT') {
       currentUser.value = null;
       currentProfile.value = null;
       isGuestUser.value = true;
+      isGuest.value = true;
     }
   });
   

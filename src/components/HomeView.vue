@@ -33,6 +33,7 @@
               <Settings :size="20" />
             </button>
             <div v-if="showGearMenu" class="gear-menu" @mouseleave="closeGearMenu">
+              <button class="gear-item" @click="openAccountModal(); closeGearMenu()">Mon Compte</button>
               <button class="gear-item" @click="emit('settings'); closeGearMenu()">{{ $t('home.settings') }}</button>
               <button class="gear-item" @click="emit('help'); closeGearMenu()">{{ $t('home.help') }}</button>
               <button class="gear-item" @click="emit('toggleAudio'); closeGearMenu()">{{ audioMuted ? $t('home.audioOn') : $t('home.audioOff') }}</button>
@@ -105,6 +106,21 @@
         </a> -->
       </div>
   </div>
+      
+  <!-- Account Modal -->
+      <AccountModal
+        :show="showAccountModal"
+        :displayName="displayName"
+        :isGuest="isGuest"
+        :hasRenamedOnce="hasRenamedOnce"
+        :playerLevel="playerLevel"
+        :playerGold="playerGold"
+        :playerGems="playerGems"
+        :playerEssence="playerEssence"
+        @close="closeAccountModal"
+        @rename="handleRename"
+        @linkAccount="handleLinkAccount"
+      />
 </template>
 
 <script setup>
@@ -112,6 +128,7 @@ import { ref, computed } from 'vue';
 import { HelpCircle, Settings, Heart, VolumeX, Volume2 } from 'lucide-vue-next';
 import primaryBtn from '../assets/buttons/primary_btn.svg';
 import secondaryBtn from '../assets/buttons/secondary_btn.svg';
+import AccountModal from './AccountModal.vue';
 
 const props = defineProps({
   logoSrc: { type: String, default: '' },
@@ -125,8 +142,10 @@ const props = defineProps({
   currentFlag: { type: String, default: '@/assets/fr.png' },
   audioMuted: { type: Boolean, default: true },
   championsState: { type: Object, default: () => ({}) },
+  isGuest: { type: Boolean, default: true },
+  hasRenamedOnce: { type: Boolean, default: false },
 });
-const emit = defineEmits(['start', 'solo', 'versus', 'openLang', 'help', 'settings', 'stats', 'toggleAudio', 'openProfile', 'openShop', 'evolveChampion']);
+const emit = defineEmits(['start', 'solo', 'versus', 'openLang', 'help', 'settings', 'stats', 'toggleAudio', 'openProfile', 'openShop', 'evolveChampion', 'renamePlayer', 'linkAccount']);
 
 // Formatters
 const formattedGold = computed(() => {
@@ -143,6 +162,21 @@ const isHovering = ref(false);
 const showGearMenu = ref(false);
 function toggleGearMenu() { showGearMenu.value = !showGearMenu.value; }
 function closeGearMenu() { showGearMenu.value = false; }
+
+// Account modal state
+const showAccountModal = ref(false);
+function openAccountModal() { showAccountModal.value = true; }
+function closeAccountModal() { showAccountModal.value = false; }
+
+function handleRename(newName) {
+  emit('renamePlayer', newName);
+  closeAccountModal();
+}
+
+function handleLinkAccount() {
+  closeAccountModal(); // Fermer d'abord AccountModal
+  emit('linkAccount'); // Puis ouvrir AuthModal
+}
 
 function onCardMove(e) {
   const el = e.currentTarget;
@@ -178,11 +212,7 @@ const avatarCardStyle = computed(() => {
 // Champion info helpers
 function getChampionInfo() {
   if (!props.selectedAvatar?.id || !props.championsState) return null;
-  console.log('[HomeView] Looking for champion:', props.selectedAvatar.id);
-  console.log('[HomeView] Champions state:', props.championsState);
-  const championInfo = props.championsState[props.selectedAvatar.id];
-  console.log('[HomeView] Champion info found:', championInfo);
-  return championInfo;
+  return props.championsState[props.selectedAvatar.id];
 }
 
 function getChampionXpProgress() {
