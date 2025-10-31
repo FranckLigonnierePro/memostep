@@ -1,43 +1,31 @@
 <template>
   <div class="home" style="border: 1px red solid;">
-      <div class="flex flex-col mt-4 w-full grow justify-center items-center">
+      <div class="flex flex-col w-full grow items-center">
         <div class="header">
-          <!-- Compact profile chip: avatar + level badge + progress pill -->
+          <!-- Compact profile chip: avatar + level badge -->
           <div class="profile-chip" role="button" tabindex="0" @click="emit('openProfile')" :aria-label="displayName" :title="displayName">
             <div class="chip-avatar-wrap">
-              <img class="chip-avatar" :src="(selectedAvatar && selectedAvatar.img) || fallbackAvatar" alt="avatar" width="44" height="44" />
               <div class="chip-level-badge">{{ playerLevel }}</div>
-            </div>
-            <div class="progress-pill">
-              <div class="progress-fill" :style="{ width: `${Math.round((playerLevelProgress || 0) * 100)}%` }"></div>
-              <div class="progress-text">{{ Math.round((playerLevelProgress || 0) * 100) }}%</div>
             </div>
           </div>
 
           <!-- Resources bar (gold + gems) -->
           <div class="resources-bar">
-            <div class="resource-chip">
-              <button class="plus-btn" @click="emit('openShop', 'gold')" aria-label="Acheter or">＋</button>
-              <span class="res-value">{{ formattedGold }}</span>
-              <span class="res-icon gold">🪙</span>
+            <div class="resource-item">
+              <div class="resource-icon-box gold">
+                <!-- <button class="plus-btn" @click="emit('openShop', 'gold')" aria-label="Acheter or">＋</button> -->
+              </div>
+              <div class="resource-value-box">
+                <span class="res-value">{{ formattedGold }}</span>
+              </div>
             </div>
-            <div class="resource-chip">
-              <button class="plus-btn" @click="emit('openShop', 'gems')" aria-label="Acheter gemmes">＋</button>
-              <span class="res-value">{{ playerGems }}</span>
-              <span class="res-icon gem">💎</span>
-            </div>
-          </div>
-
-          <div class="gear-wrap">
-            <button class="gear-btn" @click="toggleGearMenu" :aria-label="$t('home.settings')" :title="$t('home.settings')">
-              <Settings :size="20" />
-            </button>
-            <div v-if="showGearMenu" class="gear-menu" @mouseleave="closeGearMenu">
-              <button class="gear-item" @click="openAccountModal(); closeGearMenu()">Mon Compte</button>
-              <button class="gear-item" @click="emit('settings'); closeGearMenu()">{{ $t('home.settings') }}</button>
-              <button class="gear-item" @click="emit('help'); closeGearMenu()">{{ $t('home.help') }}</button>
-              <button class="gear-item" @click="emit('toggleAudio'); closeGearMenu()">{{ audioMuted ? $t('home.audioOn') : $t('home.audioOff') }}</button>
-              <button class="gear-item" @click="emit('openLang'); closeGearMenu()">{{ $t('home.lang') }}</button>
+            <div class="resource-item">
+              <div class="resource-icon-box gem">
+                <!-- <button class="plus-btn" @click="emit('openShop', 'gems')" aria-label="Acheter gemmes">＋</button> -->
+              </div>
+              <div class="resource-value-box">
+                <span class="res-value">{{ playerGems }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -77,9 +65,6 @@
               <span class="cost-item">✨{{ getEvolutionCost().essence }}</span>
             </div>
           </div>
-        </div>
-        <div class="actions">
-          
         </div>
         <div class="mode-buttons">
           <div class="btn-wrap" role="button" tabindex="0" aria-label="Jouer maintenant" @click="emit('solo')"
@@ -372,37 +357,48 @@ function handleEvolve() {
 }
 
 /* Header layout */
-.header { width: 100%; display:flex; align-items:center; justify-content: space-between; margin-bottom: 10px; gap: 10px; }
+.header { width: 100%; display:flex; align-items:start; justify-content: space-around; margin-bottom: 10px; gap: 10px; }
 
-/* Compact profile chip */
+/* Compact profile chip - Style inspiré de l'image */
 .profile-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0; /* no space between avatar and progress */
-  padding: 0; /* remove inner padding */
-  border: none; /* no card border */
-  background: transparent; /* no card background */
-  box-shadow: none; /* remove shadow */
-  color: var(--text);
   cursor: pointer;
+  position: relative;
 }
 .profile-chip:focus-visible { outline: 2px solid #4c6ef5; outline-offset: 2px; }
 
-.chip-avatar-wrap { position: relative; width: 36px; height: 36px; flex-shrink: 0; }
-.chip-avatar { width: 36px; height: 36px; border-radius: 12px; display:block; }
+.chip-avatar-wrap {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  background: linear-gradient(135deg, #FFBE3D 0%, #FF6E00 100%);
+  border-radius: 4px;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25), inset 0 0 0 1px #7A3100, 0 4px 8px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .chip-level-badge {
   position: absolute;
-  top: -6px;
-  left: -6px;
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  display:flex; align-items:center; justify-content:center;
-  font-size: 12px; font-weight: 900;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 10px;
+  height: 10px;
+  padding: 0 10px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 900;
   color: #fff;
-  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
-  border: 2px solid #0f1124;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  border: 3px solid #1a1c30;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25), inset 0 0 0 1px #5b21b6, 0 4px 8px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .progress-pill {
@@ -483,32 +479,76 @@ function handleEvolve() {
 .res-pill.essence { color:#a78bfa; }
 .res-pill.gem { color:#76e4f7; }
 
-/* Resources bar */
-.resources-bar { display:flex; align-items:center; gap: 10px; }
-.resource-chip {
-  display:inline-flex; align-items:center; gap:8px;
-  background: #0a0e1a;
-  border: 1px solid #2a2e52;
-  border-radius: 12px;
-  height: 28px;
-  padding: 0 10px 0 4px;
-  box-shadow: 0 2px 0 #0b0e18, inset 0 1px 0 rgba(255,255,255,0.06);
+/* Resources bar - Style inspiré de l'image */
+.resources-bar { display:flex; align-items:center; gap: 8px; }
+
+.resource-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  height: 44px;
 }
-.plus-btn {
-  width: 22px; height: 22px;
-  display:flex; align-items:center; justify-content:center;
-  border-radius: 6px;
-  border: 1px solid #b45309;
-  background: linear-gradient(180deg, #fb923c 0%, #f97316 100%);
-  color: #fff; font-weight: 900; line-height: 1;
-  box-shadow: 0 1px 0 rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.35);
+
+.resource-icon-box {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.20), inset 0 0 0 1px #7A3100;
+  position: relative;
+  z-index: 1;
+}
+
+.resource-icon-box.gold {
+  background: linear-gradient(135deg, #FFBE3D 0%, #FF6E00 100%);
+}
+
+.resource-icon-box.gem {
+  background: linear-gradient(135deg, #FFBE3D 0%, #FF6E00 100%);
+}
+
+.resource-icon-box .plus-btn {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
   cursor: pointer;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
 }
-.plus-btn:active { transform: translateY(1px); }
-.res-value { color:#ffffff; font-weight: 900; text-shadow: 0 1px 0 rgba(0,0,0,0.35); font-size: 14px; }
-.res-icon { font-size: 16px; line-height: 1; }
-.res-icon.gold { color: #ffd166; }
-.res-icon.gem { color: #76e4f7; }
+
+.resource-icon-box .plus-btn:active {
+  transform: scale(0.95);
+}
+
+.resource-value-box {
+  height: 18px;
+  width: 80px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #2a3447f0 0%, #1f2937f0 100%);
+  border-radius: 0 4px 4px 0;
+  margin-left: -10px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,1);
+}
+
+.res-value {
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 18px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  letter-spacing: 0.5px;
+}
 
 /* Mode buttons: yellow 3D cartoon */
 .mode-buttons { display:flex; gap:12px; margin: 10px 0 6px; }
