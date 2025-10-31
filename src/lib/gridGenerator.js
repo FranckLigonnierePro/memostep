@@ -39,7 +39,11 @@ function isAdjacentToPath(r, c, pathSet) {
 
 /**
  * Vérifie si un bonus peut permettre de rejoindre le chemin de la ligne suivante
- * RÈGLE: |colBonus - colNextPath| <= 1
+ * RÈGLE 1: Le bonus doit être adjacent à la case du chemin sur sa propre ligne
+ * RÈGLE 2: Depuis le bonus, on doit pouvoir atteindre le chemin de la ligne suivante
+ *          Cela signifie: |colBonus - colNextPath| <= 1
+ * RÈGLE 3: Depuis la case du chemin actuel, on doit aussi pouvoir atteindre le chemin suivant
+ *          Cela signifie: |colCurrentPath - colNextPath| <= 1
  * 
  * @param {number} r - Ligne du bonus
  * @param {number} c - Colonne du bonus
@@ -47,25 +51,49 @@ function isAdjacentToPath(r, c, pathSet) {
  * @returns {boolean} true si le bonus est jouable, false sinon
  */
 function canReachNextPathFromBonus(r, c, path) {
-  // Si c'est la dernière ligne, pas de contrainte (pas de ligne suivante)
-  if (r >= ROWS - 1) {
-    return true;
+  // RÈGLE 1: Vérifier que le bonus est adjacent à la case du chemin sur la même ligne
+  const currentPathCell = path.find(p => p.r === r);
+  
+  if (!currentPathCell) {
+    // Pas de chemin sur cette ligne (ne devrait pas arriver)
+    return false;
   }
   
-  // Trouver la colonne du chemin sur la ligne suivante (r + 1)
-  const nextPathCell = path.find(p => p.r === r + 1);
+  const colCurrentPath = currentPathCell.c;
+  const distanceToCurrent = Math.abs(c - colCurrentPath);
   
-  // Si pas de chemin sur la ligne suivante (ne devrait pas arriver), accepter
-  if (!nextPathCell) {
-    return true;
+  // Le bonus doit être adjacent (distance 1) à la case du chemin actuel
+  if (distanceToCurrent !== 1) {
+    return false;
   }
   
-  const colNextPath = nextPathCell.c;
+  // RÈGLE 2 & 3: Si ce n'est pas la dernière ligne, vérifier qu'on peut rejoindre la ligne suivante
+  if (r < ROWS - 1) {
+    // Trouver la colonne du chemin sur la ligne suivante (r + 1)
+    const nextPathCell = path.find(p => p.r === r + 1);
+    
+    // Si pas de chemin sur la ligne suivante (ne devrait pas arriver), accepter
+    if (!nextPathCell) {
+      return true;
+    }
+    
+    const colNextPath = nextPathCell.c;
+    
+    // RÈGLE 2: Vérifier qu'on peut rejoindre le chemin suivant DEPUIS LE BONUS
+    const distanceFromBonusToNext = Math.abs(c - colNextPath);
+    if (distanceFromBonusToNext > 1) {
+      return false;
+    }
+    
+    // RÈGLE 3: Vérifier qu'on peut rejoindre le chemin suivant DEPUIS LE CHEMIN ACTUEL
+    // (pour éviter les situations où le bonus crée un détour impossible)
+    const distanceFromCurrentToNext = Math.abs(colCurrentPath - colNextPath);
+    if (distanceFromCurrentToNext > 1) {
+      return false;
+    }
+  }
   
-  // Vérifier la contrainte: |colBonus - colNextPath| <= 1
-  const distance = Math.abs(c - colNextPath);
-  
-  return distance <= 1;
+  return true;
 }
 
 /**
