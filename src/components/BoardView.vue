@@ -122,6 +122,49 @@
       
       <div class="flex flex-col items-center">
         <div class="side-actions">
+          <!-- Champion Abilities Indicators -->
+          <div v-if="mode === 'solo' && (hasActiveShield || shieldCharges > 0)" class="champion-ability-card shield-card">
+            <div class="ability-header">
+              <span class="ability-icon">🛡️</span>
+              <span class="ability-name">Bouclier Sacré</span>
+            </div>
+            <div class="ability-status">
+              <div v-if="hasActiveShield" class="status-active">
+                <span class="status-icon">✨</span>
+                <span class="status-text">ACTIF</span>
+              </div>
+              <div class="charges-display">
+                <span class="charges-label">Charges:</span>
+                <div class="charges-dots">
+                  <span 
+                    v-for="i in 3" 
+                    :key="i" 
+                    class="charge-dot"
+                    :class="{ active: i <= shieldCharges, used: i > shieldCharges }"
+                  ></span>
+                </div>
+              </div>
+            </div>
+            <div class="ability-hint">Appuyez sur ESPACE</div>
+          </div>
+          
+          <div v-if="mode === 'versus' && (hasActiveStun || stunDuration > 0)" class="champion-ability-card stun-card">
+            <div class="ability-header">
+              <span class="ability-icon">✨</span>
+              <span class="ability-name">Lumière Étourdissante</span>
+            </div>
+            <div class="ability-status">
+              <div v-if="hasActiveStun" class="status-active">
+                <span class="status-icon">⚡</span>
+                <span class="status-text">ACTIF ({{ stunDuration }}s)</span>
+              </div>
+              <div v-else class="status-ready">
+                <span class="status-text">PRÊT</span>
+              </div>
+            </div>
+            <div class="ability-hint">Appuyez sur ESPACE</div>
+          </div>
+          
           <!-- Ressources collectées -->
           <div v-if="mode === 'solo'" class="resources-card">
             <div class="resource-item" title="Or collecté">
@@ -245,6 +288,10 @@ const props = defineProps({
   playerGold: { type: Number, default: 0 },
   playerEssence: { type: Number, default: 0 },
   playerGems: { type: Number, default: 0 },
+  hasActiveShield: { type: Boolean, default: false },
+  shieldCharges: { type: Number, default: 0 },
+  hasActiveStun: { type: Boolean, default: false },
+  stunDuration: { type: Number, default: 0 },
 });
 
 const emit = defineEmits(['cellClick', 'goHome']);
@@ -1133,6 +1180,183 @@ const getBonusIcon = (r, c) => CellStates.getBonusIcon(props.gridContent, r, c);
   opacity: 0.8;
   animation: snowfall linear infinite;
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+/* Champion Abilities Indicators */
+.champion-ability-card {
+  background: rgba(23, 25, 44, 0.95);
+  border: 2px solid;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  animation: ability-pulse 2s ease-in-out infinite;
+}
+
+.shield-card {
+  border-color: #fbbf24;
+  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4), 0 0 20px rgba(251, 191, 36, 0.2);
+}
+
+.stun-card {
+  border-color: #8b5cf6;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4), 0 0 20px rgba(139, 92, 246, 0.2);
+}
+
+.ability-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ability-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.ability-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ability-status {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.status-active {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.2));
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  border-radius: 6px;
+  animation: status-glow 1.5s ease-in-out infinite;
+}
+
+.stun-card .status-active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(124, 58, 237, 0.2));
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+.status-ready {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  background: rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(34, 197, 94, 0.5);
+  border-radius: 6px;
+}
+
+.status-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.status-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fbbf24;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stun-card .status-text {
+  color: #8b5cf6;
+}
+
+.status-ready .status-text {
+  color: #22c55e;
+}
+
+.charges-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.charges-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+}
+
+.charges-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.charge-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #fbbf24;
+  background: transparent;
+  transition: all 0.3s ease;
+}
+
+.charge-dot.active {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.6), inset 0 0 4px rgba(255, 255, 255, 0.3);
+  animation: charge-pulse 1.5s ease-in-out infinite;
+}
+
+.charge-dot.used {
+  border-color: rgba(251, 191, 36, 0.3);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.ability-hint {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+@keyframes ability-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes status-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(251, 191, 36, 0.6);
+  }
+}
+
+@keyframes charge-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.8);
+  }
 }
 
 @keyframes snowfall {

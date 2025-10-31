@@ -123,11 +123,12 @@ export function generateBorderHazards(path) {
  * @param {Array<{r: number, c: number}>} path - Chemin
  * @param {number} floorNumber - Numéro de l'étage (commence à 1)
  * @param {Object} runCounters - Compteurs globaux pour maxPerRun
+ * @param {number} bonusChanceModifier - Modificateur de chance pour les bonus (champion passive)
  * @returns {{grid: Array, rollback: Set, stun: Set, lifeLoss: Set, newCounters: Object}}
  */
-export function applyEnrichedGrid(path, floorNumber = 1, runCounters = { gem: 0, potion: 0 }) {
+export function applyEnrichedGrid(path, floorNumber = 1, runCounters = { gem: 0, potion: 0 }, bonusChanceModifier = 0) {
   // Générer la grille enrichie
-  const { grid, runCounters: newCounters } = generateEnrichedGrid(path, floorNumber, runCounters);
+  const { grid, runCounters: newCounters } = generateEnrichedGrid(path, floorNumber, runCounters, bonusChanceModifier);
   
   const rollback = new Set();
   const stun = new Set();

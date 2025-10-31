@@ -81,9 +81,10 @@ function canReachNextPathFromBonus(r, c, path) {
  * @param {Array} path - Chemin [{r, c}, ...]
  * @param {number} floorNumber - Numéro de l'étage (commence à 1)
  * @param {Object} runCounters - Compteurs pour maxPerRun {gem: 0, potion: 0}
+ * @param {number} bonusChanceModifier - Modificateur de chance pour les bonus (0-1, ex: 0.05 = +5%)
  * @returns {Object} { grid, runCounters } - grid[row][col] = {type, value?, ...}
  */
-export function generateEnrichedGrid(path, floorNumber = 1, runCounters = { gem: 0, potion: 0 }) {
+export function generateEnrichedGrid(path, floorNumber = 1, runCounters = { gem: 0, potion: 0 }, bonusChanceModifier = 0) {
   // Initialiser la grille vide
   const grid = Array.from({ length: ROWS }, () => 
     Array.from({ length: COLS }, () => null)
@@ -283,12 +284,14 @@ export function generateEnrichedGrid(path, floorNumber = 1, runCounters = { gem:
     const pathGold = gridConfig.cells.path.canContain.gold;
     const totalGold = floorCounters.goldPath + floorCounters.goldAdjacent;
     if (totalGold < gridConfig.bonuses.gold.maxPerFloor) {
-      const chancePathGold = calculateChance(
+      let chancePathGold = calculateChance(
         pathGold.baseChance,
         pathGold.perFloorBonus,
         pathGold.maxChance,
         floorNumber
       );
+      // Apply champion passive bonus
+      chancePathGold = Math.min(1, chancePathGold + bonusChanceModifier);
       if (Math.random() < chancePathGold) {
         const value = randomInt(pathGold.valueMin, pathGold.valueMax);
         grid[r][c] = { type: 'path', gold: value };
@@ -301,12 +304,14 @@ export function generateEnrichedGrid(path, floorNumber = 1, runCounters = { gem:
     const pathEssence = gridConfig.cells.path.canContain.essence;
     const totalEssence = floorCounters.essencePath + floorCounters.essenceAdjacent;
     if (totalEssence < gridConfig.bonuses.essence.maxPerFloor) {
-      const chancePathEssence = calculateChance(
+      let chancePathEssence = calculateChance(
         pathEssence.baseChance,
         pathEssence.perFloorBonus,
         pathEssence.maxChance,
         floorNumber
       );
+      // Apply champion passive bonus
+      chancePathEssence = Math.min(1, chancePathEssence + bonusChanceModifier);
       if (Math.random() < chancePathEssence) {
         grid[r][c] = { type: 'path', essence: pathEssence.value };
         floorCounters.essencePath++;

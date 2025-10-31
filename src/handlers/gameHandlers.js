@@ -21,14 +21,16 @@ export function createGameHandlers(context) {
     stopChrono,
     router,
     t,
+    grantCurrentChampionXp,
+    CHAMPION_XP_RULES,
   } = context;
 
   /**
    * Gère une victoire de match
    */
-  function handleMatchWin() {
+  function handleMatchWin(isPerfect = false) {
     if (state.mode === 'solo') {
-      showEndPathModalForSolo('completed');
+      showEndPathModalForSolo('completed', isPerfect);
     } else {
       winActive.value = true;
       const xpAmount = getMatchXP('win');
@@ -56,6 +58,9 @@ export function createGameHandlers(context) {
     winActive.value = true;
     const xpAmount = getMultiplayerXP('duel_win');
     grantXP(xpAmount, 'Multiplayer Win');
+    
+    // Grant champion XP for multiplayer win
+    grantCurrentChampionXp(CHAMPION_XP_RULES.MULTIPLAYER_WIN, 'Multiplayer Win');
   }
 
   /**
@@ -70,7 +75,7 @@ export function createGameHandlers(context) {
   /**
    * Affiche la modal de fin de chemin (solo)
    */
-  function showEndPathModalForSolo(status) {
+  function showEndPathModalForSolo(status, isPerfect = false) {
     const stage = soloLevel.value + 1;
     const timeSeconds = Math.floor(chronoMs.value / 1000);
     const livesLeft = 3 - soloLivesUsed.value;
@@ -82,7 +87,8 @@ export function createGameHandlers(context) {
       stage,
       timeSeconds,
       livesLeft,
-      xpBreakdown
+      xpBreakdown,
+      isPerfect
     };
 
     showEndPathModal.value = true;
@@ -96,6 +102,22 @@ export function createGameHandlers(context) {
 
     const xpAmount = endPathData.value.xpBreakdown.totalXp;
     grantXP(xpAmount, `Solo Stage ${endPathData.value.stage}`);
+
+    // Grant champion XP based on conditions
+    const livesLeft = endPathData.value.livesLeft;
+    const isPerfect = endPathData.value.isPerfect;
+    
+    let championXp = CHAMPION_XP_RULES.FINISH_STAGE; // +1 for finishing
+    
+    if (livesLeft === 3) {
+      championXp = CHAMPION_XP_RULES.FINISH_WITH_3_HEARTS; // +2 for 3 hearts
+    }
+    
+    if (isPerfect) {
+      championXp = CHAMPION_XP_RULES.PERFECT_STAGE; // +3 for perfect
+    }
+    
+    grantCurrentChampionXp(championXp, `Stage ${endPathData.value.stage}`);
 
     if (endPathData.value.status === 'no_life_left') {
       goHome();

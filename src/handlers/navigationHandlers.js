@@ -48,12 +48,14 @@ export function createNavigationHandlers(context) {
   /**
    * Gère la sélection d'un profil/avatar
    */
-  function handleProfileSelect(card, selectedAvatar) {
-    selectedAvatar.value = card;
+  function handleProfileSelect(card) {
+    // This function is now just a wrapper that returns the card
+    // The actual selection is handled in App.vue
     try {
       localStorage.setItem('selectedAvatar', JSON.stringify(card));
     } catch (_) {}
     router.push('/');
+    return card;
   }
 
   /**

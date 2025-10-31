@@ -50,7 +50,8 @@
         @toggleAudio="toggleAudio"
         @openProfile="openProfile"
         @close="handleCloseView"
-        @select="handleProfileSelect"
+        @select="onProfileSelect"
+        @evolveChampion="handleEvolveChampion"
         @begin="handleBeginVersusFromLobby"
         @cellClick="onCellClick"
         @goHome="goHome"
@@ -290,6 +291,7 @@ import { usePlayerStats } from './composables/usePlayerStats.js';
 import { useChampionSelection } from './composables/useChampionSelection.js';
 import { useVersusMode } from './composables/useVersusMode.js';
 import { useGameLogic } from './composables/useGameLogic.js';
+import { useChampions } from './composables/useChampions.js';
 
 // Handlers
 import { createGameHandlers } from './handlers/gameHandlers.js';
@@ -318,9 +320,10 @@ const playerStats = usePlayerStats();
 const championSelection = useChampionSelection();
 const versusMode = useVersusMode();
 const gameLogic = useGameLogic();
+const champions = useChampions();
 
 // Destructure composables
-const { state, flipActive, flipBackActive, stunActive, faceDownActive, faceColors, shakeActive, clickBlocked, mirrorColumns, revealComplete, highlightIdx, soloLivesUsed, soloLevel, runCounters, cells, boardStyle, revealMsLeft, revealProgress, revealSecondsText, nextCell, livesUsed, lastExtinguishedIndex, cellClass, startRevealTicker, stopRevealTicker, resetGameState } = gameState;
+const { state, flipActive, flipBackActive, stunActive, faceDownActive, faceColors, shakeActive, clickBlocked, mirrorColumns, revealComplete, highlightIdx, soloLivesUsed, soloLevel, runCounters, soloErrorCount, cells, boardStyle, revealMsLeft, revealProgress, revealSecondsText, nextCell, livesUsed, lastExtinguishedIndex, cellClass, startRevealTicker, stopRevealTicker, resetGameState } = gameState;
 
 const { audioMuted, toggleAudio, pauseMainMusic, resumeMainMusic, initAudio } = audio;
 
@@ -331,6 +334,8 @@ const { selectedAvatar, showChampionSelector, selectSecondsLeft, versusReadyCoun
 const { versusCode, versusRoom, versusIsHost, versusError, versusSeed, versusStartAtMs, versusCurrentRound, versusLastProgress, playerId, versusLivesUsed, versusWins, versusProgress, versusPlayers, versusPathsByPlayer, versusRanking, startProgressAutoPublish, stopProgressAutoPublish, createRoom, joinRoom, startVersusGame, subscribeToRoom, leaveRoom, resetVersusRoom, useFreezePower, updateFreezeState, reportRoundVictory, reportLifeLossEvent, getSupabase } = versusMode;
 
 const { chronoMs, startChrono, stopChrono, onCellClick: gameOnCellClick, prepareNextSoloLevel } = gameLogic;
+
+const { championsState, currentChampionId, currentChampion, currentChampionStats, currentChampionProgress, championAbilityState, showEvolutionModal, evolutionModalData, canCurrentChampionEvolve, hasActiveShield, shieldCharges, hasActiveStun, stunDuration, loadChampions, saveChampions, selectChampion, grantChampionXp, grantCurrentChampionXp, openEvolutionModal, closeEvolutionModal, performEvolution, activateShieldAbility, consumeShieldCharge, activateStunAbility, deactivateStun, resetAbilityState, applyPassiveVisionSacree, CHAMPION_XP_RULES } = champions;
 
 // Additional state
 const rootScale = ref(1);
@@ -411,6 +416,9 @@ const routeProps = computed(() => {
       playerLevel: playerLevel.value,
       playerTotalXp: playerTotalXp.value,
       playerLevelProgress: playerLevelProgress.value,
+      championsState: championsState.value,
+      playerGold: playerGold.value,
+      playerEssence: playerEssence.value,
     };
   }
   
@@ -468,6 +476,10 @@ const routeProps = computed(() => {
       playerGold: playerGold.value,
       playerEssence: playerEssence.value,
       playerGems: playerGems.value,
+      hasActiveShield: hasActiveShield.value,
+      shieldCharges: shieldCharges.value,
+      hasActiveStun: hasActiveStun.value,
+      stunDuration: stunDuration.value,
     };
   }
   
@@ -477,7 +489,7 @@ const routeProps = computed(() => {
 // Create handlers
 const gameHandlers = createGameHandlers({
   state, winActive, loseActive, showEndPathModal, endPathData, soloLevel, chronoMs, soloLivesUsed,
-  grantXP, stopChrono, router, t
+  grantXP, stopChrono, router, t, grantCurrentChampionXp, CHAMPION_XP_RULES
 });
 
 const modalHandlers = createModalHandlers({
@@ -575,7 +587,10 @@ function startMode(mode) {
     state.heartCell = null;
     state.preparedHeart = null;
     
-    const result = applyEnrichedGrid(state.path, 1, runCounters.value);
+    // Apply champion passive bonus (Vision Sacrée)
+    const bonusModifier = currentChampionStats.value?.passive?.bonusOnPathChance || 0;
+    
+    const result = applyEnrichedGrid(state.path, 1, runCounters.value, bonusModifier);
     state.gridContent = result.grid;
     state.rollback = result.rollback;
     state.stun = result.stun;
@@ -657,7 +672,11 @@ function newGame() {
     state.preparedHeart = null;
     
     const currentFloor = Math.max(1, (soloLevel.value || 0) + 1);
-    const result = applyEnrichedGrid(state.soloPath, currentFloor, runCounters.value);
+    
+    // Apply champion passive bonus (Vision Sacrée)
+    const bonusModifier = currentChampionStats.value?.passive?.bonusOnPathChance || 0;
+    
+    const result = applyEnrichedGrid(state.soloPath, currentFloor, runCounters.value, bonusModifier);
     state.gridContent = result.grid;
     state.rollback = result.rollback;
     state.stun = result.stun;
@@ -684,8 +703,8 @@ async function goHome() {
 function onCellClick(r, c) {
   gameOnCellClick(r, c, {
     state, mirrorColumns, clickBlocked, shakeActive, stunActive, justLost, flipBackActive,
-    faceDownActive, soloLivesUsed, playerGold, playerEssence, playerGems, t, handleMatchWin,
-    handleMatchLose, versusMode: state.mode === 'versus'
+    faceDownActive, soloLivesUsed, soloErrorCount, playerGold, playerEssence, playerGems, t, handleMatchWin,
+    handleMatchLose, versusMode: state.mode === 'versus', hasActiveShield, consumeShieldCharge
   });
 }
 
@@ -700,6 +719,31 @@ function handleChampionPick(card) {
       }
     }
   });
+}
+
+function onProfileSelect(card) {
+  selectedAvatar.value = card;
+  handleProfileSelect(card);
+}
+
+function handleEvolveChampion(championId) {
+  const result = evolveChampion(championId, playerGold.value, playerEssence.value);
+  
+  if (result.success) {
+    // Deduct resources
+    playerGold.value -= result.cost.gold;
+    playerEssence.value -= result.cost.essence;
+    
+    // Save resources and champions
+    saveResources();
+    saveChampions();
+    
+    console.log(`[Champion] ${championId} evolved to level ${result.newLevel}!`);
+    
+    // TODO: Show evolution modal/animation
+  } else {
+    console.warn(`[Champion] Evolution failed: ${result.error}`);
+  }
 }
 
 async function updatePlayerAvatarUrl(url) {
@@ -751,6 +795,41 @@ function handleBeginVersusFromLobby(payload) {
   }
 }
 
+// Handle keyboard input for champion abilities
+function handleKeyDown(event) {
+  // Only handle spacebar
+  if (event.code !== 'Space') return;
+  
+  // Don't trigger if typing in input
+  if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') return;
+  
+  // Only during active gameplay
+  if (!state.inPlay) return;
+  
+  event.preventDefault();
+  
+  // Solo mode: Bouclier Sacré
+  if (state.mode === 'solo') {
+    if (!hasActiveShield.value) {
+      const activated = activateShieldAbility();
+      if (activated) {
+        console.log('[Champion] Bouclier Sacré activated');
+      }
+    }
+  }
+  
+  // Versus mode: Lumière Étourdissante
+  if (state.mode === 'versus') {
+    if (!hasActiveStun.value) {
+      const result = activateStunAbility();
+      if (result) {
+        console.log('[Champion] Lumière Étourdissante activated', result);
+        // TODO: Apply stun effect to other players
+      }
+    }
+  }
+}
+
 // Watch for all players ready in versus
 watch(versusRoom, (room) => {
   if (state.mode !== 'versus' || !showChampionSelector.value || versusReadyCountdown.value > 0) return;
@@ -772,6 +851,7 @@ onMounted(() => {
   fitRootScale();
   window.addEventListener('resize', fitRootScale);
   window.addEventListener('orientationchange', fitRootScale);
+  window.addEventListener('keydown', handleKeyDown);
   
   try { ensurePlayerId(); } catch (_) {}
   
@@ -779,6 +859,7 @@ onMounted(() => {
   loadSelectedAvatar();
   loadPlayerXP();
   loadResources();
+  loadChampions();
   loadUserProfile();
   
   const authSubscription = onAuthStateChange(async (event, session) => {
@@ -801,6 +882,7 @@ onBeforeUnmount(() => {
   }
   window.removeEventListener('resize', fitRootScale);
   window.removeEventListener('orientationchange', fitRootScale);
+  window.removeEventListener('keydown', handleKeyDown);
   if (state.timerId) clearTimeout(state.timerId);
   stopRevealTicker();
 });

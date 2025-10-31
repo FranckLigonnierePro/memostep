@@ -65,6 +65,7 @@ export function useGameState() {
   const soloLivesUsed = ref(0);
   const soloLevel = ref(0);
   const runCounters = ref({ gem: 0, potion: 0 });
+  const soloErrorCount = ref(0); // Track errors for perfect stage detection
 
   // Computed
   const cells = computed(() => {
@@ -158,6 +159,7 @@ export function useGameState() {
     state.wrongSet.clear();
     state.collectedBonuses.clear();
     faceDownActive.value = false;
+    soloErrorCount.value = 0;
     stopRevealTicker();
   }
 
@@ -177,6 +179,7 @@ export function useGameState() {
     soloLivesUsed,
     soloLevel,
     runCounters,
+    soloErrorCount,
     
     // Computed
     cells,

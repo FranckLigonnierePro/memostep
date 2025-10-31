@@ -57,6 +57,7 @@ export function useGameLogic() {
       flipBackActive,
       faceDownActive,
       soloLivesUsed,
+      soloErrorCount,
       playerGold,
       playerEssence,
       playerGems,
@@ -97,7 +98,8 @@ export function useGameLogic() {
 
           // Check if path complete
           if (state.nextIndex === state.path.length) {
-            completePathSuccess(state, flipBackActive, faceDownActive, t, handleMatchWin);
+            const isPerfect = (state.mode === 'solo' && context.soloErrorCount && context.soloErrorCount.value === 0);
+            completePathSuccess(state, flipBackActive, faceDownActive, t, handleMatchWin, isPerfect);
           }
 
           return;
@@ -154,7 +156,8 @@ export function useGameLogic() {
 
       // Check if path complete
       if (state.nextIndex === state.path.length) {
-        completePathSuccess(state, flipBackActive, faceDownActive, t, handleMatchWin);
+        const isPerfect = (state.mode === 'solo' && context.soloErrorCount && context.soloErrorCount.value === 0);
+        completePathSuccess(state, flipBackActive, faceDownActive, t, handleMatchWin, isPerfect);
       }
     } else {
       // Wrong cell
@@ -166,11 +169,15 @@ export function useGameLogic() {
         clickBlocked,
         justLost,
         soloLivesUsed,
+        soloErrorCount,
         flipBackActive,
         faceDownActive,
+        playerEssence,
         t,
         handleMatchLose,
         versusMode,
+        hasActiveShield: context.hasActiveShield,
+        consumeShieldCharge: context.consumeShieldCharge,
       });
     }
   }
@@ -178,7 +185,7 @@ export function useGameLogic() {
   /**
    * Gère la complétion réussie du chemin
    */
-  function completePathSuccess(state, flipBackActive, faceDownActive, t, handleMatchWin) {
+  function completePathSuccess(state, flipBackActive, faceDownActive, t, handleMatchWin, isPerfect = false) {
     state.statusText = t('status.bravo');
     state.inPlay = false;
     stopChrono();
@@ -190,7 +197,7 @@ export function useGameLogic() {
     setTimeout(() => {
       flipBackActive.value = false;
       faceDownActive.value = false;
-      handleMatchWin();
+      handleMatchWin(isPerfect);
     }, backTotal);
   }
 
@@ -206,12 +213,18 @@ export function useGameLogic() {
       clickBlocked,
       justLost,
       soloLivesUsed,
+      soloErrorCount,
       flipBackActive,
       faceDownActive,
       t,
       handleMatchLose,
       versusMode,
     } = context;
+    
+    // Increment error count for solo mode
+    if (state.mode === 'solo' && soloErrorCount) {
+      soloErrorCount.value++;
+    }
 
     // Decoy handling (solo)
     if (state.mode === 'solo' && state.decoys.has(keyAlready)) {
@@ -277,6 +290,17 @@ export function useGameLogic() {
 
     // Check if out of hearts (solo)
     if (state.mode === 'solo') {
+      // Check for active shield (champion ability)
+      if (context.hasActiveShield && context.hasActiveShield.value && context.consumeShieldCharge) {
+        console.log('[Champion] Shield absorbed the error!');
+        context.consumeShieldCharge();
+        // Grant essence bonus
+        if (context.playerEssence) {
+          context.playerEssence.value += 1;
+        }
+        return;
+      }
+      
       soloLivesUsed.value++;
       
       if (soloLivesUsed.value >= 3) {

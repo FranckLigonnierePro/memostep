@@ -1,6 +1,6 @@
 <template>
   <div class="profile-view">
-    <div class="profile-body mt-4" style="height: 100%;">
+    <div class="profile-body mt-4">
       <p class="profile-title">Choisis ton personnage</p>
       <div style="display:flex; flex-direction:column; gap:8px; align-items:center; margin-bottom:8px;">
         <input
@@ -88,6 +88,30 @@
           <div class="card-media">
             <img class="char-img" :src="card.img" :alt="card.name" />
           </div>
+          
+          <!-- Champion Info Overlay -->
+          <div class="champion-info" v-if="getChampionInfo(card.id)">
+            <div class="champion-level">Niv. {{ getChampionInfo(card.id).level }}</div>
+            <div class="champion-xp-bar">
+              <div class="champion-xp-fill" :style="{ width: getChampionXpProgress(card.id) + '%' }"></div>
+            </div>
+            <div class="champion-xp-text">{{ getChampionInfo(card.id).xp }} / {{ getChampionNextLevelXp(card.id) }} XP</div>
+          </div>
+          
+          <!-- Evolution Button -->
+          <button 
+            :disabled="!hasEnoughResources(card.id) || !canEvolve(card.id)"
+            class="evolve-btn"
+            @click.stop="handleEvolve(card.id)"
+          >
+            <span class="evolve-icon">⬆️</span>
+            <span class="evolve-text">Évoluer</span>
+            <div class="evolve-cost">
+              <span class="cost-item">💰{{ getEvolutionCost(card.id).gold }}</span>
+              <span class="cost-item">✨{{ getEvolutionCost(card.id).essence }}</span>
+            </div>
+          </button>
+          
           <div class="card-label">{{ card.name }}</div>
           <div class="sparkles" aria-hidden="true">
             <span v-for="n in 20" :key="n" class="p"></span>
@@ -110,8 +134,14 @@ import { calculateLevel } from '../lib/xpSystem.js';
 const props = defineProps({
   playerLevel: { type: Number, default: 1 },
   playerTotalXp: { type: Number, default: 0 },
-  playerLevelProgress: { type: Number, default: 0 }
+  playerLevelProgress: { type: Number, default: 0 },
+  championsState: { type: Object, default: () => ({}) },
+  playerGold: { type: Number, default: 0 },
+  playerEssence: { type: Number, default: 0 }
 });
+
+const emit = defineEmits(['select', 'close', 'linkAccount', 'evolveChampion']);
+
 import imgCasseur from '../assets/profils/casseur.png';
 import imgDark from '../assets/profils/dark.png';
 import imgElectrik from '../assets/profils/electrik.png';
@@ -169,6 +199,55 @@ const cards = [
   { id: 'hack', name: 'Hack', img: imgHack, color: '#6366f1', glow: 'rgba(99,102,241,0.45)' },
   { id: 'archie', name: 'Archie', img: imgArchie, color: '#f59e0b', glow: 'rgba(245,158,11,0.45)' },
 ];
+
+// Champion helper functions
+function getChampionInfo(championId) {
+  return props.championsState[championId];
+}
+
+function getChampionXpProgress(championId) {
+  const info = getChampionInfo(championId);
+  if (!info) return 0;
+  const nextLevelXp = getChampionNextLevelXp(championId);
+  if (nextLevelXp === 0) return 100;
+  return Math.min(100, (info.xp / nextLevelXp) * 100);
+}
+
+function getChampionNextLevelXp(championId) {
+  const info = getChampionInfo(championId);
+  if (!info || info.level >= 10) return 0;
+  // XP required increases by level: 100, 200, 300, etc.
+  return (info.level + 1) * 100;
+}
+
+function canEvolve(championId) {
+  const info = getChampionInfo(championId);
+  if (!info || !info.unlocked) return false;
+  if (info.level >= 10) return false; // Max level
+  const nextLevelXp = getChampionNextLevelXp(championId);
+  return info.xp >= nextLevelXp;
+}
+
+function getEvolutionCost(championId) {
+  const info = getChampionInfo(championId);
+  if (!info) return { gold: 0, essence: 0 };
+  const nextLevel = info.level + 1;
+  // Cost increases with level
+  return {
+    gold: nextLevel * 50,
+    essence: Math.floor(nextLevel / 2)
+  };
+}
+
+function hasEnoughResources(championId) {
+  const cost = getEvolutionCost(championId);
+  return props.playerGold >= cost.gold && props.playerEssence >= cost.essence;
+}
+
+function handleEvolve(championId) {
+  if (!hasEnoughResources(championId)) return;
+  emit('evolveChampion', championId);
+}
 </script>
 
 <style scoped>
@@ -189,8 +268,9 @@ const cards = [
   flex-direction: column;
   width: 100%;
   flex: 1;
-  min-height: 0; /* allow children to shrink for scrolling */
-  justify-content: center;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .profile-title {
@@ -211,12 +291,10 @@ const cards = [
   align-content: start;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 5px;
-  /* Make the grid scrollable within the available space */
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 2px 25px; /* tighter sides, keep vertical space for shadows */
+  padding: 2px 25px;
   box-sizing: border-box;
+  margin-top: 16px;
+  margin-bottom: 16px;
 }
 
 .char-card {
@@ -356,6 +434,10 @@ const cards = [
   border-radius: 16px;
   padding: 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
 }
 
 .xp-roadmap-header {
@@ -449,7 +531,8 @@ const cards = [
 }
 
 .xp-roadmap-scroll {
-  max-height: 300px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 8px 4px;
@@ -616,5 +699,139 @@ const cards = [
 
 .level-milestone.completed .reward-xp {
   color: rgba(139, 92, 246, 0.8);
+}
+
+/* Champion Info Overlay */
+.champion-info {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.6) 100%);
+  backdrop-filter: blur(4px);
+  border-radius: 8px;
+  padding: 6px 8px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.champion-level {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fbbf24;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+  margin-bottom: 4px;
+}
+
+.champion-xp-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 3px;
+}
+
+.champion-xp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6, #ec4899);
+  border-radius: 2px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.8);
+}
+
+.champion-xp-text {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Evolution Button */
+.evolve-btn {
+  position: absolute;
+  bottom: 32px;
+  left: 8px;
+  right: 8px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  border: 2px solid #fbbf24;
+  border-radius: 8px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 3;
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.4), 0 0 16px rgba(251, 191, 36, 0.3);
+  animation: evolve-pulse 2s ease-in-out infinite;
+}
+
+.evolve-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.6), 0 0 24px rgba(251, 191, 36, 0.5);
+}
+
+.evolve-btn:active {
+  transform: translateY(0);
+}
+
+.evolve-btn.disabled {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+  border-color: #6b7280;
+  cursor: not-allowed;
+  opacity: 0.6;
+  animation: none;
+  box-shadow: none;
+}
+
+.evolve-btn.disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.evolve-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.evolve-text {
+  font-size: 10px;
+  font-weight: 700;
+  color: #000;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.evolve-btn.disabled .evolve-text {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.evolve-cost {
+  display: flex;
+  gap: 6px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #000;
+}
+
+.evolve-btn.disabled .evolve-cost {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.cost-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+@keyframes evolve-pulse {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(251, 191, 36, 0.4), 0 0 16px rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    box-shadow: 0 2px 12px rgba(251, 191, 36, 0.6), 0 0 24px rgba(251, 191, 36, 0.5);
+  }
 }
 </style>
