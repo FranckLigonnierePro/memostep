@@ -1088,6 +1088,15 @@ html, body, #app {
   flex: 1;
 }
 
+span {
+    letter-spacing: 0.5px;
+    text-shadow: 0 2px 0px black;
+  /* Bordure (contour) du texte */
+  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.9);
+  paint-order: stroke fill;
+  color: white;
+}
+
 .content {
   width: 320px;
   height: 568px;
