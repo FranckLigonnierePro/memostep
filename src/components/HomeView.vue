@@ -45,8 +45,13 @@
         @mouseleave="onCardLeave" :style="avatarCardStyle">
         <img class="avatar-img" :src="selectedAvatar.img" :alt="selectedAvatar.name || 'Avatar'" />
 
+        <div v-if="getChampionInfo()" class="champion-level-wrap">
+          <div class="champion-progress-ring" :style="{ '--p': getChampionXpProgress() }"></div>
+          <div class="champion-level-round">{{ getChampionInfo().level }}</div>
+        </div>
+
         <!-- Champion Info Overlay -->
-        <div class="champion-info" v-if="getChampionInfo()">
+        <div class="champion-info" v-if="false">
           <div class="champion-level">Niv. {{ getChampionInfo().level }}</div>
           <div class="champion-xp-bar">
             <div class="champion-xp-fill" :style="{ width: getChampionXpProgress() + '%' }"></div>
@@ -75,7 +80,7 @@
         </div>
         <div class="btn-wrap" role="button" tabindex="0" aria-label="Se connecter / Créer un compte"
           @click="emit('versus')" @keydown.enter="emit('versus')" @keydown.space="emit('versus')">
-          <img class="svg-btn" :src="primaryBtn" alt="" width="213" height="65" />
+          <img class="svg-btn" :src="primaryBtn2" alt="" width="213" height="65" />
           <span class="btn-label-primary">PvP</span>
         </div>
       </div>
@@ -103,6 +108,7 @@
 import { ref, computed } from 'vue';
 import { HelpCircle, Settings, Heart, VolumeX, Volume2 } from 'lucide-vue-next';
 import primaryBtn from '../assets/buttons/primary_btn.svg';
+import primaryBtn2 from '../assets/buttons/primary_btn_2.svg';
 import secondaryBtn from '../assets/buttons/secondary_btn.svg';
 import AccountModal from './AccountModal.vue';
 
@@ -363,12 +369,60 @@ function handleEvolve() {
   pointer-events: none;
 }
 
+.avatar-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 10px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #8b5a2b, #c08b5a 50%, #8b5a2b);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
+}
+
 .avatar-img {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.champion-level-wrap {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 48px;
+  height: 48px;
+  z-index: 3;
+}
+
+.champion-progress-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: conic-gradient(#fbbf24 calc(var(--p, 0) * 1%), rgba(255,255,255,0.15) 0);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+}
+
+.champion-level-round {
+  position: absolute;
+  inset: 4px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, #ffe08a, #f7b84a 60%, #c67b2a 100%);
+  border: 3px solid #6e3d1a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  color: #1a1207;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.6);
 }
 
 @keyframes shine {
@@ -675,8 +729,7 @@ function handleEvolve() {
 /* Mode buttons: yellow 3D cartoon */
 .mode-buttons {
   display: flex;
-  gap: 12px;
-  margin: 10px 0 6px;
+  margin: 10px 20px;
 }
 
 /* New pill buttons */
@@ -834,6 +887,7 @@ function handleEvolve() {
   pointer-events: none;
   display: block;
   margin: 0 auto;
+  height: 63px;
 }
 
 .btn-wrap:hover {

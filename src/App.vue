@@ -1,31 +1,6 @@
 <template>
   <div class="app-frame">
-    <div class="content" :style="{ transform: `scale(${rootScale})`}">
-    <div v-if="route.name === 'Game'" :class="'header small'">
-      <button class="profile-card" @click="openProfile" :aria-label="$t('home.settings')" :title="displayName">
-        <img class="profile-avatar" :src="(selectedAvatar && selectedAvatar.img) || imgMage" alt="avatar" width="36" height="36" />
-        <div class="profile-meta">
-          <div class="profile-name">{{ displayName }}</div>
-          <div class="profile-res">
-            <span class="res-pill gold">🪙 {{ playerGold }}</span>
-            <span class="res-pill essence">✨ {{ playerEssence }}</span>
-            <span class="res-pill gem">💎 {{ playerGems }}</span>
-          </div>
-        </div>
-      </button>
-      <div class="gear-wrap">
-        <button class="gear-btn" @click="toggleGearMenuMain" :aria-label="$t('home.settings')" :title="$t('home.settings')">
-          <Settings :size="18" />
-        </button>
-        <div v-if="showGearMenuMain" class="gear-menu" @mouseleave="closeGearMenuMain">
-          <button class="gear-item" @click="openSettings(); closeGearMenuMain()">{{ $t('home.settings') }}</button>
-          <button class="gear-item" @click="openHelp(); closeGearMenuMain()">{{ $t('home.help') }}</button>
-          <button class="gear-item" @click="toggleAudio(); closeGearMenuMain()">{{ audioMuted ? $t('home.audioOn') : $t('home.audioOff') }}</button>
-          <button class="gear-item" @click="openLang(); closeGearMenuMain()">{{ $t('home.lang') }}</button>
-        </div>
-      </div>
-    </div>
-    
+    <div class="content" :style="{ transform: `scale(${rootScale})`}">    
     <UsernameModal
       v-if="route.name === 'Home' && showNameModal"
       :name="nameModalInput"
@@ -60,6 +35,38 @@
         @newGame="newGame"
       />
     </router-view>
+    <!-- <nav v-if="route.name !== 'Game'" class="bottom-bar">
+      <button
+        class="bottom-btn"
+        :class="{ active: activeTab === 'home' }"
+        @click="router.push('/')"
+        aria-label="Home"
+        title="Home"
+      >
+        <Home :size="18" />
+        <span>Home</span>
+      </button>
+      <button
+        class="bottom-btn"
+        :class="{ active: activeTab === 'league' }"
+        @click="router.push('/versus')"
+        aria-label="Ligue"
+        title="Ligue"
+      >
+        <Trophy :size="18" />
+        <span>Ligue</span>
+      </button>
+      <button
+        class="bottom-btn"
+        :class="{ active: activeTab === 'shop' }"
+        @click="router.push('/profile')"
+        aria-label="Boutique"
+        title="Boutique"
+      >
+        <ShoppingBag :size="18" />
+        <span>Boutique</span>
+      </button>
+    </nav> -->
 
    
     </div>
@@ -289,7 +296,7 @@ import XpToast from './components/XpToast.vue';
 import EndPathModal from './components/EndPathModal.vue';
 import AuthModal from './components/AuthModal.vue';
 import ChampionEvolutionModal from './components/ChampionEvolutionModal.vue';
-import { Settings } from 'lucide-vue-next';
+import { Settings, Home, Trophy, ShoppingBag } from 'lucide-vue-next';
 
 // Assets
 import themeUrl from './assets/memosteptheme2.mp3';
@@ -406,6 +413,14 @@ const chronoText = computed(() => formatMs(chronoMs.value));
 
 const flags = { fr: frFlag, en: enFlag, es: esFlag, de: deFlag };
 const currentFlag = computed(() => flags[currentLang.value] || frFlag);
+
+const activeTab = computed(() => {
+  const n = String(route.name || '');
+  if (n === 'Home') return 'home';
+  if (n === 'Versus') return 'league';
+  if (n === 'Profile' || n === 'Login') return 'shop';
+  return '';
+});
 
 const takenAvatars = computed(() => {
   if (state.mode !== 'versus') return [];
@@ -1341,5 +1356,39 @@ svg, img {
   shape-rendering: geometricPrecision;
   text-rendering: geometricPrecision;
   image-rendering: optimizeQuality;
+}
+
+.bottom-bar {
+  margin-top: auto;
+  display: flex;
+  gap: 8px;
+  background: rgba(13, 14, 28, 0.85);
+  border: 1px solid #2a2e52;
+  border-radius: 14px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.02);
+  padding: 6px;
+}
+.bottom-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #1a1c30;
+  color: var(--text);
+  border: 1px solid #2a2e52;
+  border-radius: 10px;
+  box-shadow: 0 2px 0 #101226;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all 200ms ease;
+  font-weight: 700;
+}
+.bottom-btn:hover { background: #1f2238; }
+.bottom-btn.active {
+  flex: 1.6;
+  background: linear-gradient(135deg, rgba(111,8,239,0.45) 0%, rgba(111,8,239,0.25) 100%);
+  border-color: #6F08EF;
+  box-shadow: 0 0 0 1px rgba(111,8,239,0.35) inset, 0 6px 14px rgba(111,8,239,0.25);
 }
 </style>
