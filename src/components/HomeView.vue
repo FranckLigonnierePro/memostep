@@ -24,19 +24,21 @@
           <div class="resource-item">
             <button class="resource-icon-box gold" @click="emit('openShop', 'gold')">
               <div>
-                <img src="../assets/plus_icon.svg" alt="plus" width="13" height="14"/>
+                <img src="../assets/plus_icon.svg" alt="plus" width="13" height="14" />
               </div>
             </button>
             <div class="resource-value-box">
               <span class="res-value">{{ formattedGold }}</span>
+              <img class="res-img" src="../assets/piece.png" alt="gem" width="20" height="20" />
             </div>
           </div>
           <div class="resource-item">
             <button class="resource-icon-box gem" @click="emit('openShop', 'gems')" aria-label="Acheter gemmes">
-                <img src="../assets/plus_icon.svg" alt="plus" width="13" height="14"/>
+              <img src="../assets/plus_icon.svg" alt="plus" width="13" height="14" />
             </button>
-            <div class="resource-value-box">
+            <div class="resource-value-box">  
               <span class="res-value">{{ playerGems }}</span>
+              <img class="res-img" src="../assets/gem.png" alt="gem" width="20" height="20" />
             </div>
           </div>
         </div>
@@ -382,7 +384,7 @@ function handleEvolve() {
   mask-composite: exclude;
   pointer-events: none;
   z-index: 1;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 
 .avatar-img {
@@ -406,8 +408,8 @@ function handleEvolve() {
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  background: conic-gradient(#fbbf24 calc(var(--p, 0) * 1%), rgba(255,255,255,0.15) 0);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  background: conic-gradient(#fbbf24 calc(var(--p, 0) * 1%), rgba(255, 255, 255, 0.15) 0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 .champion-level-round {
@@ -421,8 +423,8 @@ function handleEvolve() {
   justify-content: center;
   font-weight: 900;
   color: #1a1207;
-  text-shadow: 0 1px 0 rgba(255,255,255,0.4);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.6);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 @keyframes shine {
@@ -643,6 +645,18 @@ function handleEvolve() {
   gap: 8px;
 }
 
+.resource-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+}
+
+.res-img {
+  position: absolute;
+  right: -4px;
+}
+
 .resource-item {
   display: inline-flex;
   align-items: center;
@@ -679,6 +693,7 @@ function handleEvolve() {
 }
 
 .resource-value-box {
+  position: relative;
   height: 18px;
   width: 80px;
   padding: 0 16px;
