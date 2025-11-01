@@ -2,18 +2,23 @@
   <div class="home" style="border: 1px red solid;">
       <div class="flex flex-col w-full grow items-center">
         <div class="header">
-          <!-- Compact profile chip: avatar + level badge -->
-          <div class="profile-chip" role="button" tabindex="0" @click="emit('openProfile')" :aria-label="displayName" :title="displayName">
-            <div class="chip-avatar-wrap">
-              <div class="chip-level-badge">{{ playerLevel }}</div>
-            </div>
-          </div>
+          <!-- Compact profile chip: avatar + level badge + xp percent value box -->
+          
 
           <!-- Resources bar (gold + gems) -->
           <div class="resources-bar">
+            <div class="profile-chip" role="button" tabindex="0" @click="emit('openProfile')" :aria-label="displayName" :title="displayName">
+            <div class="chip-avatar-wrap">
+              <div class="chip-level-badge">{{ playerLevel }}</div>
+            </div>
+            <div class="resource-value-box profile-xp-box">
+              <div class="xp-fill" :style="{ width: `${Math.min(100, Math.round((playerLevelProgress || 0) * 100))}%` }"></div>
+              <span class="res-value">{{ Math.round((playerLevelProgress || 0) * 100) }}%</span>
+            </div>
+          </div>
             <div class="resource-item">
               <div class="resource-icon-box gold">
-                <!-- <button class="plus-btn" @click="emit('openShop', 'gold')" aria-label="Acheter or">＋</button> -->
+                <button class="plus-btn" @click="emit('openShop', 'gold')" aria-label="Acheter or">＋</button>
               </div>
               <div class="resource-value-box">
                 <span class="res-value">{{ formattedGold }}</span>
@@ -21,7 +26,7 @@
             </div>
             <div class="resource-item">
               <div class="resource-icon-box gem">
-                <!-- <button class="plus-btn" @click="emit('openShop', 'gems')" aria-label="Acheter gemmes">＋</button> -->
+                <button class="plus-btn" @click="emit('openShop', 'gems')" aria-label="Acheter gemmes">＋</button>
               </div>
               <div class="resource-value-box">
                 <span class="res-value">{{ playerGems }}</span>
@@ -548,6 +553,32 @@ function handleEvolve() {
   font-size: 18px;
   text-shadow: 0 2px 4px rgba(0,0,0,0.5);
   letter-spacing: 0.5px;
+}
+
+/* Profile chip XP percent box */
+.profile-xp-box {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Smaller text for the compact XP box */
+.profile-xp-box .res-value {
+  font-size: 14px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Purple XP fill behind text */
+.profile-xp-box .xp-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0%;
+  background: linear-gradient(90deg, #7b2cff 0%, #a78bfa 50%, #c4b5fd 100%);
+  box-shadow: inset 0 0 8px rgba(123, 44, 255, 0.45);
+  transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0.95;
 }
 
 /* Mode buttons: yellow 3D cartoon */
