@@ -375,6 +375,7 @@ function handleEvolve() {
 
 .chip-avatar-wrap {
   position: relative;
+  z-index: 1;
   width: 26px;
   height: 26px;
   background: linear-gradient(135deg, #FFBE3D 0%, #FF6E00 100%);
@@ -523,7 +524,7 @@ function handleEvolve() {
   border: none;
   background: transparent;
   color: #fff;
-  font-size: 28px;
+  font-size: 16px;
   font-weight: 900;
   line-height: 1;
   cursor: pointer;
@@ -550,7 +551,9 @@ function handleEvolve() {
 .res-value {
   color: #ffffff;
   font-weight: 900;
-  font-size: 18px;
+  padding-left: 6px;
+  padding-bottom: 2px;
+  font-size: 12px;
   text-shadow: 0 2px 4px rgba(0,0,0,0.5);
   letter-spacing: 0.5px;
 }
@@ -563,7 +566,7 @@ function handleEvolve() {
 
 /* Smaller text for the compact XP box */
 .profile-xp-box .res-value {
-  font-size: 14px;
+  font-size: 12px;
   position: relative;
   z-index: 1;
 }
@@ -572,10 +575,12 @@ function handleEvolve() {
 .profile-xp-box .xp-fill {
   position: absolute;
   left: 0;
-  top: 0;
+  top: 1px;
   bottom: 0;
   width: 0%;
-  background: linear-gradient(90deg, #7b2cff 0%, #a78bfa 50%, #c4b5fd 100%);
+  border-radius: 4px;
+  height: 16px;
+  background: linear-gradient(180deg, #7b2cff 0%, #c4b5fd 50%, #7b2cff 100%);
   box-shadow: inset 0 0 8px rgba(123, 44, 255, 0.45);
   transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
   opacity: 0.95;
