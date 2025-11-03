@@ -32,19 +32,24 @@ jobs:
         with:
           node-version: 18
 
-      - name: Run AI script
+      - name: Install OpenAI SDK
+        run: npm install openai@4.0.0
+
+      - name: Generate AI Fix
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          npm install
           node scripts/autofix.js "${{ github.event.issue.title }}" "${{ github.event.issue.body }}"
 
-      - name: Commit AI fix
+      - name: Apply AI patch
         run: |
           git config user.email "bot@github.com"
           git config user.name "AutoFix Bot"
           git checkout "fix/issue-${{ github.event.issue.number }}"
-          git add autofix.txt
-          git commit -m "AI fix for issue #${{ github.event.issue.number }}" || echo "No AI changes"
-          git push origin "fix/issue-${{ github.event.issue.number }}"
+          git apply --reject --whitespace=fix autofix.patch || echo "Patch rejected or partial"
+          git add .
+          git commit -m "AI fix for issue #${{ github.event.issue.number }}" || echo "No changes from patch"
+          git push origin "fix/issue-${{ github.event.issue.number }}"  
 
       # ✅ ✅ Crée la PR APRÈS le commit final
       - name: Create Pull Request
