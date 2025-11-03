@@ -1,5 +1,5 @@
 <template>
-  <div class="board-wrap">
+  <div class="board-wrap my-6">
     <!-- Snowstorm animation overlay -->
     <div v-if="showSnowstorm" class="snowstorm-overlay">
       <div v-for="i in 50" :key="i" class="snowflake" :style="snowflakeStyle(i)"></div>

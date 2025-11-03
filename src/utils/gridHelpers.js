@@ -126,6 +126,20 @@ export function generateBorderHazards(path) {
  * @param {number} bonusChanceModifier - Modificateur de chance pour les bonus (champion passive)
  * @returns {{grid: Array, rollback: Set, stun: Set, lifeLoss: Set, newCounters: Object}}
  */
+/**
+ * Calcule le niveau de difficulté initial basé sur l'XP du joueur et du champion
+ * La formule : niveau = floor((playerXP + championXP) / 1000)
+ * Cela signifie qu'il faut 1000 XP combinés pour augmenter le niveau de difficulté de 1
+ * @param {number} playerXp - XP total du joueur
+ * @param {number} championXp - XP du champion sélectionné
+ * @returns {number} Niveau de difficulté initial (minimum 1)
+ */
+export function calculateBaseDifficulty(playerXp = 0, championXp = 0) {
+  const totalXp = (playerXp || 0) + (championXp || 0);
+  const baseLevel = Math.floor(totalXp / 1000);
+  return Math.max(1, baseLevel + 1); // Minimum niveau 1
+}
+
 export function applyEnrichedGrid(path, floorNumber = 1, runCounters = { gem: 0, potion: 0 }, bonusChanceModifier = 0) {
   // Générer la grille enrichie
   const { grid, runCounters: newCounters } = generateEnrichedGrid(path, floorNumber, runCounters, bonusChanceModifier);

@@ -13,6 +13,7 @@ export function createNavigationHandlers(context) {
     loseActive,
     faceDownActive,
     soloLivesUsed,
+    soloLevel,
     versusMode,
     t,
   } = context;
@@ -103,8 +104,9 @@ export function createNavigationHandlers(context) {
     winActive.value = false;
     loseActive.value = false;
 
-    // Reset solo lives
+    // Reset solo lives and level
     soloLivesUsed.value = 0;
+    soloLevel.value = 0;
 
     // Navigate to home
     router.push('/');

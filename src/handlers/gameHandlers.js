@@ -23,7 +23,13 @@ export function createGameHandlers(context) {
     t,
     grantCurrentChampionXp,
     CHAMPION_XP_RULES,
+    prepareNextSoloLevel,
+    runCounters,
+    baseDifficulty,
   } = context;
+
+  // Callback à exécuter après la fermeture de la modal de level up
+  let pendingContinueAction = null;
 
   /**
    * Gère une victoire de match
@@ -97,12 +103,12 @@ export function createGameHandlers(context) {
   /**
    * Gère le clic sur "Continue" dans la modal de fin de chemin
    */
-  function handleEndPathContinue(newGame) {
+  function handleEndPathContinue(newGame, goHomeCallback) {
     showEndPathModal.value = false;
 
     const xpAmount = endPathData.value.xpBreakdown.totalXp;
-    grantXP(xpAmount, `Solo Stage ${endPathData.value.stage}`);
-
+    const status = endPathData.value.status;
+    
     // Grant champion XP based on conditions
     const livesLeft = endPathData.value.livesLeft;
     const isPerfect = endPathData.value.isPerfect;
@@ -119,11 +125,31 @@ export function createGameHandlers(context) {
     
     grantCurrentChampionXp(championXp, `Stage ${endPathData.value.stage}`);
 
-    if (endPathData.value.status === 'no_life_left') {
-      goHome();
+    if (status === 'no_life_left') {
+      if (goHomeCallback) goHomeCallback();
     } else {
       soloLevel.value++;
-      newGame();
+      
+      // Stocker l'action de continuation à exécuter après la modal de level up (si elle apparaît)
+      pendingContinueAction = () => {
+        // Préparer le prochain niveau APRÈS validation de toutes les modals
+        if (prepareNextSoloLevel && status === 'completed') {
+          prepareNextSoloLevel(state, soloLevel, soloLivesUsed, runCounters, baseDifficulty.value);
+        }
+        newGame();
+        pendingContinueAction = null;
+      };
+      
+      // Donner l'XP (peut déclencher une modal de level up)
+      grantXP(xpAmount, `Solo Stage ${endPathData.value.stage}`);
+      
+      // Si pas de level up, exécuter immédiatement
+      // Sinon, ce sera exécuté quand la modal de level up sera fermée
+      setTimeout(() => {
+        if (pendingContinueAction) {
+          pendingContinueAction();
+        }
+      }, 200);
     }
   }
 
@@ -204,8 +230,15 @@ export function createGameHandlers(context) {
     router.push('/versus');
   }
 
-  function goHome() {
-    // Sera implémenté dans navigationHandlers
+  /**
+   * Exécute l'action de continuation en attente (après fermeture de la modal de level up)
+   */
+  function executePendingContinue() {
+    if (pendingContinueAction) {
+      const action = pendingContinueAction;
+      pendingContinueAction = null;
+      action();
+    }
   }
 
   return {
@@ -221,5 +254,6 @@ export function createGameHandlers(context) {
     handleWinReturn,
     handleShare,
     handleVersusReplay,
+    executePendingContinue,
   };
 }

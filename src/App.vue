@@ -234,7 +234,7 @@
       :visible="showLevelUpModal"
       :newLevel="levelUpData.newLevel"
       :rewards="levelUpData.rewards"
-      @close="closeLevelUpModal"
+      @close="handleCloseLevelUpModal"
     />
     
     <!-- XP Toast Notifications -->
@@ -380,6 +380,7 @@ const winActive = ref(false);
 const loseActive = ref(false);
 const justLost = ref(false);
 const showNameModal = ref(false);
+const baseDifficulty = ref(1); // Niveau de difficulté de base calculé depuis l'XP
 
 // Champion Evolution Modal State
 const showChampionEvolutionModal = ref(false);
@@ -545,7 +546,8 @@ const routeProps = computed(() => {
 // Create handlers
 const gameHandlers = createGameHandlers({
   state, winActive, loseActive, showEndPathModal, endPathData, soloLevel, chronoMs, soloLivesUsed,
-  grantXP, stopChrono, router, t, grantCurrentChampionXp, CHAMPION_XP_RULES
+  grantXP, stopChrono, router, t, grantCurrentChampionXp, CHAMPION_XP_RULES, prepareNextSoloLevel,
+  runCounters, baseDifficulty
 });
 
 const modalHandlers = createModalHandlers({
@@ -555,11 +557,11 @@ const modalHandlers = createModalHandlers({
 
 const navigationHandlers = createNavigationHandlers({
   router, state, stopChrono, chronoMs, stopRevealTicker, winActive, loseActive, faceDownActive,
-  soloLivesUsed, versusMode: versusMode, t
+  soloLivesUsed, soloLevel, versusMode: versusMode, t
 });
 
 // Destructure handlers
-const { handleMatchWin, handleMatchLose, handleMultiplayerWin, handleMultiplayerLose, showEndPathModalForSolo, handleEndPathContinue: endPathContinue, handleEndPathAbandon: endPathAbandon, handleReplay, handleQuit, handleWinReturn, handleShare, handleVersusReplay } = gameHandlers;
+const { handleMatchWin, handleMatchLose, handleMultiplayerWin, handleMultiplayerLose, showEndPathModalForSolo, handleEndPathContinue: endPathContinue, handleEndPathAbandon: endPathAbandon, handleReplay, handleQuit, handleWinReturn, handleShare, handleVersusReplay, executePendingContinue } = gameHandlers;
 
 const { openHelp, openSettings, openStats, openLang, closeOverlays, selectLang, toggleGearMenuLeft, closeGearMenuLeft, toggleGearMenuMain, closeGearMenuMain, toggleGearMenuRight, closeGearMenuRight } = modalHandlers;
 
@@ -952,17 +954,17 @@ async function updatePlayerAvatarUrl(url) {
 }
 
 function handleEndPathContinue() {
-  try {
-    if (endPathData?.value && endPathData.value.status === 'completed') {
-      // Préparer le prochain chemin solo avant de lancer newGame
-      prepareNextSoloLevel(state, soloLevel, soloLivesUsed, runCounters);
-    }
-  } catch (_) {}
-  endPathContinue(newGame);
+  // Ne pas préparer le chemin ici, cela sera fait dans le handler après validation
+  endPathContinue(newGame, goHome);
 }
 
 function handleEndPathAbandon() {
   endPathAbandon(goHome);
+}
+
+function handleCloseLevelUpModal() {
+  // Fermer la modal et exécuter l'action de continuation en attente
+  closeLevelUpModal(executePendingContinue);
 }
 
 function handleBeginVersusFromLobby(payload) {

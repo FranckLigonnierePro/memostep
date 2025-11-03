@@ -143,8 +143,15 @@ export function usePlayerStats() {
     showLevelUpModal.value = true;
   }
 
-  function closeLevelUpModal() {
+  function closeLevelUpModal(callback) {
     showLevelUpModal.value = false;
+    // Exécuter le callback après fermeture si fourni
+    if (callback && typeof callback === 'function') {
+      // Petit délai pour laisser la modal se fermer proprement
+      setTimeout(() => {
+        callback();
+      }, 100);
+    }
   }
 
   function showXpNotification(amount, reason, isLevelUp = false) {
