@@ -5,7 +5,7 @@ on:
     types: [opened]
 
 jobs:
-  create-pr:
+  autofix:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -13,22 +13,24 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Create branch and add placeholder fix
+      # ✅ Crée la branche
+      - name: Create branch with placeholder
         run: |
           git config user.email "bot@github.com"
           git config user.name "AutoFix Bot"
           git checkout -b "fix/issue-${{ github.event.issue.number }}"
-          echo "Auto fix for issue #${{ github.event.issue.number }}" > autofix.txt
+          echo "Auto fix placeholder" > autofix.txt
           git add autofix.txt
-          git commit -m "Auto fix placeholder"
+          git commit -m "Auto fix placeholder for issue #${{ github.event.issue.number }}"
           git push --set-upstream origin "fix/issue-${{ github.event.issue.number }}"
 
+      # ✅ Correction IA (si tu veux)
       - name: Install Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: 20
+          node-version: 18
 
       - name: Run AI script
         run: |
@@ -41,16 +43,15 @@ jobs:
           git config user.name "AutoFix Bot"
           git checkout "fix/issue-${{ github.event.issue.number }}"
           git add autofix.txt
-          git commit -m "AI fix for issue #${{ github.event.issue.number }}"
+          git commit -m "AI fix for issue #${{ github.event.issue.number }}" || echo "No AI changes"
           git push origin "fix/issue-${{ github.event.issue.number }}"
 
+      # ✅ ✅ Crée la PR APRÈS le commit final
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          branch: "fix/issue-${{ github.event.issue.number }}"
+          base: "main"
           title: "Auto fix for issue #${{ github.event.issue.number }}"
-          body: |
-            PR générée automatiquement ✅
-            Issue liée : #${{ github.event.issue.number }}
-          branch: fix/issue-${{ github.event.issue.number }}
-          base: main
+          body: "PR auto-générée ✅ Issue liée #${{ github.event.issue.number }}"
