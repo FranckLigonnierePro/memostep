@@ -13,36 +13,22 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # ✅ Génère une branche dédiée
-      - name: Create fix branch
+      - name: Create branch and add placeholder fix
         run: |
           git config user.email "bot@github.com"
           git config user.name "AutoFix Bot"
-          BRANCH="fix/issue-${{ github.event.issue.number }}"
-          git checkout -b $BRANCH
-          echo "Auto fix placeholder" > autofix.txt
-          git add .
-          git commit -m "Start fix for issue #${{ github.event.issue.number }}"
-          git push origin $BRANCH
-
-      # ✅ Crée automatiquement la Pull Request
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          title: "Auto fix for issue #${{ github.event.issue.number }}"
-          body: |
-            Cette PR a été générée automatiquement pour corriger l'issue #${{ github.event.issue.number }}.
-            Merci de vérifier avant de merger ✅
-          branch: fix/issue-${{ github.event.issue.number }}
-          base: main
+          git checkout -b "fix/issue-${{ github.event.issue.number }}"
+          echo "Auto fix for issue #${{ github.event.issue.number }}" > autofix.txt
+          git add autofix.txt
+          git commit -m "Auto fix placeholder"
+          git push --set-upstream origin "fix/issue-${{ github.event.issue.number }}"
 
       - name: Install Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Run AI script
         run: |
@@ -51,7 +37,20 @@ jobs:
 
       - name: Commit AI fix
         run: |
+          git config user.email "bot@github.com"
+          git config user.name "AutoFix Bot"
+          git checkout "fix/issue-${{ github.event.issue.number }}"
           git add autofix.txt
-          git commit -m "Auto fix for issue #${{ github.event.issue.number }}"
-          git push origin $BRANCH
+          git commit -m "AI fix for issue #${{ github.event.issue.number }}"
+          git push origin "fix/issue-${{ github.event.issue.number }}"
 
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: "Auto fix for issue #${{ github.event.issue.number }}"
+          body: |
+            PR générée automatiquement ✅
+            Issue liée : #${{ github.event.issue.number }}
+          branch: fix/issue-${{ github.event.issue.number }}
+          base: main
