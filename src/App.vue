@@ -91,6 +91,9 @@
     </div>
   </div>
 
+    <!-- Resource Particles Animation -->
+    <ResourceParticles :particles="flyingParticles" />
+
     <!-- Hidden audio element for background music -->
     <audio ref="audioRef" :src="themeUrl" preload="auto" volume="0.2" style="display:none"></audio>
     <!-- Loses modal -->
@@ -296,6 +299,7 @@ import XpToast from './components/XpToast.vue';
 import EndPathModal from './components/EndPathModal.vue';
 import AuthModal from './components/AuthModal.vue';
 import ChampionEvolutionModal from './components/ChampionEvolutionModal.vue';
+import ResourceParticles from './components/ResourceParticles.vue';
 import { Settings, Home, Trophy, ShoppingBag } from 'lucide-vue-next';
 
 // Assets
@@ -318,6 +322,7 @@ import { useChampionSelection } from './composables/useChampionSelection.js';
 import { useVersusMode } from './composables/useVersusMode.js';
 import { useGameLogic } from './composables/useGameLogic.js';
 import { useChampions } from './composables/useChampions.js';
+import { useResourceAnimation } from './composables/useResourceAnimation.js';
 
 // Champion System
 import { getChampionStats, evolveChampion } from './lib/championSystem.js';
@@ -350,6 +355,7 @@ const championSelection = useChampionSelection();
 const versusMode = useVersusMode();
 const gameLogic = useGameLogic();
 const champions = useChampions();
+const resourceAnimation = useResourceAnimation();
 
 // Destructure composables
 const { state, flipActive, flipBackActive, stunActive, faceDownActive, faceColors, shakeActive, clickBlocked, mirrorColumns, revealComplete, highlightIdx, soloLivesUsed, soloLevel, runCounters, soloErrorCount, cells, boardStyle, revealMsLeft, revealProgress, revealSecondsText, nextCell, livesUsed, lastExtinguishedIndex, cellClass, startRevealTicker, stopRevealTicker, resetGameState } = gameState;
@@ -365,6 +371,8 @@ const { versusCode, versusRoom, versusIsHost, versusError, versusSeed, versusSta
 const { chronoMs, startChrono, stopChrono, onCellClick: gameOnCellClick, prepareNextSoloLevel } = gameLogic;
 
 const { championsState, currentChampionId, currentChampion, currentChampionStats, currentChampionProgress, championAbilityState, showEvolutionModal, evolutionModalData, canCurrentChampionEvolve, hasActiveShield, shieldCharges, hasActiveStun, stunDuration, loadChampions, saveChampions, selectChampion, grantChampionXp, grantCurrentChampionXp, openEvolutionModal, closeEvolutionModal, performEvolution, activateShieldAbility, consumeShieldCharge, activateStunAbility, deactivateStun, resetAbilityState, applyPassiveVisionSacree, CHAMPION_XP_RULES } = champions;
+
+const { collectedResources, flyingParticles, addCollectedResource, resetCollectedResources, animateResourcesToBar, hasResourcesToAnimate } = resourceAnimation;
 
 // Additional state
 const rootScale = ref(1);
@@ -762,14 +770,31 @@ function newGame() {
 }
 
 async function goHome() {
+  // Sauvegarder les ressources collectées avant de naviguer
+  const hasResources = hasResourcesToAnimate();
+  console.log('[ResourceAnimation] Has resources to animate:', hasResources, collectedResources.value);
+  
+  // Naviguer vers l'accueil d'abord
   await navGoHome(leaveRoom, openNameModalIfNeeded);
+  
+  // Déclencher l'animation des ressources APRÈS la navigation
+  if (hasResources) {
+    console.log('[ResourceAnimation] Starting animation...');
+    setTimeout(() => {
+      animateResourcesToBar(playerGold, playerGems, () => {
+        console.log('[ResourceAnimation] Animation complete');
+        saveResources();
+      });
+    }, 500);
+  }
 }
 
 function onCellClick(r, c) {
   gameOnCellClick(r, c, {
     state, mirrorColumns, clickBlocked, shakeActive, stunActive, justLost, flipBackActive,
     faceDownActive, soloLivesUsed, soloErrorCount, playerGold, playerEssence, playerGems, t, handleMatchWin,
-    handleMatchLose, versusMode: state.mode === 'versus', hasActiveShield, consumeShieldCharge
+    handleMatchLose, versusMode: state.mode === 'versus', hasActiveShield, consumeShieldCharge,
+    addCollectedResource
   });
 }
 

@@ -87,9 +87,20 @@ export function useGameLogic() {
 
           // Apply bonus effects
           if (cell.type === 'gold') {
-            playerGold.value += cell.value || 5;
+            const amount = cell.value || 5;
+            // En mode solo, tracker pour l'animation, sinon ajouter directement
+            if (state.mode === 'solo' && context.addCollectedResource) {
+              context.addCollectedResource('gold', amount);
+            } else {
+              playerGold.value += amount;
+            }
           } else if (cell.type === 'gem') {
-            playerGems.value += 1;
+            // En mode solo, tracker pour l'animation, sinon ajouter directement
+            if (state.mode === 'solo' && context.addCollectedResource) {
+              context.addCollectedResource('gem', 1);
+            } else {
+              playerGems.value += 1;
+            }
           } else if (cell.type === 'essence') {
             playerEssence.value += 1;
           } else if (cell.type === 'potion') {
