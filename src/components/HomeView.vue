@@ -87,6 +87,8 @@
         </div>
       </div>
       <button class="menu-btn" @click="emit('settings')">{{ $t('home.settings') }}</button>
+      <button class="menu-btn" @click="handleLinkAccount">{{ $t('home.account') }}</button>
+      <button class="menu-btn" v-if="isGuest" @click="emit('linkAccount')">Se connecter</button>
       <!-- <button class="menu-btn" @click="emit('stats')">{{ $t('home.stats') }}</button>
         <a
           class="menu-btn donate-btn"
