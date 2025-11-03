@@ -179,12 +179,12 @@
       <div class="modal-card">
         <h2 class="modal-title">{{ $t('settings.title') }}</h2>
         <div class="modal-body">
-          <p>{{ $t('settings.basicSoon') }}</p>
-          <ul class="settings-list">
-            <li>{{ $t('settings.volume') }}</li>
-            <li>{{ $t('settings.theme') }}</li>
-            <li>{{ $t('settings.a11y') }}</li>
-          </ul>
+          <div class="setting-item">
+            <label class="setting-label">
+              <span>Afficher les indicateurs de cases</span>
+              <input type="checkbox" v-model="showCellIndicators" @change="saveSettings" class="setting-toggle" />
+            </label>
+          </div>
         </div>
         <div class="modal-actions">
           <button class="modal-btn" @click="closeOverlays">{{ $t('settings.close') }}</button>
@@ -374,6 +374,7 @@ const showStats = ref(false);
 const showLang = ref(false);
 const showGearMenuLeft = ref(false);
 const showGearMenuMain = ref(false);
+const showCellIndicators = ref(true);
 const showGearMenuRight = ref(false);
 const winActive = ref(false);
 const loseActive = ref(false);
@@ -534,6 +535,7 @@ const routeProps = computed(() => {
       shieldCharges: shieldCharges.value,
       hasActiveStun: hasActiveStun.value,
       stunDuration: stunDuration.value,
+      showCellIndicators: showCellIndicators.value,
     };
   }
   
@@ -907,11 +909,28 @@ function loadAccountSettings() {
     const renamed = localStorage.getItem('memostep_hasRenamedOnce');
     hasRenamedOnce.value = renamed === 'true';
     
-    // Check if user is guest (no auth session)
-    // This will be updated by the auth state change listener
     isGuest.value = !currentUser.value;
   } catch (e) {
     console.error('[Account] Error loading account settings:', e);
+  }
+}
+
+function loadSettings() {
+  try {
+    const indicators = localStorage.getItem('memostep_showCellIndicators');
+    if (indicators !== null) {
+      showCellIndicators.value = indicators === 'true';
+    }
+  } catch (e) {
+    console.error('[Settings] Error loading settings:', e);
+  }
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem('memostep_showCellIndicators', String(showCellIndicators.value));
+  } catch (e) {
+    console.error('[Settings] Error saving settings:', e);
   }
 }
 
@@ -1031,6 +1050,7 @@ onMounted(() => {
   loadChampions();
   loadUserProfile();
   loadAccountSettings();
+  loadSettings();
   
   const authSubscription = onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN') {
@@ -1390,5 +1410,58 @@ svg, img {
   background: linear-gradient(135deg, rgba(111,8,239,0.45) 0%, rgba(111,8,239,0.25) 100%);
   border-color: #6F08EF;
   box-shadow: 0 0 0 1px rgba(111,8,239,0.35) inset, 0 6px 14px rgba(111,8,239,0.25);
+}
+
+.setting-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #2a2e52;
+}
+
+.setting-item:last-child {
+  border-bottom: none;
+}
+
+.setting-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.setting-toggle {
+  appearance: none;
+  width: 48px;
+  height: 24px;
+  background: #2a2e52;
+  border-radius: 12px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  border: 1px solid #3a3f52;
+}
+
+.setting-toggle::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.setting-toggle:checked {
+  background: linear-gradient(135deg, #6F08EF, #8b5cf6);
+  border-color: #6F08EF;
+}
+
+.setting-toggle:checked::after {
+  transform: translateX(24px);
 }
 </style>

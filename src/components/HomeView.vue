@@ -86,6 +86,7 @@
           <span class="btn-label-primary">PvP</span>
         </div>
       </div>
+      <button class="menu-btn" @click="emit('settings')">{{ $t('home.settings') }}</button>
       <!-- <button class="menu-btn" @click="emit('stats')">{{ $t('home.stats') }}</button>
         <a
           class="menu-btn donate-btn"

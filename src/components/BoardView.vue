@@ -18,48 +18,47 @@
             >
               <div class="cell-inner" :class="{ frozen: frozenGrid }" :style="pathRevealStyle(cell.r, cell.c)">
                 <div class="cell-face front" :class="[cellClass(cell.r, cell.c), { 'stun-shadow': isStunCell(cell.r, cell.c) }]">
-                  <!-- Indicateurs visuels selon le type de case -->
                   
                   <!-- BONUS (cases valides en violet) -->
-                  <div v-if="isBonusCell(cell.r, cell.c)" class="cell-indicator bonus-indicator">
+                  <div v-if="showCellIndicators && isBonusCell(cell.r, cell.c)" class="cell-indicator bonus-indicator">
                     <div class="indicator-icon">{{ getBonusIcon(cell.r, cell.c) }}</div>
                     <div class="indicator-label">BONUS</div>
                   </div>
                   
                   <!-- CHEMIN (PATH) -->
-                  <div v-else-if="isPathCell(cell.r, cell.c)" class="cell-indicator path-indicator">
+                  <div v-else-if="showCellIndicators && isPathCell(cell.r, cell.c)" class="cell-indicator path-indicator">
                     <div class="indicator-icon">✓</div>
                     <div class="indicator-label">CHEMIN</div>
                   </div>
                   
                   <!-- CORRECT (validé) -->
-                  <div v-else-if="isCorrectCell(cell.r, cell.c)" class="cell-indicator correct-indicator">
+                  <div v-else-if="showCellIndicators && isCorrectCell(cell.r, cell.c)" class="cell-indicator correct-indicator">
                     <div class="indicator-icon">✓</div>
                     <div class="indicator-label">VALIDÉ</div>
                   </div>
                   
                   <!-- WRONG (erreur) -->
-                  <div v-else-if="isCellWrong(cell.r, cell.c)" class="cell-indicator wrong-indicator">
+                  <div v-else-if="showCellIndicators && isCellWrong(cell.r, cell.c)" class="cell-indicator wrong-indicator">
                     <div class="indicator-icon">✗</div>
                     <div class="indicator-label">ERREUR</div>
                   </div>
                   
                   <!-- PIÈGES -->
-                  <div v-else-if="isStunCell(cell.r, cell.c)" class="cell-indicator trap-indicator stun">
+                  <div v-else-if="showCellIndicators && isStunCell(cell.r, cell.c)" class="cell-indicator trap-indicator stun">
                     <div class="indicator-icon">⚡</div>
                     <div class="indicator-label">STUN</div>
                   </div>
-                  <div v-else-if="isRollbackCell(cell.r, cell.c)" class="cell-indicator trap-indicator rollback">
+                  <div v-else-if="showCellIndicators && isRollbackCell(cell.r, cell.c)" class="cell-indicator trap-indicator rollback">
                     <div class="indicator-icon">⬅</div>
                     <div class="indicator-label">RECUL -2</div>
                   </div>
-                  <div v-else-if="lifeLossKeys.includes(`${cell.r}-${cell.c}`)" class="cell-indicator trap-indicator life">
+                  <div v-else-if="showCellIndicators && lifeLossKeys.includes(`${cell.r}-${cell.c}`)" class="cell-indicator trap-indicator life">
                     <div class="indicator-icon">💔</div>
                     <div class="indicator-label">-1 VIE</div>
                   </div>
                   
                   <!-- NEUTRE (par défaut) -->
-                  <div v-else class="cell-indicator neutral-indicator">
+                  <div v-else-if="showCellIndicators" class="cell-indicator neutral-indicator">
                     <div class="indicator-icon">○</div>
                     <div class="indicator-label">NEUTRE</div>
                   </div>
@@ -71,7 +70,7 @@
                 </div>
                 <div class="cell-face back" :class="cellClass(cell.r, cell.c)">
                   <!-- Back face simple -->
-                  <div class="cell-indicator back-indicator">
+                  <div v-if="showCellIndicators" class="cell-indicator back-indicator">
                     <div class="indicator-icon">?</div>
                   </div>
                 </div>
@@ -292,6 +291,7 @@ const props = defineProps({
   shieldCharges: { type: Number, default: 0 },
   hasActiveStun: { type: Boolean, default: false },
   stunDuration: { type: Number, default: 0 },
+  showCellIndicators: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(['cellClick', 'goHome']);
@@ -750,24 +750,36 @@ const getBonusIcon = (r, c) => CellStates.getBonusIcon(props.gridContent, r, c);
 /* BONUS - Cases bonus valides (violet) */
 .bonus-indicator {
   background: linear-gradient(145deg, #9b59b6, #8e44ad);
+  background-image: url('../assets/stone.png'), linear-gradient(145deg, #9b59b6, #8e44ad);
+  background-blend-mode: multiply;
+  background-size: cover;
   color: white;
 }
 
 /* PATH - Chemin (bleu) */
 .path-indicator {
   background: linear-gradient(145deg, #1e90ff, #0b61d0);
+  background-image: url('../assets/stone.png'), linear-gradient(145deg, #1e90ff, #0b61d0);
+  background-blend-mode: multiply;
+  background-size: cover;
   color: white;
 }
 
 /* CORRECT - Validé (vert) */
 .correct-indicator {
   background: linear-gradient(145deg, #24a95b, #27ae60);
+  background-image: url('../assets/stone.png'), linear-gradient(145deg, #24a95b, #27ae60);
+  background-blend-mode: multiply;
+  background-size: cover;
   color: white;
 }
 
 /* WRONG - Erreur (rouge) */
 .wrong-indicator {
   background: linear-gradient(145deg, #e74c3c, #c0392b);
+  background-image: url('../assets/stone.png'), linear-gradient(145deg, #e74c3c, #c0392b);
+  background-blend-mode: multiply;
+  background-size: cover;
   color: white;
   animation: wrongPulse 0.6s ease-out;
 }
@@ -779,26 +791,41 @@ const getBonusIcon = (r, c) => CellStates.getBonusIcon(props.gridContent, r, c);
 
 .trap-indicator.stun {
   background: linear-gradient(145deg, #f1c40f, #f39c12);
+  background-image: url('../assets/stone.png'), linear-gradient(145deg, #f1c40f, #f39c12);
+  background-blend-mode: multiply;
+  background-size: cover;
   color: #333;
 }
 
 .trap-indicator.rollback {
   background: linear-gradient(145deg, #f39c12, #e67e22);
+  background-image: url('../assets/stone.png'), linear-gradient(145deg, #f39c12, #e67e22);
+  background-blend-mode: multiply;
+  background-size: cover;
 }
 
 .trap-indicator.life {
   background: linear-gradient(145deg, #e74c3c, #c0392b);
+  background-image: url('../assets/stone.png'), linear-gradient(145deg, #e74c3c, #c0392b);
+  background-blend-mode: multiply;
+  background-size: cover;
 }
 
 /* NEUTRAL - Neutre (gris) */
 .neutral-indicator {
   background: linear-gradient(145deg, #5a5f6d, #3a3f3d);
+  background-image: url('../assets/stone.png'), linear-gradient(145deg, #5a5f6d, #3a3f3d);
+  background-blend-mode: multiply;
+  background-size: cover;
   color: rgba(255, 255, 255, 0.7);
 }
 
 /* BACK - Face arrière */
 .back-indicator {
   background: linear-gradient(145deg, #2a2e52, #1a1c30);
+  background-image: url('../assets/stone.png'), linear-gradient(145deg, #2a2e52, #1a1c30);
+  background-blend-mode: multiply;
+  background-size: cover;
   color: rgba(255, 255, 255, 0.5);
 }
 
