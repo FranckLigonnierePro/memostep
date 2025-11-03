@@ -1,0 +1,57 @@
+name: Auto PR on New Issue
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      # ✅ Génère une branche dédiée
+      - name: Create fix branch
+        run: |
+          git config user.email "bot@github.com"
+          git config user.name "AutoFix Bot"
+          BRANCH="fix/issue-${{ github.event.issue.number }}"
+          git checkout -b $BRANCH
+          echo "Auto fix placeholder" > autofix.txt
+          git add .
+          git commit -m "Start fix for issue #${{ github.event.issue.number }}"
+          git push origin $BRANCH
+
+      # ✅ Crée automatiquement la Pull Request
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: "Auto fix for issue #${{ github.event.issue.number }}"
+          body: |
+            Cette PR a été générée automatiquement pour corriger l'issue #${{ github.event.issue.number }}.
+            Merci de vérifier avant de merger ✅
+          branch: fix/issue-${{ github.event.issue.number }}
+          base: main
+
+      - name: Install Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Run AI script
+        run: |
+          npm install
+          node scripts/autofix.js "${{ github.event.issue.title }}" "${{ github.event.issue.body }}"
+
+      - name: Commit AI fix
+        run: |
+          git add autofix.txt
+          git commit -m "Auto fix for issue #${{ github.event.issue.number }}"
+          git push origin $BRANCH
+
