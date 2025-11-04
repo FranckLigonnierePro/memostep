@@ -137,6 +137,14 @@ export function useChampionSelection() {
         }
         
         selectedAvatar.value = avatar;
+      } else {
+        // Première visite : présélectionner le mage lumineux
+        const mageLumineux = avatarCards.find(card => card.id === 'mage_lumineux');
+        if (mageLumineux) {
+          selectedAvatar.value = mageLumineux;
+          localStorage.setItem('selectedAvatar', JSON.stringify(mageLumineux));
+          console.log('[First Visit] Mage Lumineux présélectionné par défaut');
+        }
       }
     } catch (_) {}
   }

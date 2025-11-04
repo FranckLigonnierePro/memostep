@@ -17,7 +17,7 @@
         v-bind="routeProps"
         @start="newGame"
         @solo="() => startMode('solo')"
-        @versus="openVersusView"
+        @versus="handleVersusClick"
         @help="openHelp"
         @settings="openSettings"
         @stats="openStats"
@@ -576,22 +576,31 @@ const { openHelp, openSettings, openStats, openLang, closeOverlays, selectLang, 
 const { openProfile, openVersusView, handleCloseView, handleCloseProfileView, handleProfileSelect, handleCloseVersusView, goHome: navGoHome } = navigationHandlers;
 
 // Username modal functions
-function openNameModalIfNeeded() {
+function ensureGuestName() {
   try {
     const raw = localStorage.getItem('memostep_username');
     const saved = (raw == null ? '' : String(raw)).trim();
-    if (!saved && route.name === 'Home') {
-      nameModalInput.value = '';
-      nameError.value = '';
-      showNameModal.value = true;
+    if (!saved) {
+      // Première visite : générer un nom de guest automatiquement
+      const guestName = generateGuestName();
+      localStorage.setItem('memostep_username', guestName);
+      usernameInput.value = guestName;
+      console.log('[First Visit] Guest name generated:', guestName);
     }
   } catch (_) {
-    if (route.name === 'Home') {
-      nameModalInput.value = '';
-      nameError.value = '';
-      showNameModal.value = true;
-    }
+    // En cas d'erreur, générer quand même un nom de guest
+    const guestName = generateGuestName();
+    usernameInput.value = guestName;
   }
+}
+
+function openNameModalIfNeeded() {
+  // Cette fonction ne fait plus rien, le nom est initialisé lors du premier clic sur jouer
+}
+
+function handleVersusClick() {
+  ensureGuestName();
+  openVersusView();
 }
 
 function continueAsGuest() {
@@ -623,6 +632,9 @@ async function handleAuthSuccess() {
   if (isLinkingAccount.value) {
     isGuest.value = false;
     console.log('[Account] Account linked successfully - no longer a guest');
+  } else {
+    // New account creation - ensure guest name is set
+    ensureGuestName();
   }
   
   closeAuthModal();
@@ -645,6 +657,7 @@ function fitRootScale() {
 
 // Game functions
 function startMode(mode) {
+  ensureGuestName();
   state.mode = mode;
   router.push('/game');
   

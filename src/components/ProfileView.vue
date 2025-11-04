@@ -1,20 +1,7 @@
 <template>
   <div class="profile-view">
     <div class="profile-body mt-4">
-      <p class="profile-title">Choisis ton personnage</p>
-      <div style="display:flex; flex-direction:column; gap:8px; align-items:center; margin-bottom:8px;">
-        <input
-          v-model="username"
-          @change="saveName"
-          @keyup.enter="saveName"
-          class="input"
-          :placeholder="'Ton pseudo'"
-          style="height: 36px; width: 70%; max-width: 420px;"
-        />
-        <button v-if="isGuest" class="btn" @click="$emit('linkAccount')" style="margin-top:0;">
-          Lier un compte
-        </button>
-      </div>
+      <p class="profile-title">Progression XP</p>
 
       <!-- XP Progress Roadmap -->
       <div class="xp-roadmap-container">
@@ -77,51 +64,6 @@
           </div>
         </div>
       </div>
-      <div class="cards-grid">
-        <button
-          v-for="(card, idx) in cards"
-          :key="idx"
-          class="char-card"
-          :style="{ '--accent': card.color, '--glow': card.glow }"
-          @click="$emit('select', card)"
-        >
-          <div class="card-media">
-            <img class="char-img" :src="card.img" :alt="card.name" />
-          </div>
-          
-          <!-- Champion Info Overlay -->
-          <div class="champion-info" v-if="getChampionInfo(card.id)">
-            <div class="champion-level">Niv. {{ getChampionInfo(card.id).level }}</div>
-            <div class="champion-xp-bar">
-              <div class="champion-xp-fill" :style="{ width: getChampionXpProgress(card.id) + '%' }"></div>
-            </div>
-            <div class="champion-xp-text">{{ getChampionInfo(card.id).xp }} / {{ getChampionNextLevelXp(card.id) }} XP</div>
-          </div>
-          
-          <!-- Evolution Button -->
-          <div 
-            class="evolve-btn"
-            :class="{ disabled: !hasEnoughResources(card.id) }"
-            role="button"
-            tabindex="0"
-            @click.stop="hasEnoughResources(card.id) && handleEvolve(card.id)"
-            @keydown.enter.stop="hasEnoughResources(card.id) && handleEvolve(card.id)"
-            @keydown.space.prevent.stop="hasEnoughResources(card.id) && handleEvolve(card.id)"
-          >
-            <span class="evolve-icon">⬆️</span>
-            <span class="evolve-text">Évoluer</span>
-            <div class="evolve-cost">
-              <span class="cost-item">💰{{ getEvolutionCost(card.id).gold }}</span>
-              <span class="cost-item">✨{{ getEvolutionCost(card.id).essence }}</span>
-            </div>
-          </div>
-          
-          <div class="card-label">{{ card.name }}</div>
-          <div class="sparkles" aria-hidden="true">
-            <span v-for="n in 20" :key="n" class="p"></span>
-          </div>
-        </button>
-      </div>
       <div class="footer">
         <button class="btn" @click="$emit('close')">Retour</button>
       </div>
@@ -144,34 +86,7 @@ const props = defineProps({
   playerEssence: { type: Number, default: 0 }
 });
 
-const emit = defineEmits(['select', 'close', 'linkAccount', 'evolveChampion']);
-
-import imgCasseur from '../assets/profils/casseur.png';
-import imgDark from '../assets/profils/dark.png';
-import imgElectrik from '../assets/profils/electrik.png';
-import imgForest from '../assets/profils/forest.jpg';
-import imgFrozen from '../assets/profils/frozen.png';
-import imgGuerriere from '../assets/profils/guerriere.png';
-import imgMage from '../assets/profils/mage.png';
-import imgPixel from '../assets/profils/pixel.png';
-import imgDanseur from '../assets/profils/danseur.png';
-import imgInventeur from '../assets/profils/inventeur.png';
-import imgShadow from '../assets/profils/shadow.png';
-import imgAstre from '../assets/profils/astre.png';
-import imgColosse from '../assets/profils/colosse.png';
-import imgChrono from '../assets/profils/chrono.png';
-import imgHack from '../assets/profils/hack.png';
-import imgArchie from '../assets/profils/archie.png';
-
-const username = ref('');
-onMounted(() => {
-  try { username.value = String(localStorage.getItem('memostep_username') || '').trim(); } catch (_) { username.value = ''; }
-});
-function saveName() {
-  const v = String(username.value || '').trim();
-  try { localStorage.setItem('memostep_username', v); } catch (_) {}
-}
-const isGuest = computed(() => /^Memoguest\d{4}$/.test(String(username.value || '').trim()));
+const emit = defineEmits(['close']);
 
 const levelsList = computed(() => xpSystemData.player_xp_system.levels);
 
@@ -184,74 +99,6 @@ const nextLevelXp = computed(() => {
   if (props.playerLevel >= 50) return 0;
   return currentLevelInfo.value.xpForNextLevel || 0;
 });
-
-const cards = [
-  { id: 'guerriere', name: 'Guerrière', img: imgGuerriere, color: '#ff5a8a', glow: 'rgba(255,90,138,0.45)' },
-  { id: 'mage', name: 'Mage', img: imgMage, color: '#8b5cf6', glow: 'rgba(139,92,246,0.45)' },
-  { id: 'casseur', name: 'Casseur', img: imgCasseur, color: '#fb923c', glow: 'rgba(251,146,60,0.45)' },
-  { id: 'dark', name: 'Dark', img: imgDark, color: '#7c3aed', glow: 'rgba(124,58,237,0.45)' },
-  { id: 'electrik', name: 'Electrik', img: imgElectrik, color: '#22d3ee', glow: 'rgba(34,211,238,0.45)' },
-  { id: 'frozen', name: 'Frozen', img: imgFrozen, color: '#60a5fa', glow: 'rgba(96,165,250,0.45)' },
-  { id: 'forest', name: 'Forest', img: imgForest, color: '#34d399', glow: 'rgba(52,211,153,0.45)' },
-  { id: 'pixel', name: 'Pixel', img: imgPixel, color: '#facc15', glow: 'rgba(250,204,21,0.45)' },
-  { id: 'danseur', name: 'Danseur', img: imgDanseur, color: '#f43f5e', glow: 'rgba(244,63,94,0.45)' },
-  { id: 'inventeur', name: 'Inventeur', img: imgInventeur, color: '#14b8a6', glow: 'rgba(20,184,166,0.45)' },
-  { id: 'shadow', name: 'Shadow', img: imgShadow, color: '#0ea5e9', glow: 'rgba(14,165,233,0.45)' },
-  { id: 'astre', name: 'Astre', img: imgAstre, color: '#a3e635', glow: 'rgba(163,230,53,0.45)' },
-  { id: 'colosse', name: 'Colosse', img: imgColosse, color: '#ef4444', glow: 'rgba(239,68,68,0.45)' },
-  { id: 'chrono', name: 'Chrono', img: imgChrono, color: '#06b6d4', glow: 'rgba(6,182,212,0.45)' },
-  { id: 'hack', name: 'Hack', img: imgHack, color: '#6366f1', glow: 'rgba(99,102,241,0.45)' },
-  { id: 'archie', name: 'Archie', img: imgArchie, color: '#f59e0b', glow: 'rgba(245,158,11,0.45)' },
-];
-
-// Champion helper functions
-function getChampionInfo(championId) {
-  return props.championsState[championId];
-}
-
-function getChampionXpProgress(championId) {
-  const info = getChampionInfo(championId);
-  if (!info) return 0;
-  const nextLevelXp = getChampionNextLevelXp(championId);
-  if (nextLevelXp === 0) return 100;
-  return Math.min(100, (info.xp / nextLevelXp) * 100);
-}
-
-function getChampionNextLevelXp(championId) {
-  const info = getChampionInfo(championId);
-  if (!info || info.level >= 10) return 0;
-  // XP required increases by level: 100, 200, 300, etc.
-  return (info.level + 1) * 100;
-}
-
-function canEvolve(championId) {
-  const info = getChampionInfo(championId);
-  if (!info || !info.unlocked) return false;
-  if (info.level >= 10) return false; // Max level
-  const nextLevelXp = getChampionNextLevelXp(championId);
-  return info.xp >= nextLevelXp;
-}
-
-function getEvolutionCost(championId) {
-  const info = getChampionInfo(championId);
-  if (!info) return { gold: 0, essence: 0 };
-  const nextLevel = info.level + 1;
-  // Cost increases with level
-  return {
-    gold: nextLevel * 50,
-    essence: Math.floor(nextLevel / 2)
-  };
-}
-
-function hasEnoughResources(championId) {
-  const cost = getEvolutionCost(championId);
-  return props.playerGold >= cost.gold && props.playerEssence >= cost.essence;
-}
-
-function handleEvolve(championId) {
-  if (!hasEnoughResources(championId)) return;
-  emit('evolveChampion', championId);
-}
 </script>
 
 <style scoped>
